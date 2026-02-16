@@ -1,0 +1,39 @@
+{
+  "agents": {
+    "jinx": {
+      "persistent_name": "Jinx",
+      "universe": "Arcane",
+      "created_at": "2026-02-16T01:11:18Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "ekko": {
+      "persistent_name": "Ekko",
+      "universe": "Arcane",
+      "created_at": "2026-02-16T01:11:18Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "vi": {
+      "persistent_name": "Vi",
+      "universe": "Arcane",
+      "created_at": "2026-02-16T01:11:18Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "mylo": {
+      "persistent_name": "Mylo",
+      "universe": "Arcane",
+      "created_at": "2026-02-16T01:11:18Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "scribe": {
+      "persistent_name": "Scribe",
+      "universe": "—",
+      "created_at": "2026-02-16T01:11:18Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}
