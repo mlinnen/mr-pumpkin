@@ -5,15 +5,11 @@ on:
     # Every 30 minutes — adjust or remove if not needed
     - cron: '*/30 * * * *'
 
-  # React to completed work
+  # React to completed work or new squad work
   issues:
-    types: [closed]
+    types: [closed, labeled]
   pull_request:
     types: [closed]
-
-  # React to new squad work
-  issues:
-    types: [labeled]
 
   # Manual trigger
   workflow_dispatch:
@@ -55,7 +51,7 @@ jobs:
             const members = [];
             let inMembersTable = false;
             for (const line of lines) {
-              if (line.startsWith('## Members')) {
+              if (line.match(/^##\s+(Members|Team Roster)/i)) {
                 inMembersTable = true;
                 continue;
               }
