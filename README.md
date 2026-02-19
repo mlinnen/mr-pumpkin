@@ -111,7 +111,34 @@ Edit `pumpkin_face.py` to customize:
 
 - **pumpkin_face.py**: Main application with rendering and network server
 - **client_example.py**: Example client for sending commands
-- **requirements.txt**: Python dependencies (pygame)
+- **test_projection_mapping.py**: Test suite for projection mapping feature
+- **requirements.txt**: Python dependencies (pygame, pytest)
+
+## Testing
+
+Run the test suite to validate projection mapping and other features:
+
+```bash
+# Install test dependencies
+pip install -r requirements.txt
+
+# Run all tests
+pytest test_projection_mapping.py -v
+
+# Run specific test class
+pytest test_projection_mapping.py::TestProjectionMappingColors -v
+
+# Run with detailed output
+pytest test_projection_mapping.py -vv
+```
+
+The test suite validates:
+- Black background (RGB 0,0,0) for projection mapping
+- White features (RGB 255,255,255) for eyes, nose, mouth
+- Minimum 15:1 contrast ratio for reliable projection
+- All expression states render correctly
+- Resolution independence
+- Transition behavior
 
 ## License
 
