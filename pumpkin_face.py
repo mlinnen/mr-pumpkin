@@ -27,29 +27,16 @@ class PumpkinFace:
         self.transition_progress = 1.0
         self.transition_speed = 0.05
         
-        # Colors
-        self.PUMPKIN_COLOR = (255, 140, 0)
-        self.EYE_COLOR = (0, 0, 0)
-        self.WHITE = (255, 255, 255)
-        self.DARK_BROWN = (101, 67, 33)
+        # Colors - optimized for projection mapping
+        self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
+        self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
         
     def draw(self, surface: pygame.Surface):
-        surface.fill((240, 240, 240))
+        # Black background for projection
+        surface.fill(self.BACKGROUND_COLOR)
         
         center_x = self.width // 2
         center_y = self.height // 2
-        
-        # Draw pumpkin body (circle)
-        pumpkin_radius = 300
-        pygame.draw.circle(surface, self.PUMPKIN_COLOR, (center_x, center_y), pumpkin_radius)
-        
-        # Draw pumpkin ridges
-        ridge_count = 8
-        for i in range(ridge_count):
-            angle = (i / ridge_count) * 2 * math.pi
-            ridge_x = int(center_x + pumpkin_radius * 0.9 * math.cos(angle))
-            ridge_y = int(center_y + pumpkin_radius * 0.9 * math.sin(angle))
-            pygame.draw.circle(surface, self.DARK_BROWN, (ridge_x, ridge_y), 20, 2)
         
         # Calculate eye and mouth positions based on expression
         left_eye_pos, right_eye_pos = self._get_eye_positions(center_x, center_y)
@@ -118,35 +105,33 @@ class PumpkinFace:
         elif self.current_expression == Expression.SCARED:
             eye_radius = 45
         
-        # Left eye
-        pygame.draw.circle(surface, self.EYE_COLOR, left_pos, eye_radius)
-        pygame.draw.circle(surface, self.WHITE, left_pos, eye_radius, 3)
+        # Left eye - white filled circle for projection
+        pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
         
-        # Right eye
-        pygame.draw.circle(surface, self.EYE_COLOR, right_pos, eye_radius)
-        pygame.draw.circle(surface, self.WHITE, right_pos, eye_radius, 3)
+        # Right eye - white filled circle for projection
+        pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
         
-        # Draw pupils
+        # Draw pupils as black circles
         pupil_radius = 15
-        pygame.draw.circle(surface, self.WHITE, (left_pos[0] - 10, left_pos[1] - 10), pupil_radius)
-        pygame.draw.circle(surface, self.WHITE, (right_pos[0] - 10, right_pos[1] - 10), pupil_radius)
+        pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - 10, left_pos[1] - 10), pupil_radius)
+        pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - 10, right_pos[1] - 10), pupil_radius)
     
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:
             if self.current_expression == Expression.SURPRISED:
-                # O-shaped mouth
-                pygame.draw.circle(surface, self.EYE_COLOR, (self.width // 2, self.height // 2 + 80), 30)
+                # O-shaped mouth - white filled circle
+                pygame.draw.circle(surface, self.FEATURE_COLOR, (self.width // 2, self.height // 2 + 80), 30)
             elif self.current_expression == Expression.SCARED:
-                # Scared mouth
-                pygame.draw.ellipse(surface, self.EYE_COLOR, 
+                # Scared mouth - white filled ellipse
+                pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
                                    (self.width // 2 - 40, self.height // 2 + 70, 80, 50))
             return
         
-        # Draw lines between consecutive points
+        # Draw thick white lines for mouth curves
         for i in range(len(points) - 1):
             p1 = (int(points[i][0]), int(points[i][1]))
             p2 = (int(points[i+1][0]), int(points[i+1][1]))
-            pygame.draw.line(surface, self.DARK_BROWN, p1, p2, 4)
+            pygame.draw.line(surface, self.FEATURE_COLOR, p1, p2, 8)
     
     def set_expression(self, expression: Expression):
         if expression != self.current_expression:
