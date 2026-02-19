@@ -29,3 +29,13 @@
 - **Git commits:** Include issue/task reference when available
 - **Testing:** Unit tests for core logic, integration tests for state + rendering
 - **Expressions:** Modular design — each expression is a composable state
+
+---
+
+## Issue Source
+
+| Field | Value |
+|-------|-------|
+| **Repository** | mlinnen/mr-pumpkin |
+| **Connected** | 2026-02-19 |
+| **Filters** | all open |
