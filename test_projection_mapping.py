@@ -540,8 +540,8 @@ class TestSleepingExpression:
             
             # Find white pixels in eye area
             has_white = False
-            for x in range(200, 600, 20):
-                for y in range(200, 350, 20):
+            for x in range(200, 600, 5):
+                for y in range(200, 350, 5):
                     if surface.get_at((x, y))[:3] == (255, 255, 255):
                         has_white = True
                         break
