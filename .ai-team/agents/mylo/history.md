@@ -48,3 +48,35 @@
 - Eye/mouth coordinate sampling uses approximate positions - may need adjustment
 - Parametrized tests for all six expression states
 - Edge case tests for resolution independence and rapid changes
+
+### Sleeping Expression Tests (Issue #4) - 2026-02-19
+**Proactive testing approach**: Wrote comprehensive test suite before implementation landed
+
+**Patterns used from existing tests:**
+- Fixture-based setup (pumpkin_projection) for consistent pygame initialization
+- Pixel sampling strategy at specific coordinates to verify visual output
+- Contrast ratio calculation using WCAG luminance formula (15:1 minimum)
+- Binary color validation (only black 0,0,0 and white 255,255,255 allowed)
+- Transition testing between all expression states
+- Socket command and keyboard shortcut validation
+
+**Edge cases discovered during test writing:**
+- Closed eyes (horizontal lines) vs open eyes (circles) require different sampling strategy
+  - Horizontal sampling along line for sleeping eyes
+  - Vertical sampling to verify no circular pupil patterns
+- Bidirectional transitions: both TO sleeping (from 6 expressions) and FROM sleeping (to 6 expressions)
+- No pupils visible test distinguishes closed eyes from open eyes structurally
+- Keyboard shortcut 7 mapping requires testing _handle_keyboard_input method directly
+
+**Test structure for sleeping expression:**
+1. Enum existence and value validation
+2. Visual rendering (white horizontal lines)
+3. Absence of pupils (structural difference from open eyes)
+4. Projection mapping compliance (contrast + binary colors)
+5. State transitions (6 to sleeping, sleeping to 6)
+6. Command interfaces (socket "sleeping", keyboard 7)
+
+**Collaboration notes:**
+- Tests written while Ekko implements the feature (parallel development)
+- May require minor coordinate adjustments once implementation details finalized
+- Expression.SLEEPING enum and keyboard mapping (K_7) will need to be added by implementation
