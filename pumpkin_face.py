@@ -13,6 +13,7 @@ class Expression(Enum):
     ANGRY = "angry"
     SURPRISED = "surprised"
     SCARED = "scared"
+    SLEEPING = "sleeping"
 
 class PumpkinFace:
     def __init__(self, width: int = 1920, height: int = 1080, monitor: int = 0, fullscreen: bool = True):
@@ -104,6 +105,22 @@ class PumpkinFace:
             eye_radius = 50
         elif self.current_expression == Expression.SCARED:
             eye_radius = 45
+        
+        # Sleeping expression - closed eyes as horizontal white lines
+        if self.current_expression == Expression.SLEEPING:
+            line_width = 60
+            line_thickness = 8
+            # Left closed eye
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (left_pos[0] - line_width // 2, left_pos[1]), 
+                           (left_pos[0] + line_width // 2, left_pos[1]), 
+                           line_thickness)
+            # Right closed eye
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (right_pos[0] - line_width // 2, right_pos[1]), 
+                           (right_pos[0] + line_width // 2, right_pos[1]), 
+                           line_thickness)
+            return
         
         # Left eye - white filled circle for projection
         pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
@@ -228,6 +245,7 @@ class PumpkinFace:
             pygame.K_4: Expression.ANGRY,
             pygame.K_5: Expression.SURPRISED,
             pygame.K_6: Expression.SCARED,
+            pygame.K_7: Expression.SLEEPING,
         }
         if key in mapping:
             self.set_expression(mapping[key])
