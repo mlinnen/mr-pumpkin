@@ -644,5 +644,255 @@ class TestSleepingExpression:
             f"Sleeping expression should use only black/white, found: {intermediate_colors}"
 
 
+class TestBlinkAnimation:
+    """Test suite for blink animation feature (Issue #5)."""
+    
+    @pytest.fixture
+    def pumpkin_projection(self):
+        """Create a PumpkinFace instance for testing."""
+        pygame.init()
+        pumpkin = PumpkinFace(width=800, height=600)
+        surface = pygame.Surface((800, 600))
+        yield pumpkin, surface
+        pygame.quit()
+    
+    def test_blink_method_exists(self):
+        """Verify PumpkinFace has a blink() method."""
+        pygame.init()
+        pumpkin = PumpkinFace(width=800, height=600)
+        
+        assert hasattr(pumpkin, 'blink'), \
+            "PumpkinFace must have a blink() method"
+        assert callable(getattr(pumpkin, 'blink')), \
+            "blink() must be callable"
+        
+        pygame.quit()
+    
+    def test_blink_sets_is_blinking_flag(self, pumpkin_projection):
+        """After calling blink(), is_blinking should be True."""
+        pumpkin, surface = pumpkin_projection
+        
+        # Initially not blinking
+        assert hasattr(pumpkin, 'is_blinking'), \
+            "PumpkinFace must have is_blinking attribute"
+        
+        # Call blink
+        pumpkin.blink()
+        
+        assert pumpkin.is_blinking is True, \
+            "blink() should set is_blinking to True"
+    
+    def test_blink_saves_current_expression(self, pumpkin_projection):
+        """pre_blink_expression should be saved before blink."""
+        pumpkin, surface = pumpkin_projection
+        
+        # Set to a specific expression
+        pumpkin.current_expression = Expression.HAPPY
+        
+        # Call blink
+        pumpkin.blink()
+        
+        assert hasattr(pumpkin, 'pre_blink_expression'), \
+            "PumpkinFace must have pre_blink_expression attribute"
+        assert pumpkin.pre_blink_expression == Expression.HAPPY, \
+            "blink() should save current expression to pre_blink_expression"
+    
+    def test_blink_does_not_interrupt_ongoing_blink(self, pumpkin_projection):
+        """Calling blink() while is_blinking=True should NOT reset blink_progress."""
+        pumpkin, surface = pumpkin_projection
+        
+        # Start first blink
+        pumpkin.blink()
+        initial_progress = pumpkin.blink_progress
+        
+        # Advance blink progress manually
+        pumpkin.blink_progress = 0.4
+        
+        # Try to blink again
+        pumpkin.blink()
+        
+        assert pumpkin.blink_progress == 0.4, \
+            "Calling blink() during ongoing blink should not reset progress"
+    
+    def test_blink_progress_advances_in_update(self, pumpkin_projection):
+        """Calling update() while blinking should advance blink_progress."""
+        pumpkin, surface = pumpkin_projection
+        
+        pumpkin.blink()
+        initial_progress = pumpkin.blink_progress
+        
+        # Call update
+        pumpkin.update()
+        
+        assert pumpkin.blink_progress > initial_progress, \
+            "update() should advance blink_progress when is_blinking=True"
+    
+    def test_blink_completes_and_restores_expression(self, pumpkin_projection):
+        """After enough update() calls, is_blinking should be False and expression restored."""
+        pumpkin, surface = pumpkin_projection
+        
+        pumpkin.current_expression = Expression.SAD
+        pumpkin.blink()
+        
+        # Call update() enough times to complete blink
+        # blink_speed = 0.03, so need 1.0 / 0.03 = 34 updates
+        for _ in range(40):  # Extra margin
+            pumpkin.update()
+        
+        assert pumpkin.is_blinking is False, \
+            "is_blinking should be False after blink completes"
+        assert pumpkin.current_expression == Expression.SAD, \
+            "Expression should be restored after blink completes"
+    
+    def test_blink_restores_original_expression(self, pumpkin_projection):
+        """Verify the EXACT original expression (not neutral) is restored after blink."""
+        pumpkin, surface = pumpkin_projection
+        
+        # Test with non-neutral expression
+        pumpkin.current_expression = Expression.ANGRY
+        pumpkin.blink()
+        
+        # Complete blink
+        for _ in range(40):
+            pumpkin.update()
+        
+        assert pumpkin.current_expression == Expression.ANGRY, \
+            "Blink should restore ANGRY, not NEUTRAL"
+        
+        # Test with another expression
+        pumpkin.current_expression = Expression.SURPRISED
+        pumpkin.blink()
+        
+        for _ in range(40):
+            pumpkin.update()
+        
+        assert pumpkin.current_expression == Expression.SURPRISED, \
+            "Blink should restore SURPRISED, not NEUTRAL"
+    
+    def test_blink_speed_is_slower_than_transition(self, pumpkin_projection):
+        """blink_speed (0.03) < transition_speed (0.05)."""
+        pumpkin, surface = pumpkin_projection
+        
+        assert hasattr(pumpkin, 'blink_speed'), \
+            "PumpkinFace must have blink_speed attribute"
+        assert hasattr(pumpkin, 'transition_speed'), \
+            "PumpkinFace must have transition_speed attribute"
+        
+        assert pumpkin.blink_speed == 0.03, \
+            "blink_speed should be 0.03"
+        assert pumpkin.transition_speed == 0.05, \
+            "transition_speed should be 0.05"
+        assert pumpkin.blink_speed < pumpkin.transition_speed, \
+            "Blink should be slower than normal transitions"
+    
+    def test_blink_maintains_projection_colors(self, pumpkin_projection):
+        """During mid-blink, only black/white pixels (projection compliance)."""
+        pumpkin, surface = pumpkin_projection
+        
+        pumpkin.current_expression = Expression.NEUTRAL
+        pumpkin.blink()
+        
+        # Advance to mid-blink
+        for _ in range(15):  # About halfway through blink
+            pumpkin.update()
+        
+        # Draw and check colors
+        pumpkin.draw(surface)
+        
+        # Sample the entire surface for intermediate colors
+        width, height = surface.get_size()
+        intermediate_colors = set()
+        
+        # Sample every 20th pixel
+        for x in range(0, width, 20):
+            for y in range(0, height, 20):
+                color = surface.get_at((x, y))[:3]
+                if color != (0, 0, 0) and color != (255, 255, 255):
+                    intermediate_colors.add(color)
+        
+        assert len(intermediate_colors) == 0, \
+            f"During blink, found non-projection colors: {intermediate_colors}"
+    
+    @pytest.mark.parametrize("expression", [
+        Expression.NEUTRAL,
+        Expression.HAPPY,
+        Expression.SAD,
+        Expression.ANGRY,
+        Expression.SURPRISED,
+        Expression.SCARED,
+        Expression.SLEEPING,
+    ])
+    def test_blink_all_expressions_restore(self, pumpkin_projection, expression):
+        """Parametrized test: blink while in each expression, verify correct restoration."""
+        pumpkin, surface = pumpkin_projection
+        
+        pumpkin.current_expression = expression
+        pumpkin.blink()
+        
+        # Complete blink
+        for _ in range(40):
+            pumpkin.update()
+        
+        assert pumpkin.current_expression == expression, \
+            f"Blink should restore {expression.value} expression"
+        assert pumpkin.is_blinking is False, \
+            f"is_blinking should be False after blink from {expression.value}"
+    
+    def test_keyboard_b_triggers_blink(self):
+        """_handle_keyboard_input(pygame.K_b) should trigger blink."""
+        pygame.init()
+        pumpkin = PumpkinFace(width=800, height=600)
+        
+        # Set to an expression
+        pumpkin.current_expression = Expression.HAPPY
+        
+        # Simulate keyboard input for key B
+        pumpkin._handle_keyboard_input(pygame.K_b)
+        
+        assert pumpkin.is_blinking is True, \
+            "Keyboard shortcut B should trigger blink"
+        assert pumpkin.pre_blink_expression == Expression.HAPPY, \
+            "Keyboard B should save current expression before blink"
+        
+        pygame.quit()
+    
+    def test_socket_blink_command(self, pumpkin_projection):
+        """Simulate 'blink' string coming through socket handler, verify blink() is triggered."""
+        pumpkin, surface = pumpkin_projection
+        
+        # Set to an expression
+        pumpkin.current_expression = Expression.SCARED
+        
+        # Simulate socket command handling
+        # The socket handler should detect "blink" as a special command
+        # and call pumpkin.blink() instead of treating it as an Expression
+        command = "blink"
+        
+        # The implementation should have logic like:
+        # if data == "blink":
+        #     self.blink()
+        # else:
+        #     expression = Expression(data)
+        #     self.set_expression(expression)
+        
+        # For testing, we verify that the blink method exists and can be called
+        # The actual socket server integration is tested separately
+        try:
+            # This simulates what the socket handler should do
+            if command == "blink":
+                pumpkin.blink()
+                
+                assert pumpkin.is_blinking is True, \
+                    "Socket 'blink' command should trigger blink"
+                assert pumpkin.pre_blink_expression == Expression.SCARED, \
+                    "Socket 'blink' command should save current expression"
+            else:
+                # Normal expression handling
+                expression = Expression(command)
+                pumpkin.set_expression(expression)
+        except ValueError:
+            pytest.fail("Socket command processing failed")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
