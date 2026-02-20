@@ -151,3 +151,104 @@ pytest>=7.0.0,<9.0.0
 **Owner:** Vi (Backend/Scripts)  
 **Reviewer:** Jinx (Architecture)  
 **Dependencies:** None
+
+---
+
+## Blink Animation Implementation — Ekko
+
+**Date:** 2026-02-20  
+**By:** Ekko (Graphics Dev)  
+**Issue:** #5 — Add a blink animation  
+**PR:** #7
+
+Blink animation is implemented as an orthogonal animation system separate from the expression state machine, using `is_blinking` flag + `blink_progress` counter rather than as an Expression enum value.
+
+The existing animation system uses Expression enum values with `current_expression` → `target_expression` transitions. A blink is fundamentally different: it's a temporary overlay that must return to the EXACT same expression afterward, not transition to a new state.
+
+**Alternatives Considered:**
+1. **Add BLINKING as Expression enum value** — Rejected because it would require complex state tracking to remember which expression to return to, and wouldn't compose well with expression transitions
+2. **Interrupt expression transitions** — Rejected because it would create jarring visual glitches
+3. **Orthogonal state system** — Chosen for clean separation of concerns
+
+**State Variables (added to `__init__`):**
+```python
+self.is_blinking = False
+self.blink_progress = 0.0
+self.blink_speed = 0.03  # Slower than transition_speed (0.05)
+self.pre_blink_expression = None
+```
+
+**Animation Phases:**
+- **Closing:** progress 0.0 → 0.5, eye_scale 1.0 → 0.0
+- **Hold closed:** progress 0.5 → 0.55 (~100ms hold at 60 FPS)
+- **Opening:** progress 0.55 → 1.0, eye_scale 0.0 → 1.0
+
+**Rendering Strategy:**
+- Eyes render as vertically-scaled ellipses during partial blink (eye_scale < 1.0)
+- When fully closed (eye_scale == 0.0), reuse sleeping expression's horizontal white lines
+- Pupils scale proportionally to maintain visual coherence
+- All states use pure black/white for projection mapping compliance
+
+**Command Handling:**
+- Socket server checks `data == "blink"` BEFORE `Expression(data)` parsing
+- Keyboard `B` key triggers blink
+- Guard prevents interrupting ongoing blink: `if not self.is_blinking`
+
+**Benefits:**
+1. **Composability:** Blink can overlay any expression without disrupting the expression state machine
+2. **Clean separation:** Expression logic and blink logic don't interfere with each other
+3. **Reusability:** Closed-eye rendering pattern from sleeping expression is reused
+4. **Extensibility:** Future animations (wink, eye dart) can follow same orthogonal pattern
+
+**Trade-offs:**
+- Slightly more complex state management (two parallel systems)
+- Must ensure both systems use compatible rendering (maintained via eye_scale abstraction)
+
+**Validation:**
+- Manual testing confirmed smooth blink animation at 60 FPS
+- Socket command `"blink"` triggers animation successfully
+- Keyboard `B` shortcut works as expected
+- Returns to original expression after completion
+- Pure black/white rendering maintained throughout animation
+
+---
+
+## Blink Test Architecture — Mylo
+
+**By:** Mylo (Tester)  
+**Date:** 2026-02-20  
+**Issue:** #5 — Add a blink animation
+
+Comprehensive test suite (12 tests) covering state machine behavior, animation phases, and integration points for blink animation feature.
+
+**Why:**
+- Blink is fundamentally different from expression transitions — it's a temporary animation detour that must restore the original state
+- Animation progress tracking (0.0 to 1.0) requires different testing approach than static expression states
+- Non-interrupting behavior is critical: calling blink() during blink should not reset progress
+- Expression restoration must be EXACT (not default to NEUTRAL) — this is user-facing correctness
+
+**Key Design Choices:**
+
+1. **State Machine Validation Over Visual Testing** — Unlike expression tests that sample pixels, blink tests validate `is_blinking` flag lifecycle, `blink_progress` advancement per update() call, and `pre_blink_expression` preservation. Animation correctness is a state machine problem first, rendering problem second.
+
+2. **Iteration Count for Completion Tests** — Tests use 40 update() calls to complete blink (blink_speed=0.03 → 34 updates theoretical, 40 for margin). Deterministic completion testing without timing dependencies.
+
+3. **Parametrized Test for All 7 Expressions** — Single test multiplied across NEUTRAL, HAPPY, SAD, ANGRY, SURPRISED, SCARED, SLEEPING. Blink must work correctly from ANY starting expression. Parametrization prevents copy-paste test sprawl.
+
+4. **Socket "blink" as Non-Enum Command** — Test validates "blink" string triggers blink() method, NOT Expression enum parsing. Establishes pattern for future animation commands (wink, nod, etc.) without polluting Expression enum.
+
+5. **Speed Differential Validation** — Explicit test: `blink_speed (0.03) < transition_speed (0.05)`. Blink feeling natural depends on being SLOWER than expression changes. This is a UX requirement codified in tests.
+
+**Test Coverage Gaps (Acknowledged):**
+- Exact visual rendering of eye closure phases not tested (covered by projection mapping tests)
+- Blink during mid-expression transition is edge case — implementation may choose to block or queue
+- Rapid blink rate-limiting is UX polish, not core functionality
+
+**Impact on Future Work:** This test pattern establishes a template for future animation commands (wink, nod, bounce), state machine testing over pixel-sampling for animations, and the socket command extension point (string commands beyond Expression enum).
+
+**Risks:**
+- Tests assume 40 iterations sufficient for all frame rates (60fps = 0.67 seconds)
+- No validation of VISUAL smoothness, only state correctness
+- Keyboard shortcut B may conflict with future features
+
+These tests were written BEFORE implementation landed (parallel to Ekko's work on squad/5-blink-animation branch).
