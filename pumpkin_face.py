@@ -13,6 +13,7 @@ class Expression(Enum):
     ANGRY = "angry"
     SURPRISED = "surprised"
     SCARED = "scared"
+    SLEEPING = "sleeping"
 
 class PumpkinFace:
     def __init__(self, width: int = 1920, height: int = 1080, monitor: int = 0, fullscreen: bool = True):
@@ -26,6 +27,12 @@ class PumpkinFace:
         self.target_expression = Expression.NEUTRAL
         self.transition_progress = 1.0
         self.transition_speed = 0.05
+        
+        # Blink animation state
+        self.is_blinking = False
+        self.blink_progress = 0.0
+        self.blink_speed = 0.03  # Slower than transition_speed (0.05)
+        self.pre_blink_expression = None  # Expression to return to after blink
         
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
@@ -105,16 +112,62 @@ class PumpkinFace:
         elif self.current_expression == Expression.SCARED:
             eye_radius = 45
         
-        # Left eye - white filled circle for projection
-        pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
+        # Calculate blink state
+        eye_scale = 1.0
+        if self.is_blinking:
+            if self.blink_progress <= 0.5:
+                # Closing phase (0.0 to 0.5)
+                eye_scale = 1.0 - (self.blink_progress * 2.0)
+            elif self.blink_progress <= 0.55:
+                # Hold closed (0.5 to 0.55)
+                eye_scale = 0.0
+            else:
+                # Opening phase (0.55 to 1.0)
+                eye_scale = (self.blink_progress - 0.55) / 0.45
         
-        # Right eye - white filled circle for projection
-        pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
+        # Sleeping expression or fully closed blink - closed eyes as horizontal white lines
+        if self.current_expression == Expression.SLEEPING or (self.is_blinking and eye_scale == 0.0):
+            line_width = 60
+            line_thickness = 8
+            # Left closed eye
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (left_pos[0] - line_width // 2, left_pos[1]), 
+                           (left_pos[0] + line_width // 2, left_pos[1]), 
+                           line_thickness)
+            # Right closed eye
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (right_pos[0] - line_width // 2, right_pos[1]), 
+                           (right_pos[0] + line_width // 2, right_pos[1]), 
+                           line_thickness)
+            return
         
-        # Draw pupils as black circles
-        pupil_radius = 15
-        pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - 10, left_pos[1] - 10), pupil_radius)
-        pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - 10, right_pos[1] - 10), pupil_radius)
+        # Scale eye height for blink animation
+        scaled_radius_vertical = int(eye_radius * eye_scale)
+        if scaled_radius_vertical == 0:
+            scaled_radius_vertical = 1  # Minimum for rendering
+        
+        # Left eye - white filled ellipse for projection (scaled vertically during blink)
+        if eye_scale < 1.0:
+            pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
+                              (left_pos[0] - eye_radius, left_pos[1] - scaled_radius_vertical,
+                               eye_radius * 2, scaled_radius_vertical * 2))
+        else:
+            pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
+        
+        # Right eye - white filled ellipse for projection (scaled vertically during blink)
+        if eye_scale < 1.0:
+            pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
+                              (right_pos[0] - eye_radius, right_pos[1] - scaled_radius_vertical,
+                               eye_radius * 2, scaled_radius_vertical * 2))
+        else:
+            pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
+        
+        # Draw pupils as black circles (scale with eye)
+        pupil_radius = int(15 * eye_scale)
+        pupil_offset = int(10 * eye_scale)
+        if pupil_radius > 0:
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - pupil_offset, left_pos[1] - pupil_offset), pupil_radius)
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - pupil_offset, right_pos[1] - pupil_offset), pupil_radius)
     
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:
@@ -138,7 +191,23 @@ class PumpkinFace:
             self.target_expression = expression
             self.transition_progress = 0.0
     
+    def blink(self):
+        if not self.is_blinking:  # Don't interrupt an ongoing blink
+            self.is_blinking = True
+            self.blink_progress = 0.0
+            self.pre_blink_expression = self.current_expression
+    
     def update(self):
+        # Handle blink animation
+        if self.is_blinking:
+            self.blink_progress += self.blink_speed
+            if self.blink_progress >= 1.0:
+                self.is_blinking = False
+                self.blink_progress = 0.0
+                # Restore original expression after blink
+                self.current_expression = self.pre_blink_expression
+        
+        # Handle expression transitions
         if self.transition_progress < 1.0:
             self.transition_progress += self.transition_speed
             if self.transition_progress >= 1.0:
@@ -228,9 +297,12 @@ class PumpkinFace:
             pygame.K_4: Expression.ANGRY,
             pygame.K_5: Expression.SURPRISED,
             pygame.K_6: Expression.SCARED,
+            pygame.K_7: Expression.SLEEPING,
         }
         if key in mapping:
             self.set_expression(mapping[key])
+        elif key == pygame.K_b:
+            self.blink()
     
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -249,6 +321,12 @@ class PumpkinFace:
                         data = client_socket.recv(1024).decode('utf-8').strip().lower()
                         if not data:
                             break
+                        
+                        # Handle blink command
+                        if data == "blink":
+                            self.blink()
+                            print("Blink animation triggered")
+                            continue
                         
                         try:
                             expression = Expression(data)

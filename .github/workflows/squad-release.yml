@@ -36,6 +36,11 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Version: $VERSION (tag: v$VERSION)"
 
+      - name: Build release package
+        run: |
+          python scripts/package_release.py
+          echo "✅ Release ZIP created"
+
       - name: Check if tag already exists
         id: check_tag
         run: |
@@ -63,7 +68,8 @@ jobs:
           gh release create "${{ steps.version.outputs.tag }}" \
             --title "${{ steps.version.outputs.tag }}" \
             --generate-notes \
-            --latest
+            --latest \
+            mr-pumpkin-v${{ steps.version.outputs.version }}.zip
 
       - name: Verify release
         if: steps.check_tag.outputs.exists == 'false'
