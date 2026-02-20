@@ -13,9 +13,45 @@ A standalone Python program that renders an animated pumpkin face on fullscreen 
 
 ## Installation
 
-1. Install dependencies:
+### Option 1: Download Release Package (Recommended)
+
+1. **Download the latest release** from [GitHub Releases](https://github.com/mlinnen/mr-pumpkin/releases)
+2. **Extract the ZIP file:**
+   ```bash
+   unzip mr-pumpkin-v0.1.0.zip
+   cd mr-pumpkin-v0.1.0
+   ```
+3. **Run the install script:**
+   
+   **Linux/macOS/Raspberry Pi:**
+   ```bash
+   chmod +x install.sh
+   ./install.sh
+   ```
+   
+   **Windows (PowerShell):**
+   ```powershell
+   .\install.ps1
+   ```
+
+The install script will:
+- Install SDL2 system dependencies (Linux/Raspberry Pi only)
+- Install Python dependencies via pip
+- Provide usage instructions
+
+### Option 2: Install from Source
+
+1. Clone the repository and install dependencies:
 ```bash
+git clone https://github.com/mlinnen/mr-pumpkin.git
+cd mr-pumpkin
 pip install -r requirements.txt
+```
+
+**Note:** On Raspberry Pi or Linux, you may need to install SDL2 system libraries first:
+```bash
+sudo apt-get update
+sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 ```
 
 ## Usage
