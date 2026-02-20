@@ -38,3 +38,32 @@
 - **pumpkin_face.py**: Core rendering with projection-safe colors (BACKGROUND_COLOR, FEATURE_COLOR) baked into base class
 - **test_projection_mapping.py**: 6 test classes validating color purity, contrast, expressions, and edge cases
 - **blog-post-projection-mapping.md**: Narrative explanation of projection mapping architecture for team + developer audience
+
+### Issue Triage Session (2026-02-20)
+
+**Codebase findings:**
+- **Current expression system:** 6 expressions (neutral, happy, sad, angry, surprised, scared) via enum
+- **Transition architecture:** Linear interpolation with `transition_progress` (0.0 → 1.0) and configurable `transition_speed`
+- **Socket server:** Port 5000, accepts expression names as strings, converts to enum via `Expression(data)`
+- **Keyboard shortcuts:** Keys 1-6 map to expressions, ESC exits
+- **Cross-platform design:** Pure Python + pygame, no OS-specific code, works on Windows/Linux/macOS/Raspberry Pi
+- **Dependencies:** pygame (rendering), pytest (testing) — both cross-platform
+- **Release infrastructure:** GitHub Actions workflow already creates releases from `VERSION` file
+
+**Triage decisions:**
+- **Issue #4 (Sleeping expression):** Graphics work (closed eyes) → Ekko; Backend (add enum + command) → Vi; Testing → Mylo. Low complexity, 1-2 hours.
+- **Issue #5 (Blink animation):** Animation architecture (temporary state change with slower timing) → Ekko; Testing → Mylo. Medium complexity, 3-4 hours. Requires new animation pattern (blink is not an expression, it's a temporary detour that returns to original state).
+
+**Release package architectural decisions:**
+- **Distribution model:** ZIP archive with install scripts (not pip package) — this is a standalone application, not a library
+- **Platform support:** Cross-platform by default, Raspberry Pi as first-class target (requires SDL2 system dependencies on Linux)
+- **Dependency pinning:** Semi-pinned (major version constraints) — `pygame>=2.0.0,<3.0.0` allows security patches, blocks breaking changes
+- **Exclusions:** `.ai-team/`, `.github/`, `.git/`, `__pycache__/`, `.copilot/` — end users don't need squad coordination files or CI/CD workflows
+- **Inclusions:** Core scripts (pumpkin_face.py, client_example.py), README, requirements.txt, VERSION, test suite (useful for users to validate setup)
+- **Automation strategy:** Modify `squad-release.yml` to create ZIP archive and attach to GitHub Release as asset
+
+**Key architectural insight for blink animation:**
+- Current transition system is expression-to-expression (stateful)
+- Blink is expression-to-closed-to-same-expression (temporary detour)
+- Solution: Add `is_blinking` flag + separate `blink_progress` counter, orthogonal to expression transitions
+- Socket command `"blink"` triggers animation method, not enum value change
