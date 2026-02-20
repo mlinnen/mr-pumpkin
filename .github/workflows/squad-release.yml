@@ -15,17 +15,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v5
         with:
-          node-version: 22
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       - name: Run tests
-        run: node --test test/*.test.js
+        run: python -m pytest
 
-      - name: Read version from package.json
+      - name: Read version from VERSION file
         id: version
         run: |
-          VERSION=$(node -e "console.log(require('./package.json').version)")
+          VERSION=$(cat VERSION | tr -d '[:space:]')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
           echo "📦 Version: $VERSION (tag: v$VERSION)"
