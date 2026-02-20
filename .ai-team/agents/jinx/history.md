@@ -14,6 +14,12 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
+### .ai-team/ Branch Tracking Policy (2026-02-20)
+- **Root cause**: `.ai-team/` and `.ai-team-templates/` were tracked on `dev` but had been manually removed from `preview` via `git rm` in commit `2cb5057`. The `.gitignore` on `preview` (and `main`) did NOT list these directories, meaning any future dev→preview merge would re-introduce them into tracking.
+- **Fix applied**: Added `.ai-team/` and `.ai-team-templates/` to `.gitignore` on both `preview` and `main`. On `main` this was already done; on `preview` it was missing and added.
+- **Git strategy for future-proofing**: `.gitignore` alone does NOT prevent re-tracking if a merge commit brings tracked files in from another branch. The authoritative prevention is: (1) `.gitignore` entries on preview/main, (2) manual `git rm -r --cached .ai-team/ .ai-team-templates/` after any dev→preview merge, and (3) the CI validation check in `squad-preview.yml` acts as the safety net to catch any slip.
+- **Decision filed**: `decisions/inbox/jinx-ai-team-tracking-policy.md`
+
 ### Projection Mapping Architecture
 - **Pure contrast design principle**: Projection mapping on 3D surfaces demands binary color schemes (black/white) rather than gradients or intermediate tones. Falloff at oblique angles eliminates gray values entirely.
 - **Projection-first, not projection-optional**: Build the core rendering around projection constraints rather than adding a feature flag. Single pipeline reduces bugs and makes all future features projection-ready by design.
