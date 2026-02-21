@@ -49,7 +49,7 @@ class PumpkinFace:
         self.rolling_direction = 'clockwise'  # 'clockwise' or 'counterclockwise'
         self.rolling_duration = 1.0  # 360° rotation in 1 second
         self.rolling_speed = 0.01  # Speed of rolling progress per frame
-        self.pupil_angle = 315.0  # Current pupil angle in degrees (315° = upper-left)
+        self.pupil_angle = 225.0  # Current pupil angle in degrees (225° = upper-left)
         
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
@@ -179,12 +179,21 @@ class PumpkinFace:
         else:
             pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
         
-        # Draw pupils as black circles (scale with eye)
+        # Draw pupils as black circles (scale with eye, position based on circular motion)
         pupil_radius = int(15 * eye_scale)
-        pupil_offset = int(10 * eye_scale)
+        # Original pupils at (center - 10, center - 10) = sqrt(200) radius at 225°
+        # For compatibility, use sqrt(200) ≈ 14.14 orbit radius
+        pupil_orbit_radius = int(math.sqrt(200) * eye_scale)
         if pupil_radius > 0:
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - pupil_offset, left_pos[1] - pupil_offset), pupil_radius)
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - pupil_offset, right_pos[1] - pupil_offset), pupil_radius)
+            # Calculate pupil position using circular motion around eye center
+            angle_rad = math.radians(self.pupil_angle)
+            left_pupil_x = int(left_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
+            left_pupil_y = int(left_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
+            right_pupil_x = int(right_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
+            right_pupil_y = int(right_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
+            
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pupil_x, left_pupil_y), pupil_radius)
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pupil_x, right_pupil_y), pupil_radius)
     
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:
@@ -298,7 +307,7 @@ class PumpkinFace:
                 self.rolling_progress = 0.0
                 self.is_rolling = False
                 # Return to default pupil position (upper-left)
-                self.pupil_angle = 315.0
+                self.pupil_angle = 225.0
             else:
                 # Start from current position and rotate full circle
                 # 315° is default, rolling adds 0-360° in the specified direction

@@ -14,6 +14,41 @@
 
 📌 Team update (2026-02-19): Projection mapping color scheme and test strategy finalized — decided by Ekko, Mylo
 
+### Pupil Rotation Implementation (Rolling Eyes Bug Fix)
+
+**Issue:** Rolling eyes feature had working state machine but pupils didn't move visually when C and X keys were pressed.
+
+**Root Cause:** The `pupil_angle` was calculated in the state machine (line 306) but never used in rendering. Pupils were drawn at fixed offset `(left_pos[0] - 10, left_pos[1] - 10)` instead of rotating around the eye center.
+
+**Fix:** Refactored `_draw_eyes()` method to use trigonometric circular motion for pupil positioning:
+
+```python
+angle_rad = math.radians(self.pupil_angle)
+pupil_x = eye_center_x + orbit_radius * math.cos(angle_rad)
+pupil_y = eye_center_y + orbit_radius * math.sin(angle_rad)
+```
+
+**Key Implementation Detail:** Used `orbit_radius = sqrt(200) ≈ 14.14` instead of 10 to match original pupil positions exactly. The original fixed offset `(center - 10, center - 10)` creates a diagonal distance of sqrt(200), which at angle 225° (upper-left) replicates the original rendering. This preserves backward compatibility while enabling smooth circular motion.
+
+**Angular Reference:**
+- 0° = RIGHT
+- 90° = DOWN
+- 180° = LEFT
+- 270° = UP
+- 225° = UPPER-LEFT (default)
+
+**Verification:**
+- Pupils render at different positions based on `self.pupil_angle`
+- All 43 projection mapping tests pass
+- Rolling clockwise (C key) progresses angle +360° over 1 second
+- Rolling counter-clockwise (X key) progresses angle -360° over 1 second
+- Rolling pauses during blink/wink, resumes after
+- Pupils scale with eye_scale during blink animations
+
+**Graphics Pattern:** This establishes a reusable pattern for any circular motion rendering: convert degrees to radians, use cos/sin for X/Y offsets, scale radius for animation purposes (blink, wink, etc.).
+
+📌 Team update (2026-02-20): Rolling eyes rendering implemented
+
 ### Projection Mapping Graphics
 
 **File:** `pumpkin_face.py`
@@ -33,7 +68,7 @@
 - `draw()` - Main rendering loop, fills background and calls feature rendering
 - `_get_eye_positions()` - Calculates dynamic eye placement per expression
 - `_get_mouth_points()` - Generates mouth curve geometry for each emotion
-- `_draw_eyes()` - Renders filled circles for eyes with centered pupils
+- `_draw_eyes()` - Renders filled circles for eyes with circular-motion pupils
 - `_draw_mouth()` - Handles both line-based (smile/frown) and shape-based (surprised/scared) mouths
 
 **Animation System:**
