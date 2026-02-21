@@ -34,12 +34,22 @@ class PumpkinFace:
         self.blink_speed = 0.03  # Slower than transition_speed (0.05)
         self.pre_blink_expression = None  # Expression to return to after blink
         
+        # Wink animation state
+        self.is_winking = False
+        self.winking_eye = None  # 'left' or 'right'
+        self.wink_progress = 0.0
+        self.wink_speed = 0.03
+        self.pre_wink_expression = None
+        self.left_eye_scale = 1.0
+        self.right_eye_scale = 1.0
+        
         # Rolling eyes animation state
         self.is_rolling = False
         self.rolling_progress = 0.0
-        self.rolling_direction = 1  # +1 for clockwise, -1 for counter-clockwise
+        self.rolling_direction = 'clockwise'  # 'clockwise' or 'counterclockwise'
         self.rolling_duration = 1.0  # 360° rotation in 1 second
-        self.roll_angle = 0.0  # Current roll angle in degrees
+        self.rolling_speed = 0.01  # Speed of rolling progress per frame
+        self.pupil_angle = 315.0  # Current pupil angle in degrees (315° = upper-left)
         
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
@@ -222,25 +232,25 @@ class PumpkinFace:
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = 1
-    
+            self.rolling_direction = 'clockwise'
+
     def roll_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = -1
-    
+            self.rolling_direction = 'counterclockwise'
+
     def roll_eyes_clockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = 1
-    
+            self.rolling_direction = 'clockwise'
+
     def roll_eyes_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = -1
+            self.rolling_direction = 'counterclockwise'
     
     def update(self):
         # Handle blink animation
@@ -288,11 +298,12 @@ class PumpkinFace:
                 self.rolling_progress = 0.0
                 self.is_rolling = False
                 # Return to default pupil position (upper-left)
-                self.roll_angle = 315.0
+                self.pupil_angle = 315.0
             else:
                 # Start from current position and rotate full circle
                 # 315° is default, rolling adds 0-360° in the specified direction
-                self.roll_angle = (315.0 + self.rolling_progress * 360 * self.rolling_direction) % 360
+                direction_multiplier = 1 if self.rolling_direction == 'clockwise' else -1
+                self.pupil_angle = (315.0 + self.rolling_progress * 360 * direction_multiplier) % 360
         elif self.is_blinking or self.is_winking:
             # Rolling animation paused during blink or wink
             pass
