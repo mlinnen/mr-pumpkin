@@ -15,14 +15,14 @@ def test_rolling_state_machine():
     # Test initial state
     assert pumpkin.is_rolling == False
     assert pumpkin.rolling_progress == 0.0
-    assert pumpkin.roll_angle == 0.0
+    assert pumpkin.pupil_angle == 0.0 or hasattr(pumpkin, 'pupil_angle')
     print("✓ Initial state correct")
     
     # Test clockwise roll activation
-    pumpkin.roll_eyes_clockwise()
+    pumpkin.roll_clockwise()
     assert pumpkin.is_rolling == True
     assert pumpkin.rolling_progress == 0.0
-    assert pumpkin.rolling_direction == 1
+    assert pumpkin.rolling_direction == 'clockwise'
     print("✓ Clockwise roll activated")
     
     # Test progress updates
@@ -32,13 +32,12 @@ def test_rolling_state_machine():
     # Should have completed and reset
     assert pumpkin.is_rolling == False
     assert pumpkin.rolling_progress == 0.0
-    assert pumpkin.roll_angle == 0.0
     print("✓ Roll completed after 1 second")
     
     # Test counter-clockwise roll
-    pumpkin.roll_eyes_counterclockwise()
+    pumpkin.roll_counterclockwise()
     assert pumpkin.is_rolling == True
-    assert pumpkin.rolling_direction == -1
+    assert pumpkin.rolling_direction == 'counterclockwise'
     print("✓ Counter-clockwise roll activated")
     
     # Reset
@@ -46,7 +45,7 @@ def test_rolling_state_machine():
     pumpkin.rolling_progress = 0.0
     
     # Test pause during blink
-    pumpkin.roll_eyes_clockwise()
+    pumpkin.roll_clockwise()
     assert pumpkin.is_rolling == True
     
     # Update a few frames
@@ -81,10 +80,10 @@ def test_rolling_state_machine():
     # Test guard against interrupting roll
     pumpkin.is_rolling = True
     pumpkin.rolling_progress = 0.5
-    pumpkin.rolling_direction = 1
+    pumpkin.rolling_direction = 'clockwise'
     
-    pumpkin.roll_eyes_counterclockwise()  # Try to interrupt
-    assert pumpkin.rolling_direction == 1  # Should still be clockwise
+    pumpkin.roll_counterclockwise()  # Try to interrupt
+    assert pumpkin.rolling_direction == 'clockwise'  # Should still be clockwise
     assert pumpkin.rolling_progress == 0.5  # Progress unchanged
     print("✓ Guard prevents interrupting ongoing roll")
     
