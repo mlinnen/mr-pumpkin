@@ -34,12 +34,22 @@ class PumpkinFace:
         self.blink_speed = 0.03  # Slower than transition_speed (0.05)
         self.pre_blink_expression = None  # Expression to return to after blink
         
+        # Wink animation state
+        self.is_winking = False
+        self.winking_eye = None  # 'left' or 'right'
+        self.wink_progress = 0.0
+        self.wink_speed = 0.03
+        self.pre_wink_expression = None
+        self.left_eye_scale = 1.0
+        self.right_eye_scale = 1.0
+        
         # Rolling eyes animation state
         self.is_rolling = False
         self.rolling_progress = 0.0
-        self.rolling_direction = 1  # +1 for clockwise, -1 for counter-clockwise
+        self.rolling_direction = 'clockwise'  # 'clockwise' or 'counterclockwise'
         self.rolling_duration = 1.0  # 360° rotation in 1 second
-        self.roll_angle = 0.0  # Current roll angle in degrees
+        self.rolling_speed = 0.01  # Speed of rolling progress per frame
+        self.pupil_angle = 225.0  # Current pupil angle in degrees (225° = upper-left)
         
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
@@ -169,12 +179,21 @@ class PumpkinFace:
         else:
             pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
         
-        # Draw pupils as black circles (scale with eye)
+        # Draw pupils as black circles (scale with eye, position based on circular motion)
         pupil_radius = int(15 * eye_scale)
-        pupil_offset = int(10 * eye_scale)
+        # Original pupils at (center - 10, center - 10) = sqrt(200) radius at 225°
+        # For compatibility, use sqrt(200) ≈ 14.14 orbit radius
+        pupil_orbit_radius = int(math.sqrt(200) * eye_scale)
         if pupil_radius > 0:
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - pupil_offset, left_pos[1] - pupil_offset), pupil_radius)
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - pupil_offset, right_pos[1] - pupil_offset), pupil_radius)
+            # Calculate pupil position using circular motion around eye center
+            angle_rad = math.radians(self.pupil_angle)
+            left_pupil_x = int(left_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
+            left_pupil_y = int(left_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
+            right_pupil_x = int(right_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
+            right_pupil_y = int(right_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
+            
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pupil_x, left_pupil_y), pupil_radius)
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pupil_x, right_pupil_y), pupil_radius)
     
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:
@@ -204,17 +223,43 @@ class PumpkinFace:
             self.blink_progress = 0.0
             self.pre_blink_expression = self.current_expression
     
+    def wink_left(self):
+        if not self.is_winking:
+            self.is_winking = True
+            self.winking_eye = 'left'
+            self.wink_progress = 0.0
+            self.pre_wink_expression = self.current_expression
+    
+    def wink_right(self):
+        if not self.is_winking:
+            self.is_winking = True
+            self.winking_eye = 'right'
+            self.wink_progress = 0.0
+            self.pre_wink_expression = self.current_expression
+    
+    def roll_clockwise(self):
+        if not self.is_rolling:  # Don't interrupt an ongoing roll
+            self.is_rolling = True
+            self.rolling_progress = 0.0
+            self.rolling_direction = 'clockwise'
+
+    def roll_counterclockwise(self):
+        if not self.is_rolling:  # Don't interrupt an ongoing roll
+            self.is_rolling = True
+            self.rolling_progress = 0.0
+            self.rolling_direction = 'counterclockwise'
+
     def roll_eyes_clockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = 1
-    
+            self.rolling_direction = 'clockwise'
+
     def roll_eyes_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = -1
+            self.rolling_direction = 'counterclockwise'
     
     def update(self):
         # Handle blink animation
@@ -226,18 +271,50 @@ class PumpkinFace:
                 # Restore original expression after blink
                 self.current_expression = self.pre_blink_expression
         
-        # Handle rolling eyes animation (pauses during blink)
-        if self.is_rolling and not self.is_blinking:
+        # Handle wink animation
+        if self.is_winking:
+            self.wink_progress += self.wink_speed
+            
+            # Closing phase (0.0 to 0.5)
+            # Hold closed (0.5 to 0.55)
+            # Opening phase (0.55 to 1.0)
+            
+            if self.wink_progress < 0.5:
+                scale = 1.0 - (self.wink_progress * 2)
+            elif self.wink_progress < 0.55:
+                scale = 0.0  # Hold closed
+            else:
+                scale = (self.wink_progress - 0.55) / 0.45
+            
+            if self.winking_eye == 'left':
+                self.left_eye_scale = scale
+                self.right_eye_scale = 1.0
+            else:
+                self.right_eye_scale = scale
+                self.left_eye_scale = 1.0
+            
+            if self.wink_progress >= 1.0:
+                self.is_winking = False
+                self.winking_eye = None
+                self.left_eye_scale = 1.0
+                self.right_eye_scale = 1.0
+        
+        # Handle rolling eyes animation (pauses during blink or wink)
+        if self.is_rolling and not (self.is_blinking or self.is_winking):
             delta_time = 1.0 / 60.0  # Assume 60 FPS
             self.rolling_progress += delta_time / self.rolling_duration
             if self.rolling_progress >= 1.0:
                 self.rolling_progress = 0.0
                 self.is_rolling = False
-                self.roll_angle = 0.0
+                # Return to default pupil position (upper-left)
+                self.pupil_angle = 225.0
             else:
-                self.roll_angle = self.rolling_progress * 360 * self.rolling_direction
-        elif self.is_blinking:
-            # Rolling animation paused during blink
+                # Start from current position and rotate full circle
+                # 315° is default, rolling adds 0-360° in the specified direction
+                direction_multiplier = 1 if self.rolling_direction == 'clockwise' else -1
+                self.pupil_angle = (315.0 + self.rolling_progress * 360 * direction_multiplier) % 360
+        elif self.is_blinking or self.is_winking:
+            # Rolling animation paused during blink or wink
             pass
         
         # Handle expression transitions
@@ -336,10 +413,14 @@ class PumpkinFace:
             self.set_expression(mapping[key])
         elif key == pygame.K_b:
             self.blink()
+        elif key == pygame.K_l:
+            self.wink_left()
+        elif key == pygame.K_r:
+            self.wink_right()
         elif key == pygame.K_c:
-            self.roll_eyes_clockwise()
+            self.roll_clockwise()
         elif key == pygame.K_x:
-            self.roll_eyes_counterclockwise()
+            self.roll_counterclockwise()
     
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -365,14 +446,24 @@ class PumpkinFace:
                             print("Blink animation triggered")
                             continue
                         
+                        # Handle wink commands
+                        if data == "wink_left":
+                            self.wink_left()
+                            print("Left wink animation triggered")
+                            continue
+                        elif data == "wink_right":
+                            self.wink_right()
+                            print("Right wink animation triggered")
+                            continue
+                        
                         # Handle rolling eyes commands
                         if data == "roll_clockwise":
-                            self.roll_eyes_clockwise()
+                            self.roll_clockwise()
                             print("Rolling eyes clockwise")
                             continue
                         
                         if data == "roll_counterclockwise":
-                            self.roll_eyes_counterclockwise()
+                            self.roll_counterclockwise()
                             print("Rolling eyes counter-clockwise")
                             continue
                         
