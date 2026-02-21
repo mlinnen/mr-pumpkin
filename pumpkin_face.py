@@ -346,6 +346,10 @@ class PumpkinFace:
             self.set_expression(mapping[key])
         elif key == pygame.K_b:
             self.blink()
+        elif key == pygame.K_l:
+            self.wink('left')
+        elif key == pygame.K_r:
+            self.wink('right')
         elif key == pygame.K_c:
             self.roll_clockwise()
         elif key == pygame.K_x:
@@ -373,6 +377,16 @@ class PumpkinFace:
                         if data == "blink":
                             self.blink()
                             print("Blink animation triggered")
+                            continue
+                        
+                        # Handle wink commands
+                        if data == "wink_left":
+                            self.wink('left')
+                            print("Left wink animation triggered")
+                            continue
+                        elif data == "wink_right":
+                            self.wink('right')
+                            print("Right wink animation triggered")
                             continue
                         
                         # Handle rolling eyes commands
