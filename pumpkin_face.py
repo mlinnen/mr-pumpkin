@@ -34,10 +34,19 @@ class PumpkinFace:
         self.blink_speed = 0.03  # Slower than transition_speed (0.05)
         self.pre_blink_expression = None  # Expression to return to after blink
         
+        # Wink animation state
+        self.is_winking = False
+        self.winking_eye = None  # 'left' or 'right'
+        self.wink_progress = 0.0
+        self.wink_speed = 0.03
+        self.pre_wink_expression = None
+        self.left_eye_scale = 1.0
+        self.right_eye_scale = 1.0
+        
         # Rolling eyes animation state
         self.is_rolling = False
         self.rolling_progress = 0.0
-        self.rolling_direction = 1  # +1 for clockwise, -1 for counter-clockwise
+        self.rolling_direction = 'clockwise'  # 'clockwise' or 'counterclockwise'
         self.rolling_duration = 1.0  # 360° rotation in 1 second
         self.roll_angle = 0.0  # Current roll angle in degrees
         
@@ -204,17 +213,17 @@ class PumpkinFace:
             self.blink_progress = 0.0
             self.pre_blink_expression = self.current_expression
     
-    def roll_eyes_clockwise(self):
+    def roll_clockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = 1
+            self.rolling_direction = 'clockwise'
     
-    def roll_eyes_counterclockwise(self):
+    def roll_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
-            self.rolling_direction = -1
+            self.rolling_direction = 'counterclockwise'
     
     def update(self):
         # Handle blink animation
@@ -226,8 +235,8 @@ class PumpkinFace:
                 # Restore original expression after blink
                 self.current_expression = self.pre_blink_expression
         
-        # Handle rolling eyes animation (pauses during blink)
-        if self.is_rolling and not self.is_blinking:
+        # Handle rolling eyes animation (pauses during blink or wink)
+        if self.is_rolling and not (self.is_blinking or self.is_winking):
             delta_time = 1.0 / 60.0  # Assume 60 FPS
             self.rolling_progress += delta_time / self.rolling_duration
             if self.rolling_progress >= 1.0:
@@ -235,9 +244,10 @@ class PumpkinFace:
                 self.is_rolling = False
                 self.roll_angle = 0.0
             else:
-                self.roll_angle = self.rolling_progress * 360 * self.rolling_direction
-        elif self.is_blinking:
-            # Rolling animation paused during blink
+                direction_multiplier = 1 if self.rolling_direction == 'clockwise' else -1
+                self.roll_angle = self.rolling_progress * 360 * direction_multiplier
+        elif self.is_blinking or self.is_winking:
+            # Rolling animation paused during blink or wink
             pass
         
         # Handle expression transitions
@@ -337,9 +347,9 @@ class PumpkinFace:
         elif key == pygame.K_b:
             self.blink()
         elif key == pygame.K_c:
-            self.roll_eyes_clockwise()
+            self.roll_clockwise()
         elif key == pygame.K_x:
-            self.roll_eyes_counterclockwise()
+            self.roll_counterclockwise()
     
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -367,12 +377,12 @@ class PumpkinFace:
                         
                         # Handle rolling eyes commands
                         if data == "roll_clockwise":
-                            self.roll_eyes_clockwise()
+                            self.roll_clockwise()
                             print("Rolling eyes clockwise")
                             continue
                         
                         if data == "roll_counterclockwise":
-                            self.roll_eyes_counterclockwise()
+                            self.roll_counterclockwise()
                             print("Rolling eyes counter-clockwise")
                             continue
                         
