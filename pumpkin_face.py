@@ -404,9 +404,9 @@ class PumpkinFace:
             self.set_expression(mapping[key])
         elif key == pygame.K_b:
             self.blink()
-        elif key == pygame.K_w:
+        elif key == pygame.K_l:
             self.wink_left()
-        elif key == pygame.K_e:
+        elif key == pygame.K_r:
             self.wink_right()
         elif key == pygame.K_c:
             self.roll_clockwise()
