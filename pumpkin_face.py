@@ -34,6 +34,13 @@ class PumpkinFace:
         self.blink_speed = 0.03  # Slower than transition_speed (0.05)
         self.pre_blink_expression = None  # Expression to return to after blink
         
+        # Rolling eyes animation state
+        self.is_rolling = False
+        self.rolling_progress = 0.0
+        self.rolling_direction = 1  # +1 for clockwise, -1 for counter-clockwise
+        self.rolling_duration = 1.0  # 360° rotation in 1 second
+        self.roll_angle = 0.0  # Current roll angle in degrees
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
@@ -197,6 +204,18 @@ class PumpkinFace:
             self.blink_progress = 0.0
             self.pre_blink_expression = self.current_expression
     
+    def roll_eyes_clockwise(self):
+        if not self.is_rolling:  # Don't interrupt an ongoing roll
+            self.is_rolling = True
+            self.rolling_progress = 0.0
+            self.rolling_direction = 1
+    
+    def roll_eyes_counterclockwise(self):
+        if not self.is_rolling:  # Don't interrupt an ongoing roll
+            self.is_rolling = True
+            self.rolling_progress = 0.0
+            self.rolling_direction = -1
+    
     def update(self):
         # Handle blink animation
         if self.is_blinking:
@@ -206,6 +225,20 @@ class PumpkinFace:
                 self.blink_progress = 0.0
                 # Restore original expression after blink
                 self.current_expression = self.pre_blink_expression
+        
+        # Handle rolling eyes animation (pauses during blink)
+        if self.is_rolling and not self.is_blinking:
+            delta_time = 1.0 / 60.0  # Assume 60 FPS
+            self.rolling_progress += delta_time / self.rolling_duration
+            if self.rolling_progress >= 1.0:
+                self.rolling_progress = 0.0
+                self.is_rolling = False
+                self.roll_angle = 0.0
+            else:
+                self.roll_angle = self.rolling_progress * 360 * self.rolling_direction
+        elif self.is_blinking:
+            # Rolling animation paused during blink
+            pass
         
         # Handle expression transitions
         if self.transition_progress < 1.0:
@@ -303,6 +336,10 @@ class PumpkinFace:
             self.set_expression(mapping[key])
         elif key == pygame.K_b:
             self.blink()
+        elif key == pygame.K_c:
+            self.roll_eyes_clockwise()
+        elif key == pygame.K_x:
+            self.roll_eyes_counterclockwise()
     
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -326,6 +363,17 @@ class PumpkinFace:
                         if data == "blink":
                             self.blink()
                             print("Blink animation triggered")
+                            continue
+                        
+                        # Handle rolling eyes commands
+                        if data == "roll_clockwise":
+                            self.roll_eyes_clockwise()
+                            print("Rolling eyes clockwise")
+                            continue
+                        
+                        if data == "roll_counterclockwise":
+                            self.roll_eyes_counterclockwise()
+                            print("Rolling eyes counter-clockwise")
                             continue
                         
                         try:
