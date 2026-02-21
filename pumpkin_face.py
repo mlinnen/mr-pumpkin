@@ -48,7 +48,8 @@ class PumpkinFace:
         self.rolling_progress = 0.0
         self.rolling_direction = 'clockwise'  # 'clockwise' or 'counterclockwise'
         self.rolling_duration = 1.0  # 360° rotation in 1 second
-        self.roll_angle = 315.0  # Current roll angle in degrees (315° = upper-left, matches original look)
+        self.rolling_speed = 0.01  # Speed of rolling progress per frame
+        self.pupil_angle = 315.0  # Current pupil angle in degrees (315° = upper-left)
         
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
@@ -128,112 +129,63 @@ class PumpkinFace:
         elif self.current_expression == Expression.SCARED:
             eye_radius = 45
         
-        # Calculate per-eye scales based on blink or wink state
-        left_eye_scale = self.left_eye_scale
-        right_eye_scale = self.right_eye_scale
-        
-        # Apply blink to both eyes if blinking
+        # Calculate blink state
+        eye_scale = 1.0
         if self.is_blinking:
             if self.blink_progress <= 0.5:
-                blink_scale = 1.0 - (self.blink_progress * 2.0)
+                # Closing phase (0.0 to 0.5)
+                eye_scale = 1.0 - (self.blink_progress * 2.0)
             elif self.blink_progress <= 0.55:
-                blink_scale = 0.0
+                # Hold closed (0.5 to 0.55)
+                eye_scale = 0.0
             else:
-                blink_scale = (self.blink_progress - 0.55) / 0.45
-            left_eye_scale = blink_scale
-            right_eye_scale = blink_scale
+                # Opening phase (0.55 to 1.0)
+                eye_scale = (self.blink_progress - 0.55) / 0.45
         
-        # Check if any eye is fully closed
-        left_eye_fully_closed = left_eye_scale == 0.0
-        right_eye_fully_closed = right_eye_scale == 0.0
-        
-        # Sleeping expression
-        if self.current_expression == Expression.SLEEPING:
+        # Sleeping expression or fully closed blink - closed eyes as horizontal white lines
+        if self.current_expression == Expression.SLEEPING or (self.is_blinking and eye_scale == 0.0):
             line_width = 60
             line_thickness = 8
+            # Left closed eye
             pygame.draw.line(surface, self.FEATURE_COLOR, 
                            (left_pos[0] - line_width // 2, left_pos[1]), 
                            (left_pos[0] + line_width // 2, left_pos[1]), 
                            line_thickness)
+            # Right closed eye
             pygame.draw.line(surface, self.FEATURE_COLOR, 
                            (right_pos[0] - line_width // 2, right_pos[1]), 
                            (right_pos[0] + line_width // 2, right_pos[1]), 
                            line_thickness)
             return
         
-        # If both eyes are fully closed
-        if left_eye_fully_closed and right_eye_fully_closed:
-            line_width = 60
-            line_thickness = 8
-            pygame.draw.line(surface, self.FEATURE_COLOR, 
-                           (left_pos[0] - line_width // 2, left_pos[1]), 
-                           (left_pos[0] + line_width // 2, left_pos[1]), 
-                           line_thickness)
-            pygame.draw.line(surface, self.FEATURE_COLOR, 
-                           (right_pos[0] - line_width // 2, right_pos[1]), 
-                           (right_pos[0] + line_width // 2, right_pos[1]), 
-                           line_thickness)
-            return
+        # Scale eye height for blink animation
+        scaled_radius_vertical = int(eye_radius * eye_scale)
+        if scaled_radius_vertical == 0:
+            scaled_radius_vertical = 1  # Minimum for rendering
         
-        # Draw left eye
-        if left_eye_fully_closed:
-            line_width = 60
-            line_thickness = 8
-            pygame.draw.line(surface, self.FEATURE_COLOR, 
-                           (left_pos[0] - line_width // 2, left_pos[1]), 
-                           (left_pos[0] + line_width // 2, left_pos[1]), 
-                           line_thickness)
+        # Left eye - white filled ellipse for projection (scaled vertically during blink)
+        if eye_scale < 1.0:
+            pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
+                              (left_pos[0] - eye_radius, left_pos[1] - scaled_radius_vertical,
+                               eye_radius * 2, scaled_radius_vertical * 2))
         else:
-            scaled_radius = int(eye_radius * left_eye_scale)
-            if scaled_radius == 0:
-                scaled_radius = 1
-            if left_eye_scale < 1.0:
-                pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
-                                  (left_pos[0] - eye_radius, left_pos[1] - scaled_radius,
-                                   eye_radius * 2, scaled_radius * 2))
-            else:
-                pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
-            pupil_radius = int(15 * left_eye_scale)
-            pupil_distance = 10  # Distance from eye center to pupil center
-            if pupil_radius > 0:
-                # Calculate pupil position based on roll angle
-                # roll_angle = 0° means pupil at top
-                # Increase clockwise: 90° = right, 180° = bottom, 270° = left
-                angle_rad = math.radians(self.roll_angle)
-                pupil_offset_x = int(pupil_distance * left_eye_scale * math.sin(angle_rad))
-                pupil_offset_y = int(pupil_distance * left_eye_scale * -math.cos(angle_rad))
-                pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] + pupil_offset_x, left_pos[1] + pupil_offset_y), pupil_radius)
+            pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
         
-        # Draw right eye
-        if right_eye_fully_closed:
-            line_width = 60
-            line_thickness = 8
-            pygame.draw.line(surface, self.FEATURE_COLOR, 
-                           (right_pos[0] - line_width // 2, right_pos[1]), 
-                           (right_pos[0] + line_width // 2, right_pos[1]), 
-                           line_thickness)
+        # Right eye - white filled ellipse for projection (scaled vertically during blink)
+        if eye_scale < 1.0:
+            pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
+                              (right_pos[0] - eye_radius, right_pos[1] - scaled_radius_vertical,
+                               eye_radius * 2, scaled_radius_vertical * 2))
         else:
-            scaled_radius = int(eye_radius * right_eye_scale)
-            if scaled_radius == 0:
-                scaled_radius = 1
-            if right_eye_scale < 1.0:
-                pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
-                                  (right_pos[0] - eye_radius, right_pos[1] - scaled_radius,
-                                   eye_radius * 2, scaled_radius * 2))
-            else:
-                pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
-            pupil_radius = int(15 * right_eye_scale)
-            pupil_distance = 10  # Distance from eye center to pupil center
-            if pupil_radius > 0:
-                # Calculate pupil position based on roll angle
-                # roll_angle = 0° means pupil at top
-                # Increase clockwise: 90° = right, 180° = bottom, 270° = left
-                angle_rad = math.radians(self.roll_angle)
-                pupil_offset_x = int(pupil_distance * right_eye_scale * math.sin(angle_rad))
-                pupil_offset_y = int(pupil_distance * right_eye_scale * -math.cos(angle_rad))
-                pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] + pupil_offset_x, right_pos[1] + pupil_offset_y), pupil_radius)
-
-
+            pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
+        
+        # Draw pupils as black circles (scale with eye)
+        pupil_radius = int(15 * eye_scale)
+        pupil_offset = int(10 * eye_scale)
+        if pupil_radius > 0:
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - pupil_offset, left_pos[1] - pupil_offset), pupil_radius)
+            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - pupil_offset, right_pos[1] - pupil_offset), pupil_radius)
+    
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:
             if self.current_expression == Expression.SURPRISED:
@@ -281,8 +233,20 @@ class PumpkinFace:
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'clockwise'
-    
+
     def roll_counterclockwise(self):
+        if not self.is_rolling:  # Don't interrupt an ongoing roll
+            self.is_rolling = True
+            self.rolling_progress = 0.0
+            self.rolling_direction = 'counterclockwise'
+
+    def roll_eyes_clockwise(self):
+        if not self.is_rolling:  # Don't interrupt an ongoing roll
+            self.is_rolling = True
+            self.rolling_progress = 0.0
+            self.rolling_direction = 'clockwise'
+
+    def roll_eyes_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
@@ -334,20 +298,14 @@ class PumpkinFace:
                 self.rolling_progress = 0.0
                 self.is_rolling = False
                 # Return to default pupil position (upper-left)
-                self.roll_angle = 315.0
+                self.pupil_angle = 315.0
             else:
-<<<<<<< HEAD
-                direction_multiplier = 1 if self.rolling_direction == 'clockwise' else -1
-                self.roll_angle = self.rolling_progress * 360 * direction_multiplier
-        elif self.is_blinking or self.is_winking:
-            # Rolling animation paused during blink or wink
-=======
                 # Start from current position and rotate full circle
                 # 315° is default, rolling adds 0-360° in the specified direction
-                self.roll_angle = (315.0 + self.rolling_progress * 360 * self.rolling_direction) % 360
-        elif self.is_blinking:
-            # Rolling animation paused during blink
->>>>>>> 833c706 (feat: Refactor pupil positioning to angle-based circular motion)
+                direction_multiplier = 1 if self.rolling_direction == 'clockwise' else -1
+                self.pupil_angle = (315.0 + self.rolling_progress * 360 * direction_multiplier) % 360
+        elif self.is_blinking or self.is_winking:
+            # Rolling animation paused during blink or wink
             pass
         
         # Handle expression transitions
@@ -446,9 +404,9 @@ class PumpkinFace:
             self.set_expression(mapping[key])
         elif key == pygame.K_b:
             self.blink()
-        elif key == pygame.K_w:
+        elif key == pygame.K_l:
             self.wink_left()
-        elif key == pygame.K_e:
+        elif key == pygame.K_r:
             self.wink_right()
         elif key == pygame.K_c:
             self.roll_clockwise()
