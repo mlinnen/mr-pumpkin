@@ -128,63 +128,100 @@ class PumpkinFace:
         elif self.current_expression == Expression.SCARED:
             eye_radius = 45
         
-        # Calculate blink state
-        eye_scale = 1.0
+        # Calculate per-eye scales based on blink or wink state
+        left_eye_scale = self.left_eye_scale
+        right_eye_scale = self.right_eye_scale
+        
+        # Apply blink to both eyes if blinking
         if self.is_blinking:
             if self.blink_progress <= 0.5:
-                # Closing phase (0.0 to 0.5)
-                eye_scale = 1.0 - (self.blink_progress * 2.0)
+                blink_scale = 1.0 - (self.blink_progress * 2.0)
             elif self.blink_progress <= 0.55:
-                # Hold closed (0.5 to 0.55)
-                eye_scale = 0.0
+                blink_scale = 0.0
             else:
-                # Opening phase (0.55 to 1.0)
-                eye_scale = (self.blink_progress - 0.55) / 0.45
+                blink_scale = (self.blink_progress - 0.55) / 0.45
+            left_eye_scale = blink_scale
+            right_eye_scale = blink_scale
         
-        # Sleeping expression or fully closed blink - closed eyes as horizontal white lines
-        if self.current_expression == Expression.SLEEPING or (self.is_blinking and eye_scale == 0.0):
+        # Check if any eye is fully closed
+        left_eye_fully_closed = left_eye_scale == 0.0
+        right_eye_fully_closed = right_eye_scale == 0.0
+        
+        # Sleeping expression
+        if self.current_expression == Expression.SLEEPING:
             line_width = 60
             line_thickness = 8
-            # Left closed eye
             pygame.draw.line(surface, self.FEATURE_COLOR, 
                            (left_pos[0] - line_width // 2, left_pos[1]), 
                            (left_pos[0] + line_width // 2, left_pos[1]), 
                            line_thickness)
-            # Right closed eye
             pygame.draw.line(surface, self.FEATURE_COLOR, 
                            (right_pos[0] - line_width // 2, right_pos[1]), 
                            (right_pos[0] + line_width // 2, right_pos[1]), 
                            line_thickness)
             return
         
-        # Scale eye height for blink animation
-        scaled_radius_vertical = int(eye_radius * eye_scale)
-        if scaled_radius_vertical == 0:
-            scaled_radius_vertical = 1  # Minimum for rendering
+        # If both eyes are fully closed
+        if left_eye_fully_closed and right_eye_fully_closed:
+            line_width = 60
+            line_thickness = 8
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (left_pos[0] - line_width // 2, left_pos[1]), 
+                           (left_pos[0] + line_width // 2, left_pos[1]), 
+                           line_thickness)
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (right_pos[0] - line_width // 2, right_pos[1]), 
+                           (right_pos[0] + line_width // 2, right_pos[1]), 
+                           line_thickness)
+            return
         
-        # Left eye - white filled ellipse for projection (scaled vertically during blink)
-        if eye_scale < 1.0:
-            pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
-                              (left_pos[0] - eye_radius, left_pos[1] - scaled_radius_vertical,
-                               eye_radius * 2, scaled_radius_vertical * 2))
+        # Draw left eye
+        if left_eye_fully_closed:
+            line_width = 60
+            line_thickness = 8
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (left_pos[0] - line_width // 2, left_pos[1]), 
+                           (left_pos[0] + line_width // 2, left_pos[1]), 
+                           line_thickness)
         else:
-            pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
+            scaled_radius = int(eye_radius * left_eye_scale)
+            if scaled_radius == 0:
+                scaled_radius = 1
+            if left_eye_scale < 1.0:
+                pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
+                                  (left_pos[0] - eye_radius, left_pos[1] - scaled_radius,
+                                   eye_radius * 2, scaled_radius * 2))
+            else:
+                pygame.draw.circle(surface, self.FEATURE_COLOR, left_pos, eye_radius)
+            pupil_radius = int(15 * left_eye_scale)
+            pupil_offset = int(10 * left_eye_scale)
+            if pupil_radius > 0:
+                pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - pupil_offset, left_pos[1] - pupil_offset), pupil_radius)
         
-        # Right eye - white filled ellipse for projection (scaled vertically during blink)
-        if eye_scale < 1.0:
-            pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
-                              (right_pos[0] - eye_radius, right_pos[1] - scaled_radius_vertical,
-                               eye_radius * 2, scaled_radius_vertical * 2))
+        # Draw right eye
+        if right_eye_fully_closed:
+            line_width = 60
+            line_thickness = 8
+            pygame.draw.line(surface, self.FEATURE_COLOR, 
+                           (right_pos[0] - line_width // 2, right_pos[1]), 
+                           (right_pos[0] + line_width // 2, right_pos[1]), 
+                           line_thickness)
         else:
-            pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
-        
-        # Draw pupils as black circles (scale with eye)
-        pupil_radius = int(15 * eye_scale)
-        pupil_offset = int(10 * eye_scale)
-        if pupil_radius > 0:
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pos[0] - pupil_offset, left_pos[1] - pupil_offset), pupil_radius)
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - pupil_offset, right_pos[1] - pupil_offset), pupil_radius)
-    
+            scaled_radius = int(eye_radius * right_eye_scale)
+            if scaled_radius == 0:
+                scaled_radius = 1
+            if right_eye_scale < 1.0:
+                pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
+                                  (right_pos[0] - eye_radius, right_pos[1] - scaled_radius,
+                                   eye_radius * 2, scaled_radius * 2))
+            else:
+                pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
+            pupil_radius = int(15 * right_eye_scale)
+            pupil_offset = int(10 * right_eye_scale)
+            if pupil_radius > 0:
+                pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pos[0] - pupil_offset, right_pos[1] - pupil_offset), pupil_radius)
+
+
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:
             if self.current_expression == Expression.SURPRISED:
@@ -213,6 +250,20 @@ class PumpkinFace:
             self.blink_progress = 0.0
             self.pre_blink_expression = self.current_expression
     
+    def wink_left(self):
+        if not self.is_winking:
+            self.is_winking = True
+            self.winking_eye = 'left'
+            self.wink_progress = 0.0
+            self.pre_wink_expression = self.current_expression
+    
+    def wink_right(self):
+        if not self.is_winking:
+            self.is_winking = True
+            self.winking_eye = 'right'
+            self.wink_progress = 0.0
+            self.pre_wink_expression = self.current_expression
+    
     def roll_clockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
@@ -234,6 +285,34 @@ class PumpkinFace:
                 self.blink_progress = 0.0
                 # Restore original expression after blink
                 self.current_expression = self.pre_blink_expression
+        
+        # Handle wink animation
+        if self.is_winking:
+            self.wink_progress += self.wink_speed
+            
+            # Closing phase (0.0 to 0.5)
+            # Hold closed (0.5 to 0.55)
+            # Opening phase (0.55 to 1.0)
+            
+            if self.wink_progress < 0.5:
+                scale = 1.0 - (self.wink_progress * 2)
+            elif self.wink_progress < 0.55:
+                scale = 0.0  # Hold closed
+            else:
+                scale = (self.wink_progress - 0.55) / 0.45
+            
+            if self.winking_eye == 'left':
+                self.left_eye_scale = scale
+                self.right_eye_scale = 1.0
+            else:
+                self.right_eye_scale = scale
+                self.left_eye_scale = 1.0
+            
+            if self.wink_progress >= 1.0:
+                self.is_winking = False
+                self.winking_eye = None
+                self.left_eye_scale = 1.0
+                self.right_eye_scale = 1.0
         
         # Handle rolling eyes animation (pauses during blink or wink)
         if self.is_rolling and not (self.is_blinking or self.is_winking):
@@ -346,10 +425,10 @@ class PumpkinFace:
             self.set_expression(mapping[key])
         elif key == pygame.K_b:
             self.blink()
-        elif key == pygame.K_l:
-            self.wink('left')
-        elif key == pygame.K_r:
-            self.wink('right')
+        elif key == pygame.K_w:
+            self.wink_left()
+        elif key == pygame.K_e:
+            self.wink_right()
         elif key == pygame.K_c:
             self.roll_clockwise()
         elif key == pygame.K_x:
@@ -381,11 +460,11 @@ class PumpkinFace:
                         
                         # Handle wink commands
                         if data == "wink_left":
-                            self.wink('left')
+                            self.wink_left()
                             print("Left wink animation triggered")
                             continue
                         elif data == "wink_right":
-                            self.wink('right')
+                            self.wink_right()
                             print("Right wink animation triggered")
                             continue
                         
