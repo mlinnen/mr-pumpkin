@@ -49,6 +49,45 @@ pupil_y = eye_center_y + orbit_radius * math.sin(angle_rad)
 
 📌 Team update (2026-02-20): Rolling eyes rendering implemented
 
+### Eyebrow Rendering System (Issue #16)
+
+**File:** `pumpkin_face.py`
+
+**Implementation:** Added `_draw_eyebrows` method with expression-based baseline positions, tilt angles, and animation integration.
+
+**Baseline Table Design:**
+- Each expression has a baseline tuple: `(brow_y_gap, angle_offset)`
+- `brow_y_gap`: How far above eye center the brow sits (negative values, e.g., -55 pixels)
+- `angle_offset`: Tilt angle where positive = outer corners up (surprised), negative = inner corners up (angry)
+- Example: `Expression.ANGRY: (-50, -12)` creates V-shaped angry brows
+
+**Tilt Geometry:**
+- Eyebrows rendered as tilted lines 70px wide (±35px from center)
+- Line drawn from `(cx - 35, brow_y + angle_offset)` to `(cx + 35, brow_y - angle_offset)`
+- For ANGRY with angle_offset=-12: left side goes down, right side goes up = inner corners raised (V-shape)
+- For SURPRISED with angle_offset=+5: outer corners raised (arched surprise)
+
+**Animation Integration:**
+- **Expression transitions:** Interpolates both gap and angle using `transition_progress`
+- **Blink lift:** Both brows rise 8px during blink using `sin(blink_progress * π)`
+- **Wink lift:** Individual brow rises based on which eye is winking using eye scale
+- **User offsets:** Applied after baseline, negative = raise, positive = lower
+- **Collision detection:** Eyebrows skipped if gap to eye top < 5px
+
+**Rendering Order:**
+1. Skip if `Expression.SLEEPING` (eyebrows hidden when sleeping)
+2. Calculate interpolated baseline during expression transitions
+3. Apply blink lift (both brows)
+4. Apply per-eye wink lift
+5. Add user-controlled offsets
+6. Clamp to floor (y=350 minimum)
+7. Check collision with eye boundary
+8. Draw tilted white line (8px thickness) if safe
+
+**Pattern Established:** Derived transient animation — animation effects (blink/wink lift) computed at render time from existing progress variables, without needing capture/restore. The eyebrow state variables (`eyebrow_left_offset`, `eyebrow_right_offset`) are orthogonal persistent state, while blink/wink lifts are ephemeral rendering effects.
+
+📌 Team update (2026-02-22): Eyebrow rendering with expression baselines implemented
+
 ### Projection Mapping Graphics
 
 **File:** `pumpkin_face.py`
