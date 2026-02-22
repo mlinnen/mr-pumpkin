@@ -49,6 +49,7 @@ class PumpkinFace:
         self.rolling_direction = 'clockwise'  # 'clockwise' or 'counterclockwise'
         self.rolling_duration = 1.0  # 360° rotation in 1 second
         self.rolling_speed = 0.01  # Speed of rolling progress per frame
+        self.rolling_start_angle = None  # Angle where rolling started
         self.pupil_angle = 225.0  # Current pupil angle in degrees (225° = upper-left)
         
         # Colors - optimized for projection mapping
@@ -242,24 +243,28 @@ class PumpkinFace:
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'clockwise'
+            self.rolling_start_angle = self.pupil_angle
 
     def roll_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'counterclockwise'
+            self.rolling_start_angle = self.pupil_angle
 
     def roll_eyes_clockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'clockwise'
+            self.rolling_start_angle = self.pupil_angle
 
     def roll_eyes_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'counterclockwise'
+            self.rolling_start_angle = self.pupil_angle
     
     def update(self):
         # Handle blink animation
@@ -304,15 +309,15 @@ class PumpkinFace:
             delta_time = 1.0 / 60.0  # Assume 60 FPS
             self.rolling_progress += delta_time / self.rolling_duration
             if self.rolling_progress >= 1.0:
+                # Complete: return to exact starting angle
+                self.pupil_angle = self.rolling_start_angle
                 self.rolling_progress = 0.0
                 self.is_rolling = False
-                # Return to default pupil position (upper-left)
-                self.pupil_angle = 225.0
+                self.rolling_start_angle = None
             else:
-                # Start from current position and rotate full circle
-                # 315° is default, rolling adds 0-360° in the specified direction
+                # Rotate 360° from starting position
                 direction_multiplier = 1 if self.rolling_direction == 'clockwise' else -1
-                self.pupil_angle = (315.0 + self.rolling_progress * 360 * direction_multiplier) % 360
+                self.pupil_angle = (self.rolling_start_angle + self.rolling_progress * 360 * direction_multiplier) % 360
         elif self.is_blinking or self.is_winking:
             # Rolling animation paused during blink or wink
             pass
