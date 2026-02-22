@@ -94,3 +94,36 @@ pupil_y = eye_center_y + orbit_radius * math.sin(angle_rad)
 - Expression-specific rendering uses conditional checks within draw methods
 - Socket server's enum-based parsing means no server code changes needed for new expressions
 - Projection mapping constraints (black/white, thick lines) guide all visual design choices
+
+### Rolling Eyes Enhancement — Current Position Tracking (Issue #21)
+
+**Problem:** Rolling eyes feature (X/C keys) cycled through predefined angles starting from hardcoded 315°, ignoring the pupil's current position. Pupils would "jump" to 315° before rolling, then return to hardcoded 225° afterward.
+
+**Solution:** Implemented state capture pattern where rolling animation:
+1. Captures `self.pupil_angle` at trigger time → stores in `self.rolling_start_angle`
+2. Rotates 360° from that captured position (clockwise or counter-clockwise)
+3. Returns to EXACT captured starting angle upon completion
+
+**Implementation Details:**
+- Added `self.rolling_start_angle` state variable to `__init__` (None when not rolling)
+- Modified all four rolling methods (`roll_clockwise()`, `roll_counterclockwise()`, `roll_eyes_clockwise()`, `roll_eyes_counterclockwise()`) to capture current angle: `self.rolling_start_angle = self.pupil_angle`
+- Updated rolling animation logic in `update()`:
+  - During animation: `pupil_angle = (rolling_start_angle + progress * 360 * direction) % 360`
+  - On completion: `pupil_angle = rolling_start_angle` (exact restoration)
+  - Clean up: `rolling_start_angle = None` after completion
+
+**Architecture Benefits:**
+- **Composability:** Rolling can start from any pupil position set by previous animations
+- **No state jumps:** Pupils smoothly transition into/out of rolling motion
+- **Interrupt protection maintained:** Guard `if not self.is_rolling` prevents overlapping rolls
+- **Orthogonal to expression system:** Rolling works independently of current expression
+
+**Animation Pattern:** This establishes the "capture-animate-restore" pattern for temporary animations that must return to exact starting state (similar to blink animation's expression restoration). Key insight: use dedicated state variables (`rolling_start_angle`) rather than hardcoded defaults.
+
+**Verification:**
+- All 43 projection mapping tests continue to pass
+- Manual test (`test_rolling_eyes.py`) verifies:
+  - Rolling from 225° (default) returns to 225°
+  - Rolling from 90° (custom) returns to 90°
+  - Multiple sequential rolls maintain correctness
+  - Interrupt protection prevents overlapping animations
