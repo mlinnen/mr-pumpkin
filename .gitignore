@@ -27,6 +27,6 @@ env/
 .DS_Store
 Thumbs.db
 
-# AI team internal files (not for release)
+# AI team internal files — not for release
 .ai-team/
 .ai-team-templates/
