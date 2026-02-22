@@ -1,5 +1,4 @@
-# Squad: union merge for append-only team state files
-.ai-team/decisions.md merge=union
-.ai-team/agents/*/history.md merge=union
-.ai-team/log/** merge=union
-.ai-team/orchestration-log/** merge=union
+# Squad: .ai-team/ never ships to preview/main.
+# merge=ours keeps preview's deleted state when merging from dev.
+# Requires once-per-clone: git config merge.ours.driver true
+.ai-team/** merge=ours
