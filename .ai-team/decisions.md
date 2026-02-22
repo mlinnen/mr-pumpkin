@@ -365,3 +365,194 @@ libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 **Architectural Alignment:** This follows the established orthogonal animation pattern set by blink/wink systems. Temporary animations preserve origin state and restore it on completion, independent of expression state machine.
 
 **Benefit:** Rolling can now be triggered from ANY pupil position (after another roll, during manual positioning, etc.) and will always return accurately. No special-case logic needed for different starting positions.
+
+---
+
+### 2026-02-22: Eye Direction Control Design — Issue #22
+
+**By:** Jinx (Lead), Ekko (Graphics), Vi (Backend)
+
+**Date:** 2026-02-22
+
+**Issue:** #22 — Eyes able to look left, right, up and down
+
+**What:** Implemented eye direction control via X/Y degree angles (±90° range) with per-eye independent positioning. Users control gaze via `gaze` socket command supporting both synchronized and asymmetric eye movements.
+
+**Data Model:**
+- Per-eye state variables: `pupil_angle_left` and `pupil_angle_right` (stored as tuples with X/Y angles)
+- Coordinate system: X axis (−90° = left, 0° = center, +90° = right), Y axis (−90° = down, 0° = center, +90° = up)
+- Default position: (−45°, 45°) for both eyes, maintaining backward compatibility with 43 existing projection tests
+
+**Rendering Contract:**
+- Graphics converts angles to pupil pixel offsets via `sin()` function for natural acceleration curve
+- Orbit radius (~14px) + pupil radius (15px) = 29.14px < eye radius (40px) ensures 10.86px safety margin
+- Projection mapping compliant: pure black pupils on white eyes, no anti-aliasing
+
+**Socket Command Format:**
+- `gaze <x> <y>` — Both eyes synchronized
+- `gaze <left_x> <left_y> <right_x> <right_y>` — Independent eye control
+- Server-side clamping to ±90° range (silent clamp, not rejection)
+- Keyboard shortcuts: arrow keys adjust gaze in 5° increments, `0` key resets to (0°, 0°)
+
+**Animation Interaction:**
+- **Expression changes:** Gaze persists (orthogonal systems)
+- **Rolling animation:** Gaze paused during roll via capture-restore pattern; rejected if attempted during roll
+- **Blink/Wink:** Gaze state preserved; eyes return to set angles after animation
+- **Eye scale (blink):** Orbit radius scales with eye → pupils converge correctly
+
+**Why This Design:**
+1. Per-eye state enables asymmetric gaze (weird eye movements requirement)
+2. X/Y angles are intuitive for users vs polar coordinates (left/right + up/down)
+3. Arity-based parsing (`gaze 45 30` for both eyes, 4 args for independent)
+4. Server-side validation + render-side clamping provides defense in depth
+5. Persistence across expressions reduces command spam
+
+**Trade-offs:**
+- **Pros:** Orthogonal state independent from expressions, capture-restore for animations, per-eye control enables asymmetric effects, ±90° prevents escape
+- **Cons:** More state variables (4 floats per eye), gaze "pauses" during rolling animation, instant changes (no easing yet)
+
+---
+
+### 2026-02-21: Gaze Control Implementation
+
+**By:** Vi (Backend Dev)
+
+**Date:** 2026-02-21
+
+**Issue:** #22
+
+**What:** Implemented gaze control as orthogonal state system following established blink/wink/rolling pattern with capture-restore integration for rolling eyes.
+
+**State Variables Added:**
+- `self.left_gaze_x`, `left_gaze_y`, `right_gaze_x`, `right_gaze_y` (individual floats, -90 to +90 degrees)
+- `self.pre_rolling_gaze_left`, `pre_rolling_gaze_right` (captured before rolling)
+
+**Command Handler:**
+- Socket command parser recognizes `gaze <args>` before expression parsing
+- 2 args: both eyes, 4 args: independent eyes
+- Invalid arg count or non-numeric args: print error, continue (non-fatal)
+
+**Rendering Logic:**
+- When not rolling: pupil offset from gaze angles using `(angle / 90.0) * max_offset` formula
+- Y-axis inverted: `offset_y = -(gaze_y / 90.0) * max_offset` (user +Y = up, pixel +Y = down)
+- When rolling: pupils follow `pupil_angle`, gaze state frozen and restored on completion
+
+**Rolling Integration:**
+- All four roll methods capture gaze state before animation
+- On completion, restore exact captured gaze
+- Follow capture-restore pattern from Issue #21
+
+---
+
+### 2026-02-21: Gaze Coordinate System and Default Position
+
+**By:** Ekko (Graphics Dev)
+
+**Date:** 2026-02-21
+
+**Issue:** #22
+
+**What:** Implemented per-eye gaze control using X/Y angle pairs with origin at 0° (straight ahead), ±90° range, default position (−45°, 45°) upper-left.
+
+**Coordinate System:**
+- X-axis: Negative = left, Positive = right
+- Y-axis: Negative = down, Positive = up
+- Clamped to ±90° to prevent pupils exceeding eye boundaries
+
+**Default Position (−45°, 45°):**
+- Maintains backward compatibility with 43 existing projection tests expecting pupils at upper-left
+- Avoids breaking existing demo videos and screenshots
+- Users can call `gaze((0, 0))` to look straight ahead when desired
+
+**Gaze vs Rolling Interaction:**
+- Rolling temporarily overrides gaze; gaze angles **persist** during rolling
+- Gaze **resumes** after rolling completes (follows orthogonal animation pattern)
+
+**Angle-to-Pixel Conversion:**
+- Uses `sin()` instead of linear mapping for natural acceleration curve
+- Small angles near center have fine control, large angles near extremes move less
+- Automatic boundary safety: `sin()` never exceeds 1.0
+- Orbit radius of √200 ≈ 14.14 with pupil radius 15 and eye radius 40 ensures 10.86px safety margin
+
+---
+
+### 2026-02-21: Gaze Control API Mismatch — Test vs Implementation
+
+**By:** Mylo (Tester)
+
+**Date:** 2026-02-21
+
+**Issue:** #22
+
+**Status:** Resolved (see consolidated decision above)
+
+**Summary:** Design review spec called for positional args (`gaze(45, 30)`), but implementation used tuples (`gaze(left_angles=(45, 30))`). Resolved by standardizing on tuple-based storage with per-eye state variables. Test suite (47 test cases in `test_gaze_control.py`) covers command parsing, state management, rendering, rolling interaction, edge cases, and socket commands.
+
+---
+
+### 2026-02-21: Rolling Eyes Gaze Integration Fix
+
+**By:** Vi (Backend Dev)
+
+**Date:** 2026-02-21
+
+**Issue:** Critical bug — X/C keys crash app when rolling eyes
+
+**What:** Fixed AttributeError crashes in rolling eyes capture/restore logic due to attempting to assign to read-only properties.
+
+**Root Cause:** Rolling capture/restore logic was written before gaze refactoring. Code assumed gaze angles were instance variables but they're actually stored as tuples with read-only properties.
+
+**Solution:** Changed all rolling methods to work directly with tuples instead of properties:
+- Before: `self.pre_rolling_gaze_left = (self.left_gaze_x, self.left_gaze_y)`
+- After: `self.pre_rolling_gaze_left = self.pupil_angle_left`
+
+**Files Changed:** `pumpkin_face.py` lines 357, 367, 377, 387, 407-416, 475-476
+
+**Impact:** X/C keys no longer crash, gaze control works correctly, rolling properly captures/restores per-eye state
+
+---
+
+### 2026-02-21: Rolling Eyes Gaze Sequencing Fix
+
+**By:** Vi (Backend Dev)
+
+**Date:** 2026-02-21
+
+**Issue:** Rolling animation doesn't start from new gaze position
+
+**What:** Fixed timing issue where rolling animation didn't reflect current gaze position when triggered after `gaze` command.
+
+**Root Cause:** Rolling captured stale `pupil_angle` (circular 0-360°) instead of converting current gaze X/Y angles to equivalent circular position. When gaze changed pupils visually, rolling animation still captured old circular angle.
+
+**Solution:** Added helper method `_gaze_to_angle()` to convert current gaze X/Y angles to circular angle:
+1. Convert gaze angles to pixel offsets (same as rendering)
+2. Use `atan2()` to calculate circular angle from offsets
+3. Return normalized 0-360° angle
+
+**Updated rolling methods:** All four trigger methods now:
+1. Capture gaze state first
+2. Convert left eye gaze to circular angle: `rolling_start_angle = _gaze_to_angle(pupil_angle_left)`
+3. Initialize: `pupil_angle = rolling_start_angle`
+4. Begin rolling from correct position
+
+**Why This Matters:** Establishes clean conversion pattern between gaze (user-facing X/Y) and circular angle (rolling animation) coordinate systems. Ensures animation continuity without visual jumps.
+
+**Impact:** Rolling eyes now correctly starts from any gaze position (left, right, up, down, diagonal) with seamless transitions.
+
+---
+
+### 2026-02-22: Release Process Workflow
+
+**By:** Copilot (User Directive)
+
+**Date:** 2026-02-22
+
+**What:** Established release workflow: stage dev branch to preview for team review, then merge preview to main only after approval. Never merge dev directly to main.
+
+**Process:**
+1. Update VERSION file only (no automatic tags)
+2. Create PR: dev → preview (for review)
+3. Merge to preview once approved
+4. squad-release workflow handles tagging and package creation automatically
+
+**Why:** Separates concerns (manual version bump → automated release), ensures release quality, provides team visibility, prevents missed/double-tagging.
