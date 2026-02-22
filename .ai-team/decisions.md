@@ -556,3 +556,253 @@ libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 4. squad-release workflow handles tagging and package creation automatically
 
 **Why:** Separates concerns (manual version bump → automated release), ensures release quality, provides team visibility, prevents missed/double-tagging.
+
+---
+
+### 2026-02-22: Eyebrow Animation Architecture — Issue #16
+
+**By:** Jinx (Lead), Ekko (Graphics), Vi (Backend), Mylo (Tester)
+
+**Date:** 2026-02-22
+
+**Status:** Design approved, implementation in progress (PR #24)
+
+**Context:** Issue #16 — Eyebrow Animation. Design review ceremony with Jinx, Ekko, Vi, Mylo. Architectural decisions for orthogonal eyebrow state, expression-driven baselines, and projection-compliant rendering.
+
+---
+
+## Eyebrow Architecture Decisions
+
+### Decision 1: Orthogonal Eyebrow State
+
+**Decision:** Eyebrow offsets are stored independently from the expression state machine.
+
+**Details:**
+- Two persistent fields: `eyebrow_left_offset` and `eyebrow_right_offset` (floats, clamped [-50, +50])
+- Expression changes via `set_expression()` do NOT reset or modify these offsets
+- User can raise/lower eyebrows independently of expression, offset stacks additively on baseline
+
+**Rationale:**
+- Satisfies orthogonal-animation-state pattern (established for blink, wink, rolling)
+- Allows independent control (raise/lower together and independently)
+- Mirrors gaze system architecture: persistent user state + expression-driven baseline
+
+**Implications:**
+- `set_expression()` must not touch eyebrow offset state
+- Expression transitions interpolate baseline; user offsets remain constant
+- Final position = expression_baseline + user_offset + transient_animation_delta
+
+---
+
+### Decision 2: Derived Transient Animation (Blink/Wink Eyebrow Movement)
+
+**Decision:** Eyebrow movement during blink/wink is computed at render time, NOT stored in state.
+
+**Details:**
+- Blink lift: `8 * sin(blink_progress * π)` — both eyebrows rise during close, return during open
+- Wink lift: `8 * (1.0 - eye_scale)` — winking eye's eyebrow lifts proportional to eye closure
+- No new capture fields needed (`pre_blink_eyebrow_offset`, etc.)
+
+**Rationale:**
+- Satisfies Capture-Animate-Restore pattern without adding state variables
+- Base eyebrow state is never mutated during animations — automatically "restored" when animation ends
+- Minimizes state complexity; mirrors how pupils are positioned during rolling
+
+**Implications:**
+- Eyebrow draw logic reads existing animation progress variables
+- No restoration logic needed in update()
+- Blink/wink eyebrow behavior visually coupled to eye animation
+
+---
+
+### Decision 3: Expression-Driven Baseline with Additive User Offset
+
+**Decision:** Each expression defines baseline eyebrow Y-position and tilt angle. User offsets and animation deltas stack additively.
+
+**Details:**
+- Baseline table (EYEBROW_BASELINES):
+  - NEUTRAL: y_gap = -55, angle = 0 (flat)
+  - HAPPY: y_gap = -50, angle = +3 (relaxed)
+  - SAD: y_gap = -60, angle = -8 (worried)
+  - ANGRY: y_gap = -50, angle = -12 (aggressive V)
+  - SURPRISED: y_gap = -70, angle = +5 (high arched)
+  - SCARED: y_gap = -65, angle = -5 (raised drooped)
+  - SLEEPING: hidden (no rendering)
+
+- Final position formula: `brow_y = expression_baseline_y + eyebrow_offset + blink_lift + wink_lift`
+
+**Rationale:**
+- Separates expression design (graphics domain) from state management (backend domain)
+- Enables smooth expression transitions while preserving user control
+- Additive model is intuitive
+
+**Implications:**
+- Expression transitions interpolate baseline Y and angle
+- Graphics renderer owns baseline table; backend owns offsets
+- Clear interface boundary
+
+---
+
+### Decision 4: Projection-First Rendering — Straight Lines Only
+
+**Decision:** Eyebrows rendered as thick white straight lines (thickness 8, width 70px), tilted via angle_offset.
+
+**Details:**
+- Shape: `pygame.draw.line(surface, (255,255,255), start_point, end_point, thickness=8)`
+- Width: 70px (slightly wider than eye radius of 40)
+- Tilt: angle_offset shifts endpoints vertically — positive = outer up (surprised), negative = inner up (angry/sad)
+
+**Rationale:**
+- Satisfies Projection-First Architecture: pure white on pure black
+- Straight lines render crisply with no intermediate colors or anti-aliasing
+- Simple geometry — no Bezier curves, no rotation matrices
+
+**Implications:**
+- Thickness matches mouth line thickness (8) for visual consistency
+- Tilt range must be bounded to prevent unnatural shapes
+- ANGRY inner-corner-down uses negative angle_offset
+
+---
+
+### Decision 5: Command Vocabulary and Control Mapping
+
+**Decision:** Socket commands and keyboard shortcuts follow established pattern: step-based increment/decrement and absolute set.
+
+**Details:**
+
+**Socket commands (step = 10px):**
+- `eyebrow_raise`, `eyebrow_lower` — both together
+- `eyebrow_raise_left`, `eyebrow_lower_left` — left independently
+- `eyebrow_raise_right`, `eyebrow_lower_right` — right independently
+- `eyebrow <val>`, `eyebrow_left <val>`, `eyebrow_right <val>` — absolute set
+- `eyebrow_reset` — both to 0.0
+
+**Keyboard shortcuts:**
+- `U` / `J` — raise/lower both (vertical neighbors)
+- `[` / `]` — raise left/right (natural mnemonics)
+- `{` / `}` (Shift+[/]) — lower left/right
+
+**Rationale:**
+- Mirrors existing command structure (blink, wink_left, gaze)
+- Keyboard layout intuitive: U/J for up/down, brackets for left/right
+- No conflicts with existing shortcuts
+
+**Implications:**
+- Socket parser handles multi-word commands and single-arg commands
+- Keyboard handler distinguishes `[` from `{` (requires Shift detection)
+- Client examples and documentation updated
+
+---
+
+### Decision 6: SLEEPING Expression — Eyebrows Hidden
+
+**Decision:** When `current_expression == SLEEPING`, eyebrows are not rendered.
+
+**Details:**
+- SLEEPING eyes rendered as horizontal white lines (not circles)
+- Eyebrows drawn above would float disconnectedly
+- Cleaner projection aesthetic: sleeping face = minimal features
+
+**Rationale:**
+- Visual clarity: avoid disconnected white elements
+- Simplifies rendering logic
+- Natural behavior: sleeping faces have less prominent brows
+
+**Implications:**
+- Graphics renderer checks `current_expression == SLEEPING` before drawing
+- User offset state preserved during SLEEPING — reappears when expression changes
+- Test cases verify absence and reappearance
+
+---
+
+### Decision 7: Sign Convention — Negative = Raise, Positive = Lower
+
+**Decision:** Eyebrow offset sign follows screen Y-coordinates: negative = raise (up), positive = lower (down).
+
+**Details:**
+- `eyebrow_left_offset = -20` means 20px higher than baseline
+- `eyebrow_right_offset = 10` means 10px lower than baseline
+- Clamped range: [-50, +50]
+
+**Rationale:**
+- Matches screen coordinate system (Y increases downward)
+- Consistent with eye Y-offset logic
+- Avoids double-negatives in render math
+
+**Implications:**
+- Socket `eyebrow_raise` decrements offset, `eyebrow_lower` increments
+- Keyboard `U` key decrements, `J` key increments
+- Documentation clarifies convention
+
+---
+
+### Decision 8: Edge Case Handling — Clamping and Overlap Prevention
+
+**Decision:** Multi-layer clamping to prevent off-screen positioning and eye overlap.
+
+**Details:**
+- Set-time clamping: offsets clamped to [-50, +50] when user sets
+- Render-time clamping: final Y position clamped to `y >= 350` (1080p canvas at cy = 540)
+- Overlap prevention: if gap between brow bottom and eye top < 5px, skip rendering
+
+**Rationale:**
+- Set-time clamping prevents absurd input
+- Render-time clamping accounts for additive stacking
+- Overlap prevention maintains pure black/white separation
+
+**Implications:**
+- Graphics renderer computes gap between brow and eye
+- Worst-case: SURPRISED (cy - 20) + max raise (-50) + blink lift (-8) = safe
+- Test cases validate boundary conditions
+
+---
+
+## Implementation Summary
+
+### Vi — Backend State & Commands
+
+**Contribution:** Eyebrow state variables, helper methods, socket commands, keyboard shortcuts
+
+**Changes to pumpkin_face.py:**
+- 2 state variables: `eyebrow_left_offset`, `eyebrow_right_offset` (range [-50, +50])
+- 8 helper methods for control
+- 10 socket commands for remote control
+- 6 keyboard shortcuts
+- Orthogonal to expression state machine
+
+**Validation:** All 43 existing tests pass. No breaking changes.
+
+### Ekko — Graphics Rendering
+
+**Contribution:** Eyebrow rendering with baseline table and animation integration
+
+**Changes to pumpkin_face.py:**
+- `EYEBROW_BASELINES` dictionary with expression-specific baselines
+- `_get_eyebrow_baseline(expression)` method for interpolation
+- `_draw_eyebrows()` method with:
+  - Baseline position lookup
+  - User offset application
+  - Blink/wink lift integration
+  - Collision detection
+  - SLEEPING expression handling
+
+### Mylo — Test Suite
+
+**Contribution:** 37 tests across 6 test classes (test_eyebrow_animation.py)
+
+**Coverage:**
+- State Variables (8 tests)
+- Orthogonality (11 tests)
+- Commands (6 tests)
+- Rendering (5 tests, skipped pending graphics)
+- Animation Integration (4 tests)
+- Edge Cases (4 tests)
+
+**Results:** 29 passed, 8 skipped
+
+---
+
+## Approval
+
+✅ Design approved for implementation  
+✅ Parallel development ready (Ekko graphics, Vi backend, Mylo testing)
