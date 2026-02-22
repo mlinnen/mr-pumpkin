@@ -52,9 +52,34 @@ class PumpkinFace:
         self.rolling_start_angle = None  # Angle where rolling started
         self.pupil_angle = 225.0  # Current pupil angle in degrees (225° = upper-left)
         
+        # Gaze control state (per-eye X/Y angles)
+        # Default (-45°, 45°) matches original 225° position (upper-left) for backward compatibility
+        self.pupil_angle_left = (-45.0, 45.0)   # (x_angle, y_angle) where 0,0 = straight ahead
+        self.pupil_angle_right = (-45.0, 45.0)  # +X = right, +Y = up, range ±90°
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
+    
+    @property
+    def left_eye_gaze_x(self):
+        """X angle for left eye (-90 to +90 degrees)."""
+        return self.pupil_angle_left[0]
+    
+    @property
+    def left_eye_gaze_y(self):
+        """Y angle for left eye (-90 to +90 degrees)."""
+        return self.pupil_angle_left[1]
+    
+    @property
+    def right_eye_gaze_x(self):
+        """X angle for right eye (-90 to +90 degrees)."""
+        return self.pupil_angle_right[0]
+    
+    @property
+    def right_eye_gaze_y(self):
+        """Y angle for right eye (-90 to +90 degrees)."""
+        return self.pupil_angle_right[1]
         
     def draw(self, surface: pygame.Surface):
         # Black background for projection
@@ -180,21 +205,86 @@ class PumpkinFace:
         else:
             pygame.draw.circle(surface, self.FEATURE_COLOR, right_pos, eye_radius)
         
-        # Draw pupils as black circles (scale with eye, position based on circular motion)
+        # Draw pupils as black circles (scale with eye, position based on gaze angles or rolling)
         pupil_radius = int(15 * eye_scale)
-        # Original pupils at (center - 10, center - 10) = sqrt(200) radius at 225°
-        # For compatibility, use sqrt(200) ≈ 14.14 orbit radius
+        # Orbit radius with safety margin: eye_radius(40) - pupil_radius(15) - safety(10.86) ≈ 14.14
         pupil_orbit_radius = int(math.sqrt(200) * eye_scale)
+        
         if pupil_radius > 0:
-            # Calculate pupil position using circular motion around eye center
-            angle_rad = math.radians(self.pupil_angle)
-            left_pupil_x = int(left_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
-            left_pupil_y = int(left_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
-            right_pupil_x = int(right_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
-            right_pupil_y = int(right_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
+            # Determine pupil position: use rolling animation if active, otherwise use gaze angles
+            if self.is_rolling:
+                # Rolling eyes: both pupils follow pupil_angle (circular motion)
+                angle_rad = math.radians(self.pupil_angle)
+                left_pupil_x = int(left_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
+                left_pupil_y = int(left_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
+                right_pupil_x = int(right_pos[0] + pupil_orbit_radius * math.cos(angle_rad))
+                right_pupil_y = int(right_pos[1] + pupil_orbit_radius * math.sin(angle_rad))
+            else:
+                # Gaze control: convert X/Y angles to pixel offsets independently per eye
+                left_pupil_x, left_pupil_y = self._angle_to_pixel(left_pos, self.pupil_angle_left, pupil_orbit_radius)
+                right_pupil_x, right_pupil_y = self._angle_to_pixel(right_pos, self.pupil_angle_right, pupil_orbit_radius)
             
             pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pupil_x, left_pupil_y), pupil_radius)
             pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pupil_x, right_pupil_y), pupil_radius)
+    
+    def _angle_to_pixel(self, eye_center: Tuple[int, int], angles: Tuple[float, float], orbit_radius: int) -> Tuple[int, int]:
+        """Convert gaze X/Y angles to pupil pixel position.
+        
+        Args:
+            eye_center: (x, y) position of eye center
+            angles: (x_angle, y_angle) where 0,0 = straight ahead, +X = right, +Y = up
+            orbit_radius: maximum radius pupils can move from center
+            
+        Returns:
+            (x, y) pixel position for pupil
+        """
+        x_angle, y_angle = angles
+        
+        # Clamp angles to ±90° to prevent pupils from going outside eyes
+        x_angle = max(-90.0, min(90.0, x_angle))
+        y_angle = max(-90.0, min(90.0, y_angle))
+        
+        # Convert angles to radians
+        x_angle_rad = math.radians(x_angle)
+        y_angle_rad = math.radians(y_angle)
+        
+        # Calculate pixel offsets: +X angle = right (+cos), +Y angle = up (-sin for screen coords)
+        # Use sin for angle mapping: at 0° no offset, at ±90° max offset
+        offset_x = orbit_radius * math.sin(x_angle_rad)
+        offset_y = -orbit_radius * math.sin(y_angle_rad)  # Negative because screen Y increases downward
+        
+        pupil_x = int(eye_center[0] + offset_x)
+        pupil_y = int(eye_center[1] + offset_y)
+        
+        return (pupil_x, pupil_y)
+    
+    def _gaze_to_angle(self, gaze: Tuple[float, float]) -> float:
+        """Convert gaze X/Y angles to circular angle for rolling animation.
+        
+        Args:
+            gaze: (x_angle, y_angle) where 0,0 = straight ahead, +X = right, +Y = up
+            
+        Returns:
+            Circular angle in degrees (0° = right, 90° = down, 180° = left, 270° = up)
+        """
+        x_angle, y_angle = gaze
+        
+        # Convert angles to radians
+        x_rad = math.radians(x_angle)
+        y_rad = math.radians(y_angle)
+        
+        # Calculate unit vector from gaze angles
+        # X: positive = right, Y: positive = up (but screen coords are inverted)
+        offset_x = math.sin(x_rad)
+        offset_y = -math.sin(y_rad)  # Invert Y for screen coordinates
+        
+        # Convert to circular angle using atan2
+        # atan2(y, x) gives angle in radians, convert to degrees
+        angle_rad = math.atan2(offset_y, offset_x)
+        angle_deg = math.degrees(angle_rad)
+        
+        # Normalize to 0-360 range
+        return angle_deg % 360
     
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:
@@ -238,33 +328,132 @@ class PumpkinFace:
             self.wink_progress = 0.0
             self.pre_wink_expression = self.current_expression
     
+    def gaze(self, *args):
+        """Set gaze direction for one or both eyes.
+        
+        Supports two calling modes:
+        - gaze(x, y): Both eyes look at (x, y) angles
+        - gaze(x1, y1, x2, y2): Left eye at (x1, y1), right eye at (x2, y2)
+        
+        Args:
+            x, y: Angles for both eyes (if 2 args)
+            x1, y1, x2, y2: Left eye (x1, y1), right eye (x2, y2) angles (if 4 args)
+            
+        Angles: 0° = straight ahead, +X = right, +Y = up, range ±90° (auto-clamped)
+        """
+        if len(args) == 2:
+            # Both eyes look same direction
+            try:
+                x, y = float(args[0]), float(args[1])
+            except (ValueError, TypeError):
+                raise TypeError(f"gaze() arguments must be numeric")
+            x = max(-90.0, min(90.0, x))
+            y = max(-90.0, min(90.0, y))
+            self.pupil_angle_left = (x, y)
+            self.pupil_angle_right = (x, y)
+        elif len(args) == 4:
+            # Independent eye control
+            try:
+                x1, y1, x2, y2 = float(args[0]), float(args[1]), float(args[2]), float(args[3])
+            except (ValueError, TypeError):
+                raise TypeError(f"gaze() arguments must be numeric")
+            x1 = max(-90.0, min(90.0, x1))
+            y1 = max(-90.0, min(90.0, y1))
+            x2 = max(-90.0, min(90.0, x2))
+            y2 = max(-90.0, min(90.0, y2))
+            self.pupil_angle_left = (x1, y1)
+            self.pupil_angle_right = (x2, y2)
+        else:
+            raise TypeError(f"gaze() takes 2 or 4 arguments ({len(args)} given)")
+    
+    def get_left_eye_gaze(self):
+        """Get current gaze angles for left eye."""
+        return self.pupil_angle_left
+    
+    def get_right_eye_gaze(self):
+        """Get current gaze angles for right eye."""
+        return self.pupil_angle_right
+    
     def roll_clockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'clockwise'
-            self.rolling_start_angle = self.pupil_angle
+            # Capture current gaze state before rolling
+            self.pre_rolling_gaze_left = self.pupil_angle_left
+            self.pre_rolling_gaze_right = self.pupil_angle_right
+            # Convert current gaze to circular angle for rolling start position
+            self.rolling_start_angle = self._gaze_to_angle(self.pupil_angle_left)
+            self.pupil_angle = self.rolling_start_angle
 
     def roll_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'counterclockwise'
-            self.rolling_start_angle = self.pupil_angle
+            # Capture current gaze state before rolling
+            self.pre_rolling_gaze_left = self.pupil_angle_left
+            self.pre_rolling_gaze_right = self.pupil_angle_right
+            # Convert current gaze to circular angle for rolling start position
+            self.rolling_start_angle = self._gaze_to_angle(self.pupil_angle_left)
+            self.pupil_angle = self.rolling_start_angle
 
     def roll_eyes_clockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'clockwise'
-            self.rolling_start_angle = self.pupil_angle
+            # Capture current gaze state before rolling
+            self.pre_rolling_gaze_left = self.pupil_angle_left
+            self.pre_rolling_gaze_right = self.pupil_angle_right
+            # Convert current gaze to circular angle for rolling start position
+            self.rolling_start_angle = self._gaze_to_angle(self.pupil_angle_left)
+            self.pupil_angle = self.rolling_start_angle
 
     def roll_eyes_counterclockwise(self):
         if not self.is_rolling:  # Don't interrupt an ongoing roll
             self.is_rolling = True
             self.rolling_progress = 0.0
             self.rolling_direction = 'counterclockwise'
-            self.rolling_start_angle = self.pupil_angle
+            # Capture current gaze state before rolling
+            self.pre_rolling_gaze_left = self.pupil_angle_left
+            self.pre_rolling_gaze_right = self.pupil_angle_right
+            # Convert current gaze to circular angle for rolling start position
+            self.rolling_start_angle = self._gaze_to_angle(self.pupil_angle_left)
+            self.pupil_angle = self.rolling_start_angle
+    
+    def set_gaze(self, x1: float, y1: float, x2: float = None, y2: float = None):
+        """Set gaze angles for one or both eyes.
+        
+        Args:
+            x1: X angle for both eyes (if x2/y2 not provided) or left eye X
+            y1: Y angle for both eyes (if x2/y2 not provided) or left eye Y
+            x2: Right eye X angle (optional)
+            y2: Right eye Y angle (optional)
+        
+        Angles are clamped to [-90, 90] range.
+        0 degrees = straight ahead, +X = right, +Y = up
+        """
+        # Clamp values to ±90°
+        def clamp(value: float) -> float:
+            return max(-90.0, min(90.0, value))
+        
+        if x2 is None or y2 is None:
+            # Two args: apply same angles to both eyes
+            self.pupil_angle_left = (clamp(x1), clamp(y1))
+            self.pupil_angle_right = (clamp(x1), clamp(y1))
+        else:
+            # Four args: independent eye control
+            self.pupil_angle_left = (clamp(x1), clamp(y1))
+            self.pupil_angle_right = (clamp(x2), clamp(y2))
+    
+    def get_gaze(self) -> tuple:
+        """Get current gaze angles for both eyes.
+        
+        Returns:
+            Tuple of (left_x, left_y, right_x, right_y)
+        """
+        return (self.left_gaze_x, self.left_gaze_y, self.right_gaze_x, self.right_gaze_y)
     
     def update(self):
         # Handle blink animation
@@ -314,6 +503,9 @@ class PumpkinFace:
                 self.rolling_progress = 0.0
                 self.is_rolling = False
                 self.rolling_start_angle = None
+                # Restore gaze state
+                self.pupil_angle_left = self.pre_rolling_gaze_left
+                self.pupil_angle_right = self.pre_rolling_gaze_right
             else:
                 # Rotate 360° from starting position
                 direction_multiplier = 1 if self.rolling_direction == 'clockwise' else -1
@@ -470,6 +662,26 @@ class PumpkinFace:
                         if data == "roll_counterclockwise":
                             self.roll_counterclockwise()
                             print("Rolling eyes counter-clockwise")
+                            continue
+                        
+                        # Handle gaze command
+                        if data.startswith("gaze "):
+                            try:
+                                parts = data.split()
+                                args = [float(x) for x in parts[1:]]
+                                
+                                if len(args) == 2:
+                                    # Two args: apply same angles to both eyes
+                                    self.set_gaze(args[0], args[1])
+                                    print(f"Gaze set to: both eyes ({args[0]}°, {args[1]}°)")
+                                elif len(args) == 4:
+                                    # Four args: independent eye control
+                                    self.set_gaze(args[0], args[1], args[2], args[3])
+                                    print(f"Gaze set to: left ({args[0]}°, {args[1]}°), right ({args[2]}°, {args[3]}°)")
+                                else:
+                                    print(f"Error: gaze command requires 2 or 4 numeric arguments, got {len(args)}")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing gaze command: {e}")
                             continue
                         
                         try:
