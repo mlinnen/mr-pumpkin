@@ -15,6 +15,20 @@ class Expression(Enum):
     SCARED = "scared"
     SLEEPING = "sleeping"
 
+# Eyebrow baseline positions per expression
+# (brow_y_gap from eye center Y, angle_offset for tilt)
+# brow_y_gap: how far ABOVE eye center the brow sits (subtracted from eye_y, negative value)
+# angle_offset: positive=outer corners UP (surprised), negative=inner corners UP (angry)
+EYEBROW_BASELINES = {
+    Expression.NEUTRAL:   (-55, 0),
+    Expression.HAPPY:     (-50, +3),
+    Expression.SAD:       (-60, -8),
+    Expression.ANGRY:     (-50, -12),
+    Expression.SURPRISED: (-70, +5),
+    Expression.SCARED:    (-65, -5),
+    # SLEEPING: hidden — no entry needed, handled by guard in _draw_eyebrows
+}
+
 class PumpkinFace:
     def __init__(self, width: int = 1920, height: int = 1080, monitor: int = 0, fullscreen: bool = True):
         self.width = width
@@ -99,6 +113,9 @@ class PumpkinFace:
         
         # Draw eyes
         self._draw_eyes(surface, left_eye_pos, right_eye_pos)
+        
+        # Draw eyebrows
+        self._draw_eyebrows(surface, left_eye_pos, right_eye_pos)
         
         # Draw mouth
         self._draw_mouth(surface, mouth_points)
@@ -290,6 +307,89 @@ class PumpkinFace:
         
         # Normalize to 0-360 range
         return angle_deg % 360
+    
+    def _get_eyebrow_baseline(self, expression: Expression) -> Tuple[float, float]:
+        """Get baseline eyebrow position for an expression.
+        
+        Args:
+            expression: Expression to get baseline for
+            
+        Returns:
+            (brow_y_gap, angle_offset) tuple. Defaults to NEUTRAL if not found.
+        """
+        return EYEBROW_BASELINES.get(expression, (-55, 0))
+    
+    def _draw_eyebrows(self, surface: pygame.Surface, left_pos: Tuple[int, int], right_pos: Tuple[int, int]):
+        """Draw eyebrows with expression-based baselines, blink/wink lift, and user offsets.
+        
+        Args:
+            surface: Surface to draw on
+            left_pos: Left eye center position
+            right_pos: Right eye center position
+        """
+        # Skip rendering if sleeping
+        if self.current_expression == Expression.SLEEPING:
+            return
+        
+        # Determine eye radius (needed for collision detection)
+        eye_radius = 40
+        if self.current_expression == Expression.SURPRISED:
+            eye_radius = 50
+        elif self.current_expression == Expression.SCARED:
+            eye_radius = 45
+        
+        # Compute interpolated baseline for transitions
+        if self.transition_progress < 1.0:
+            curr_gap, curr_angle = self._get_eyebrow_baseline(self.current_expression)
+            tgt_gap, tgt_angle = self._get_eyebrow_baseline(self.target_expression)
+            p = self.transition_progress
+            baseline_gap = curr_gap + (tgt_gap - curr_gap) * p
+            angle_offset = curr_angle + (tgt_angle - curr_angle) * p
+        else:
+            baseline_gap, angle_offset = self._get_eyebrow_baseline(self.current_expression)
+        
+        # Compute blink lift (both eyebrows rise during blink)
+        blink_lift = 8.0 * math.sin(self.blink_progress * math.pi) if self.is_blinking else 0.0
+        
+        # Compute wink lift per eye
+        left_wink_lift = 8.0 * (1.0 - self.left_eye_scale) if (self.is_winking and self.winking_eye == 'left') else 0.0
+        right_wink_lift = 8.0 * (1.0 - self.right_eye_scale) if (self.is_winking and self.winking_eye == 'right') else 0.0
+        
+        # Compute final Y positions
+        # baseline_gap is negative (e.g., -55), so adding it moves UP
+        # user offset: negative=raise (subtract from y), positive=lower (add to y)
+        # blink/wink lift: subtract (lift up)
+        left_brow_y = int(left_pos[1] + baseline_gap + self.eyebrow_left_offset - blink_lift - left_wink_lift)
+        right_brow_y = int(right_pos[1] + baseline_gap + self.eyebrow_right_offset - blink_lift - right_wink_lift)
+        
+        # Apply floor clamp (prevent eyebrows from going too high off screen)
+        left_brow_y = max(350, left_brow_y)
+        right_brow_y = max(350, right_brow_y)
+        
+        # Render each eyebrow as tilted line
+        brow_width_half = 35  # half of 70px width
+        thickness = 8
+        
+        # Left eyebrow: tilted line
+        # angle_offset positive = outer corners up = start point DOWN, end point UP
+        start_left = (left_pos[0] - brow_width_half, left_brow_y + int(angle_offset))
+        end_left = (left_pos[0] + brow_width_half, left_brow_y - int(angle_offset))
+        
+        # Skip if gap to eye top < 5px
+        eye_top_left = left_pos[1] - eye_radius
+        brow_bottom_left = left_brow_y + thickness // 2
+        if brow_bottom_left < eye_top_left - 5:
+            pygame.draw.line(surface, self.FEATURE_COLOR, start_left, end_left, thickness)
+        
+        # Right eyebrow: tilted line
+        start_right = (right_pos[0] - brow_width_half, right_brow_y + int(angle_offset))
+        end_right = (right_pos[0] + brow_width_half, right_brow_y - int(angle_offset))
+        
+        # Skip if gap to eye top < 5px
+        eye_top_right = right_pos[1] - eye_radius
+        brow_bottom_right = right_brow_y + thickness // 2
+        if brow_bottom_right < eye_top_right - 5:
+            pygame.draw.line(surface, self.FEATURE_COLOR, start_right, end_right, thickness)
     
     def _draw_mouth(self, surface: pygame.Surface, points: list):
         if not points or len(points) < 2:

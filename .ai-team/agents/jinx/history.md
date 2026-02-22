@@ -73,3 +73,36 @@
 - Blink is expression-to-closed-to-same-expression (temporary detour)
 - Solution: Add `is_blinking` flag + separate `blink_progress` counter, orthogonal to expression transitions
 - Socket command `"blink"` triggers animation method, not enum value change
+
+### Design Review — Eyebrow Animation (Issue #16) (2026-02-22)
+
+**Orthogonal state with derived transient animation:**
+- Eyebrow offsets (`eyebrow_left_offset`, `eyebrow_right_offset`) are persistent user control, independent of expression state machine
+- Blink/wink eyebrow movement is **computed at render time** from existing `blink_progress` and `wink_progress` — NOT stored in state
+- This satisfies Capture-Animate-Restore pattern without adding capture fields: base state is never mutated during animations, so it's automatically "restored" when animation ends
+- Formula: `final_brow_y = expression_baseline + user_offset + computed_transient_delta`
+
+**Expression-driven baseline with additive offsets:**
+- Each expression defines baseline Y-position and tilt angle for eyebrows (ANGRY = inner corners down, SURPRISED = high arched, etc.)
+- User offsets and animation deltas stack additively on top of baseline
+- Expression transitions interpolate the baseline; user offsets remain unchanged
+- Clear separation: graphics owns baseline table, backend owns offset state
+
+**Projection-first rendering:**
+- Eyebrows rendered as thick white straight lines (thickness 8, width 70px), tilted via angle_offset
+- No curves, no anti-aliasing — pure white (255,255,255) on pure black (0,0,0)
+- Simple geometry: line from `(cx-35, y+offset)` to `(cx+35, y-offset)` for tilt
+- SLEEPING expression: eyebrows hidden entirely (eyes are lines, brows would clutter)
+
+**Command vocabulary and control:**
+- Socket commands: `eyebrow_raise`, `eyebrow_lower`, `eyebrow_raise_left/right`, `eyebrow_lower_left/right`, `eyebrow <val>`, `eyebrow_reset`
+- Keyboard shortcuts: U/J (raise/lower both), [ / ] (raise left/right), { / } (lower left/right)
+- Step size: 10px, clamped [-50, +50]
+- Sign convention: negative = raise, positive = lower (screen Y coordinates)
+
+**Edge case handling:**
+- Multi-layer clamping: set-time (backend) and render-time (graphics) to prevent off-screen or eye overlap
+- Overlap prevention: if gap between brow and eye < 5px, skip rendering (avoids white blob on projector)
+- SLEEPING preservation: user offsets preserved during SLEEPING — brows reappear at previous position when expression changes
+
+**Key insight:** Derived transient animation (computed, not stored) is the cleanest way to satisfy Capture-Animate-Restore for effects that are purely functions of existing animation progress. No new state variables, no restoration logic, zero risk of desync.

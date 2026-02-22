@@ -59,3 +59,25 @@
 **Return Guarantee:** Animation ALWAYS returns to exact starting angle using stored `rolling_start_angle`, not a hardcoded default. This means rolling from 90° returns to 90°, from 225° returns to 225°, etc.
 
 **Socket Commands:** Existing "roll_clockwise" and "roll_counterclockwise" socket commands work unchanged — server calls appropriate method which now captures starting angle.
+
+### Eyebrow Animation Backend (Issue #16)
+
+**What:** Implemented backend state management for eyebrow animation control.
+
+**Key patterns used:**
+1. **Orthogonal state system:** Eyebrow offsets are independent of expression state machine (follow same pattern as gaze control)
+2. **Sign convention:** Negative values = raise (up), positive = lower (down) — matches screen Y coordinates
+3. **Range clamping:** All values clamped to [-50, +50] pixels to prevent extreme positioning
+4. **Incremental + absolute control:** Both step-based methods (raise/lower by 10px) and absolute positioning (set_eyebrow)
+5. **Socket command parsing:** String-based commands with error handling follow established pattern from gaze/blink commands
+
+**File changes:**
+- `pumpkin_face.py`:
+  - Added state variables: `eyebrow_left_offset`, `eyebrow_right_offset` (lines 60-63)
+  - Added 8 helper methods: `set_eyebrow`, `raise_eyebrows`, `lower_eyebrows`, `raise_eyebrow_left`, `lower_eyebrow_left`, `raise_eyebrow_right`, `lower_eyebrow_right`, `reset_eyebrows` (lines 311-351)
+  - Added keyboard shortcuts: U/J for both, [ and ] with optional Shift modifier for individual control (lines 668-683)
+  - Added 10 socket commands: `eyebrow_raise`, `eyebrow_lower`, `eyebrow_raise_left`, `eyebrow_lower_left`, `eyebrow_raise_right`, `eyebrow_lower_right`, `eyebrow_reset`, `eyebrow <val>`, `eyebrow_left <val>`, `eyebrow_right <val>` (lines 750-815)
+
+**Verified orthogonality:** `set_expression()` does NOT modify eyebrow state — eyebrow positions persist across expression changes.
+
+**All 43 existing tests pass:** No breaking changes to existing functionality.
