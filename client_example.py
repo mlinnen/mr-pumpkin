@@ -3,7 +3,8 @@ Example client to send commands to the pumpkin face server.
 
 Usage:
     python client_example.py
-    Then type an expression: neutral, happy, sad, angry, surprised, scared
+    Then type an expression: neutral, happy, sad, angry, surprised, scared, sleeping
+    Or animation commands: blink, roll_clockwise, roll_counterclockwise
 """
 
 import socket
@@ -20,7 +21,8 @@ def send_expression(expression: str):
 
 if __name__ == "__main__":
     print("Pumpkin Face Client")
-    print("Valid expressions: neutral, happy, sad, angry, surprised, scared")
+    print("Valid expressions: neutral, happy, sad, angry, surprised, scared, sleeping")
+    print("Animation commands: blink, roll_clockwise, roll_counterclockwise")
     print("Type 'quit' to exit\n")
     
     while True:
