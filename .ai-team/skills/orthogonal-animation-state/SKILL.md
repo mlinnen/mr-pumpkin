@@ -94,6 +94,12 @@ elif self.is_blinking or self.is_winking:
 - Capture: Saves expression and which eye
 - Restore: Both eyes return to full scale, expression restored
 
+**Eyebrow Lift During Blink/Wink** (pumpkin_face.py):
+- Pattern: Derived transient animation (no capture/restore needed)
+- Blink lift: `8.0 * sin(blink_progress * π)` computed at render time
+- Wink lift: `8.0 * (1.0 - eye_scale)` per eye, computed from wink state
+- Key insight: These are rendering effects derived from existing animation progress vars, not separate animations with their own capture/restore cycle
+
 ## Anti-Patterns
 
 ### ❌ Hardcoded Return State
