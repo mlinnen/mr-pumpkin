@@ -57,6 +57,11 @@ class PumpkinFace:
         self.pupil_angle_left = (-45.0, 45.0)   # (x_angle, y_angle) where 0,0 = straight ahead
         self.pupil_angle_right = (-45.0, 45.0)  # +X = right, +Y = up, range ±90°
         
+        # Eyebrow control state (orthogonal to expression state machine)
+        # Sign convention: NEGATIVE = raise (up), POSITIVE = lower (down) — screen Y coords
+        self.eyebrow_left_offset = 0.0   # pixels, clamped [-50, +50]
+        self.eyebrow_right_offset = 0.0  # pixels, clamped [-50, +50]
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
@@ -303,6 +308,48 @@ class PumpkinFace:
             p2 = (int(points[i+1][0]), int(points[i+1][1]))
             pygame.draw.line(surface, self.FEATURE_COLOR, p1, p2, 8)
     
+    def set_eyebrow(self, left: float, right: float = None):
+        """Set eyebrow offsets. Negative = raise, positive = lower. Clamped to [-50, +50].
+        
+        Args:
+            left: Offset for left eyebrow (if right not provided, applies to both)
+            right: Offset for right eyebrow (optional)
+        """
+        def clamp(v): return max(-50.0, min(50.0, float(v)))
+        self.eyebrow_left_offset = clamp(left)
+        self.eyebrow_right_offset = clamp(right if right is not None else left)
+
+    def raise_eyebrows(self, step: float = 10.0):
+        """Raise both eyebrows by step pixels."""
+        self.eyebrow_left_offset = max(-50.0, self.eyebrow_left_offset - step)
+        self.eyebrow_right_offset = max(-50.0, self.eyebrow_right_offset - step)
+
+    def lower_eyebrows(self, step: float = 10.0):
+        """Lower both eyebrows by step pixels."""
+        self.eyebrow_left_offset = min(50.0, self.eyebrow_left_offset + step)
+        self.eyebrow_right_offset = min(50.0, self.eyebrow_right_offset + step)
+
+    def raise_eyebrow_left(self, step: float = 10.0):
+        """Raise left eyebrow by step pixels."""
+        self.eyebrow_left_offset = max(-50.0, self.eyebrow_left_offset - step)
+
+    def lower_eyebrow_left(self, step: float = 10.0):
+        """Lower left eyebrow by step pixels."""
+        self.eyebrow_left_offset = min(50.0, self.eyebrow_left_offset + step)
+
+    def raise_eyebrow_right(self, step: float = 10.0):
+        """Raise right eyebrow by step pixels."""
+        self.eyebrow_right_offset = max(-50.0, self.eyebrow_right_offset - step)
+
+    def lower_eyebrow_right(self, step: float = 10.0):
+        """Lower right eyebrow by step pixels."""
+        self.eyebrow_right_offset = min(50.0, self.eyebrow_right_offset + step)
+
+    def reset_eyebrows(self):
+        """Reset both eyebrows to neutral position."""
+        self.eyebrow_left_offset = 0.0
+        self.eyebrow_right_offset = 0.0
+
     def set_expression(self, expression: Expression):
         if expression != self.current_expression:
             self.target_expression = expression
@@ -618,6 +665,22 @@ class PumpkinFace:
             self.roll_clockwise()
         elif key == pygame.K_x:
             self.roll_counterclockwise()
+        elif key == pygame.K_u:
+            self.raise_eyebrows()
+        elif key == pygame.K_j:
+            self.lower_eyebrows()
+        elif key == pygame.K_LEFTBRACKET:
+            mods = pygame.key.get_mods()
+            if mods & pygame.KMOD_SHIFT:
+                self.lower_eyebrow_left()
+            else:
+                self.raise_eyebrow_left()
+        elif key == pygame.K_RIGHTBRACKET:
+            mods = pygame.key.get_mods()
+            if mods & pygame.KMOD_SHIFT:
+                self.lower_eyebrow_right()
+            else:
+                self.raise_eyebrow_right()
     
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -682,6 +745,72 @@ class PumpkinFace:
                                     print(f"Error: gaze command requires 2 or 4 numeric arguments, got {len(args)}")
                             except (ValueError, IndexError) as e:
                                 print(f"Error parsing gaze command: {e}")
+                            continue
+                        
+                        # Handle eyebrow commands
+                        if data == "eyebrow_raise":
+                            self.raise_eyebrows()
+                            print("Eyebrows raised")
+                            continue
+                        
+                        if data == "eyebrow_lower":
+                            self.lower_eyebrows()
+                            print("Eyebrows lowered")
+                            continue
+                        
+                        if data == "eyebrow_raise_left":
+                            self.raise_eyebrow_left()
+                            print("Left eyebrow raised")
+                            continue
+                        
+                        if data == "eyebrow_lower_left":
+                            self.lower_eyebrow_left()
+                            print("Left eyebrow lowered")
+                            continue
+                        
+                        if data == "eyebrow_raise_right":
+                            self.raise_eyebrow_right()
+                            print("Right eyebrow raised")
+                            continue
+                        
+                        if data == "eyebrow_lower_right":
+                            self.lower_eyebrow_right()
+                            print("Right eyebrow lowered")
+                            continue
+                        
+                        if data == "eyebrow_reset":
+                            self.reset_eyebrows()
+                            print("Eyebrows reset to neutral")
+                            continue
+                        
+                        if data.startswith("eyebrow "):
+                            try:
+                                parts = data.split()
+                                val = float(parts[1])
+                                self.set_eyebrow(val)
+                                print(f"Both eyebrows set to: {val}")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing eyebrow command: {e}")
+                            continue
+                        
+                        if data.startswith("eyebrow_left "):
+                            try:
+                                parts = data.split()
+                                val = float(parts[1])
+                                self.set_eyebrow(val, self.eyebrow_right_offset)
+                                print(f"Left eyebrow set to: {val}")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing eyebrow_left command: {e}")
+                            continue
+                        
+                        if data.startswith("eyebrow_right "):
+                            try:
+                                parts = data.split()
+                                val = float(parts[1])
+                                self.set_eyebrow(self.eyebrow_left_offset, val)
+                                print(f"Right eyebrow set to: {val}")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing eyebrow_right command: {e}")
                             continue
                         
                         try:
