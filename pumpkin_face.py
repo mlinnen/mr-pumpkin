@@ -76,6 +76,11 @@ class PumpkinFace:
         self.eyebrow_left_offset = 0.0   # pixels, clamped [-50, +50]
         self.eyebrow_right_offset = 0.0  # pixels, clamped [-50, +50]
         
+        # Projection offset state (for alignment/jog)
+        self.projection_offset_x = 0  # pixels, horizontal offset
+        self.projection_offset_y = 0  # pixels, vertical offset
+        self.jog_step = 5  # pixels per keypress
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
@@ -104,8 +109,9 @@ class PumpkinFace:
         # Black background for projection
         surface.fill(self.BACKGROUND_COLOR)
         
-        center_x = self.width // 2
-        center_y = self.height // 2
+        # Apply projection offset to center coordinates
+        center_x = (self.width // 2) + self.projection_offset_x
+        center_y = (self.height // 2) + self.projection_offset_y
         
         # Calculate eye and mouth positions based on expression
         left_eye_pos, right_eye_pos = self._get_eye_positions(center_x, center_y)
@@ -450,6 +456,36 @@ class PumpkinFace:
         self.eyebrow_left_offset = 0.0
         self.eyebrow_right_offset = 0.0
 
+    def jog_projection(self, dx: int, dy: int):
+        """Adjust projection offset by delta pixels. Clamped to [-500, +500].
+        
+        Args:
+            dx: Horizontal offset change in pixels (positive = right)
+            dy: Vertical offset change in pixels (positive = down)
+        """
+        def clamp(v): return max(-500, min(500, int(v)))
+        self.projection_offset_x = clamp(self.projection_offset_x + dx)
+        self.projection_offset_y = clamp(self.projection_offset_y + dy)
+        print(f"Projection offset: ({self.projection_offset_x}, {self.projection_offset_y})")
+    
+    def set_projection_offset(self, x: int, y: int):
+        """Set absolute projection offset in pixels. Clamped to [-500, +500].
+        
+        Args:
+            x: Horizontal offset in pixels (positive = right)
+            y: Vertical offset in pixels (positive = down)
+        """
+        def clamp(v): return max(-500, min(500, int(v)))
+        self.projection_offset_x = clamp(x)
+        self.projection_offset_y = clamp(y)
+        print(f"Projection offset set to: ({self.projection_offset_x}, {self.projection_offset_y})")
+    
+    def reset_projection_offset(self):
+        """Reset projection offset to center (0, 0)."""
+        self.projection_offset_x = 0
+        self.projection_offset_y = 0
+        print("Projection offset reset to (0, 0)")
+
     def set_expression(self, expression: Expression):
         if expression != self.current_expression:
             self.target_expression = expression
@@ -781,6 +817,16 @@ class PumpkinFace:
                 self.lower_eyebrow_right()
             else:
                 self.raise_eyebrow_right()
+        elif key == pygame.K_UP:
+            self.jog_projection(0, -self.jog_step)
+        elif key == pygame.K_DOWN:
+            self.jog_projection(0, self.jog_step)
+        elif key == pygame.K_LEFT:
+            self.jog_projection(-self.jog_step, 0)
+        elif key == pygame.K_RIGHT:
+            self.jog_projection(self.jog_step, 0)
+        elif key == pygame.K_0:
+            self.reset_projection_offset()
     
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -911,6 +957,31 @@ class PumpkinFace:
                                 print(f"Right eyebrow set to: {val}")
                             except (ValueError, IndexError) as e:
                                 print(f"Error parsing eyebrow_right command: {e}")
+                            continue
+                        
+                        # Handle projection offset commands
+                        if data == "projection_reset":
+                            self.reset_projection_offset()
+                            continue
+                        
+                        if data.startswith("jog_offset "):
+                            try:
+                                parts = data.split()
+                                dx = int(parts[1])
+                                dy = int(parts[2])
+                                self.jog_projection(dx, dy)
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing jog_offset command: {e}")
+                            continue
+                        
+                        if data.startswith("set_offset "):
+                            try:
+                                parts = data.split()
+                                x = int(parts[1])
+                                y = int(parts[2])
+                                self.set_projection_offset(x, y)
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing set_offset command: {e}")
                             continue
                         
                         try:
