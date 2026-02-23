@@ -124,7 +124,7 @@ class PumpkinFace:
         self._draw_eyebrows(surface, left_eye_pos, right_eye_pos)
         
         # Draw mouth
-        self._draw_mouth(surface, mouth_points)
+        self._draw_mouth(surface, mouth_points, center_x, center_y)
     
     def _get_eye_positions(self, cx: int, cy: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         eye_y_offset = -50
@@ -368,9 +368,11 @@ class PumpkinFace:
         left_brow_y = int(left_pos[1] + baseline_gap + self.eyebrow_left_offset - blink_lift - left_wink_lift)
         right_brow_y = int(right_pos[1] + baseline_gap + self.eyebrow_right_offset - blink_lift - right_wink_lift)
         
-        # Apply floor clamp (prevent eyebrows from going too high off screen)
-        left_brow_y = max(350, left_brow_y)
-        right_brow_y = max(350, right_brow_y)
+        # Apply relative floor clamp (prevent eyebrows from going above screen top)
+        # Floor must account for projection offset - eyes moved down, so eyebrows' valid range also shifts
+        screen_floor = 0  # Top edge of screen
+        left_brow_y = max(screen_floor, left_brow_y)
+        right_brow_y = max(screen_floor, right_brow_y)
         
         # Render each eyebrow as tilted line
         brow_width_half = 35  # half of 70px width
@@ -397,15 +399,15 @@ class PumpkinFace:
         if brow_bottom_right < eye_top_right - 5:
             pygame.draw.line(surface, self.FEATURE_COLOR, start_right, end_right, thickness)
     
-    def _draw_mouth(self, surface: pygame.Surface, points: list):
+    def _draw_mouth(self, surface: pygame.Surface, points: list, cx: int, cy: int):
         if not points or len(points) < 2:
             if self.current_expression == Expression.SURPRISED:
                 # O-shaped mouth - white filled circle
-                pygame.draw.circle(surface, self.FEATURE_COLOR, (self.width // 2, self.height // 2 + 80), 30)
+                pygame.draw.circle(surface, self.FEATURE_COLOR, (cx, cy + 80), 30)
             elif self.current_expression == Expression.SCARED:
                 # Scared mouth - white filled ellipse
                 pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
-                                   (self.width // 2 - 40, self.height // 2 + 70, 80, 50))
+                                   (cx - 40, cy + 70, 80, 50))
             return
         
         # Draw thick white lines for mouth curves

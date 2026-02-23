@@ -81,3 +81,31 @@
 **Verified orthogonality:** `set_expression()` does NOT modify eyebrow state — eyebrow positions persist across expression changes.
 
 **All 43 existing tests pass:** No breaking changes to existing functionality.
+
+### Projection Offset Backend (Issue #18)
+
+**What:** Implemented command handler for projection offset adjustment (jog/nudge functionality).
+
+**Key patterns used:**
+1. **Orthogonal state system:** Projection offset is independent of expression state machine, gaze, eyebrows, blink, wink, etc.
+2. **Boundary clamping:** All values clamped to [-500, +500] pixels to prevent extreme positioning while allowing significant adjustment
+3. **Dual control modes:** Both relative (`jog_projection(dx, dy)`) and absolute (`set_projection_offset(x, y)`) positioning
+4. **Integer precision:** Pixel offsets use integers (no sub-pixel precision needed for projection alignment)
+5. **Socket command parsing:** String-based commands with error handling follow established pattern from gaze/blink/eyebrow commands
+
+**File changes:**
+- `pumpkin_face.py`:
+  - Added state variables: `projection_offset_x`, `projection_offset_y` (lines 79-82)
+  - Applied offset to center coordinates in `draw()` method (lines 112-114)
+  - Added 3 command methods: `jog_projection`, `set_projection_offset`, `reset_projection_offset` (lines 459-487)
+  - Added keyboard shortcuts: arrow keys for 5px nudge, 0 for reset (lines 820-830)
+  - Added 3 socket commands: `jog_offset <dx> <dy>`, `set_offset <x> <y>`, `projection_reset` (lines 962-986)
+- `test_projection_offset.py`: Test script for command validation
+
+**Verified orthogonality:** Projection offset persists across expression changes, blinks, winks, gaze changes, and eyebrow adjustments. It's a global rendering transform applied at the top level of `draw()`.
+
+**Design rationale:**
+- **±500px range:** Allows for significant realignment without causing features to disappear off-screen on standard displays
+- **Applied to center point:** Single offset affects all features uniformly (eyes, eyebrows, mouth move together)
+- **No negative coordinate prevention:** Clamping at ±500 is sufficient; features can safely move partially off-screen for edge cases
+- **Clean interface:** Simple method signatures that Ekko's UI controls can easily call from graphics layer

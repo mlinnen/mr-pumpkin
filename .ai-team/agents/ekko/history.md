@@ -166,3 +166,91 @@ pupil_y = eye_center_y + orbit_radius * math.sin(angle_rad)
   - Rolling from 90° (custom) returns to 90°
   - Multiple sequential rolls maintain correctness
   - Interrupt protection prevents overlapping animations
+
+### Projection Offset UI (Issue #18)
+
+**Implementation:** Added projection alignment jog controls to enable easy physical alignment of projected face onto foam pumpkin without manual adjustments.
+
+**Architecture:**
+- State variables: `projection_offset_x`, `projection_offset_y` (orthogonal to all other state)
+- Rendering: Offset applied to center coordinates in `draw()` method before calculating feature positions
+- Persistence: Offset survives across expression changes, blinks, winks, and all other animations
+- Bounds: Clamped to ±500 pixels to prevent extreme misalignment
+
+**UI Controls:**
+- Arrow keys: Nudge projection 5px in any direction (up/down/left/right)
+- `0` key: Reset offset to center (0, 0)
+- Console feedback: Prints current offset after each adjustment
+
+**Backend Integration:**
+- Socket commands: `jog_offset dx dy`, `set_offset x y`, `projection_reset`
+- Vi implemented command parsing in socket server
+- Test script: `test_projection_offset.py` validates backend commands
+
+**Graphics Pattern — Orthogonal State Layers:**
+This establishes the pattern for persistent UI adjustments that operate independently from animation state machines. Projection offset is applied at the rendering root (center coordinates) so all features automatically inherit the adjustment. Key insight: transform at the highest level to affect all child elements uniformly.
+
+📌 Team update (2026-02-22): Projection jog UI implemented with keyboard and socket controls
+
+### Eyebrow Clipping Bug Fix (Issue: Eyebrows disappear at high Y offset)
+
+**Problem:** When projection offset jogged to high Y values (e.g., -300 to -400), eyebrows would clip and disappear while eyes remained visible. This occurred because eyebrow rendering had a hardcoded absolute screen coordinate clamp at `y=350`.
+
+**Root Cause:** In `_draw_eyebrows()` (line 372), eyebrow Y positions were clamped using `max(350, left_brow_y)`. This clamp was in absolute screen coordinates and did not account for projection offset. When projection offset moved eyes upward (negative Y), eyebrows followed but were artificially limited to y=350, causing them to render below/behind the eyes or not at all.
+
+**Fix:** Changed floor clamp from hardcoded `350` to screen top edge (`0`). The clamp now prevents eyebrows from rendering above the screen top while allowing them to move freely with projection offset:
+
+```python
+# Old: hardcoded absolute coordinate
+left_brow_y = max(350, left_brow_y)
+
+# New: relative to screen bounds
+screen_floor = 0  # Top edge of screen
+left_brow_y = max(screen_floor, left_brow_y)
+```
+
+**Why This Works:**
+- Eyebrow Y positions are calculated relative to eye positions (`left_pos[1] + baseline_gap + ...`)
+- Eye positions already include projection offset (passed from `draw()` after offset applied)
+- By removing the hardcoded clamp, eyebrows naturally move with eyes at any offset
+- Existing collision detection (lines 385-398) prevents eyebrow/eye overlap regardless of offset
+
+**Verification:**
+- Created `test_eyebrow_clipping.py` to test extreme offsets (±400 pixels)
+- All eyebrow rendering scenarios pass with offsets: centered, high jog, extreme high jog, low jog, extreme low jog
+- All 43 existing projection mapping tests continue to pass
+- Collision detection still prevents eyebrow/eye overlap
+
+**Graphics Pattern — Coordinate System Consistency:** When applying transformations (like projection offset) at the rendering root, all child features must use relative positioning rather than absolute screen coordinates. Absolute clamps break when the coordinate system shifts. This establishes the pattern: compute positions relative to parent elements, clamp only against true boundaries (screen edges, not arbitrary hardcoded values).
+
+### Mouth Clipping Bug Fix (Issue: Mouth drops off-screen in surprised/scared mode at high Y offsets)
+
+**Problem:** When projection offset jogged to high Y values (e.g., -300 to -400) while in surprised or scared expressions, the mouth would drop excessively and clip off-screen. Eyes remained visible but the mouth would disappear or render far below expected position.
+
+**Root Cause:** In `_draw_mouth()` method (lines 404-410), surprised and scared expressions used hardcoded absolute screen coordinates `(self.width // 2, self.height // 2 + 80)` instead of the offset-adjusted center coordinates passed to the method. The `draw()` method correctly computed offset-adjusted `center_x` and `center_y`, passed them to `_get_mouth_points()`, but `_draw_mouth()` ignored these adjusted coordinates for surprised/scared rendering.
+
+**Fix:** Modified `_draw_mouth()` signature to accept center coordinates `cx` and `cy` as parameters (matching the pattern used by `_draw_eyes()` and `_draw_eyebrows()`). Updated surprised and scared mouth rendering to use these parameters:
+
+```python
+# Old: absolute coordinates ignoring offset
+pygame.draw.circle(surface, self.FEATURE_COLOR, 
+                  (self.width // 2, self.height // 2 + 80), 30)
+
+# New: relative coordinates respecting offset
+pygame.draw.circle(surface, self.FEATURE_COLOR, 
+                  (cx, cy + 80), 30)
+```
+
+**Why This Works:**
+- `draw()` applies projection offset to center coordinates (lines 113-114)
+- These adjusted coordinates flow to all rendering methods as `cx, cy` parameters
+- By accepting and using `cx, cy` in `_draw_mouth()`, surprised/scared mouths now inherit projection offset automatically
+- Eliminates coordinate system mismatch between mouth rendering and other features
+
+**Verification:**
+- Created `test_mouth_clipping.py` testing 12 scenarios (surprised/scared × various offset combinations)
+- All mouth visibility tests pass with extreme offsets: ±400 pixels Y, ±200 pixels X
+- All 43 existing projection mapping tests continue to pass
+- Mouth stays properly positioned relative to face at all reasonable offset ranges
+
+**Graphics Pattern Reinforcement:** This is the same coordinate system bug class as the eyebrow clipping issue. The fix reinforces the established pattern: rendering methods must accept offset-adjusted coordinates as parameters rather than accessing raw screen dimensions. Absolute screen coordinates (`self.width // 2`) break when projection offset transforms the coordinate system. All feature rendering methods should use the signature pattern `_draw_feature(surface, ..., cx, cy)` to maintain coordinate system consistency.
