@@ -1,6 +1,7 @@
 # Squad: team state files never ship to preview/main
 # merge=ours keeps the current branch's version (deleted on preview) when conflicts arise
 .ai-team/** merge=ours
+.ai-team-templates/** merge=ours
 
 # Exception: append-only files use union to accumulate history across branch merges
 .ai-team/decisions.md merge=union
