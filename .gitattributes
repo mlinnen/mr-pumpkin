@@ -1,4 +1,9 @@
 # Squad: .ai-team/ and .ai-team-templates/ are dev-only.
-# These files are tracked on dev but explicitly excluded from preview/main via git rm.
-# The GitHub PR merge process doesn't execute custom merge drivers, so manual branch management is necessary.
-# See README.md for team directive on branch management.
+# These directories should NOT be merged into preview/main.
+# Setting merge=ours means: in a merge, keep preview's version (which is: these dirs don't exist).
+# This prevents .ai-team/ from being added when merging from dev.
+.ai-team/** merge=ours
+.ai-team-templates/** merge=ours
+
+# Preserve this branch's .gitattributes during merges from other branches
+.gitattributes merge=ours
