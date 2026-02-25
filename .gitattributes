@@ -1,10 +1,4 @@
-# Squad: team state files never ship to preview/main
-# merge=ours keeps the current branch's version (deleted on preview) when conflicts arise
+# Squad: .ai-team/ never ships to preview/main.
+# merge=ours keeps preview's deleted state when merging from dev.
+# Requires once-per-clone: git config merge.ours.driver true
 .ai-team/** merge=ours
-.ai-team-templates/** merge=ours
-
-# Exception: append-only files use union to accumulate history across branch merges
-.ai-team/decisions.md merge=union
-.ai-team/agents/*/history.md merge=union
-.ai-team/log/** merge=union
-.ai-team/orchestration-log/** merge=union
