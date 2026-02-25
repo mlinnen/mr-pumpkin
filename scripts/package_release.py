@@ -27,7 +27,6 @@ def create_release_package():
         "README.md",
         "VERSION",
         "LICENSE",
-        "test_projection_mapping.py",
         "install.sh",
         "install.ps1"
     ]
