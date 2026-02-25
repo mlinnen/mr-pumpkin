@@ -80,3 +80,57 @@
 - Tests written while Ekko implements the feature (parallel development)
 - May require minor coordinate adjustments once implementation details finalized
 - Expression.SLEEPING enum and keyboard mapping (K_7) will need to be added by implementation
+
+### Nose Movement Tests (Issue #19) - 2026-02-24
+**Comprehensive test coverage**: 45 tests across 6 categories (state, animation, expression integration, commands, edge cases, rendering)
+
+**Animation testing patterns learned:**
+- **Frame progression testing:** Track `nose_animation_progress` from 0.0 to 1.0 over expected duration
+  - Twitch: 30 frames at 60fps (0.5s) with tolerance of ±2 frames
+  - Scrunch: 48 frames at 60fps (0.8s) with tolerance of ±2 frames
+- **Deterministic state checks:** Verify state variables at specific animation progress points
+  - Twitch oscillation: `offset_x = 8 * sin(progress * 2π * 5)` sampled at [0.0, 0.1, 0.25, 0.5, 1.0]
+  - Scrunch phases: compress (0.0-0.35), hold (0.35-0.65), release (0.65-1.0) with scale validation
+- **Easing validation:** Verify non-linear motion by checking delta variance (unique_deltas > 2)
+
+**Edge case discovery:**
+- **Non-interrupting guards:** Commands rejected during active animation (both same-type and cross-type)
+  - `if not (is_twitching or is_scrunching):` prevents animation overlap
+  - Reset command bypasses guard (immediate cancellation)
+- **State composition:** Nose animation runs independently alongside:
+  - Head movement (projection offset)
+  - Expression transitions
+  - Blink/wink animations
+- **Auto-return behavior:** Animations auto-return to neutral (0, 0, 1.0) after completion
+- **Timeout protection:** Animation completes and cleans up within expected duration (no hanging)
+
+**Assertion patterns for animation state:**
+- **Progress tracking:** Verify incremental progress with `assert progress > previous_progress`
+- **Boundary clamping:** Test offset ranges (±30px) and scale ranges (0.5-1.2)
+- **Easing curves:** Sample offset values at key progress points and validate against formula
+- **State orthogonality:** Verify animation state preserved across expression changes and head movement
+
+**Expression integration testing approach:**
+- **State persistence:** Nose offset/scale values survive expression changes (tested across 6 expressions)
+- **Animation continuity:** Mid-animation expression changes don't interrupt nose animation
+- **Independent state machines:** Nose flags (`is_twitching`, `is_scrunching`) orthogonal to `current_expression`
+- **Composition testing:** Verify both states (expression + nose animation) coexist without conflict
+
+**Rendering validation patterns:**
+- **Position verification:** Sample white pixels at expected nose position (center_y + 15)
+- **Projection compliance:** Verify pure black/white colors only (no anti-aliasing)
+- **Offset application:** Test nose follows projection offset (head position)
+- **Animation visibility:** Verify twitch displacement (X-offset) and scrunch compression (Y-scale) in rendered frames
+- **Geometry checks:** Sample vertical range adjusted for scale (50% scrunch = reduced sample range)
+
+**Test organization:**
+- **6 test classes:** StateManagement (8), Animations (10), ExpressionIntegration (7), CommandIntegration (6), EdgeCases (8), Rendering (6)
+- **Fixtures:** `pumpkin` for state tests, `pumpkin_surface` for rendering tests
+- **Parametrized approach:** Iterate through all expressions for persistence tests
+- **Progressive complexity:** Start with initialization, then single animations, then composition, then edge cases
+
+**Key testing insights:**
+- Simulating update loop manually: `progress += delta_time / duration` in test loop
+- Tolerance for frame counts: ±2 frames acceptable for 60fps timing (system variance)
+- Rendering tests use sparse sampling (every 5-10 pixels) for performance
+- Animation formula testing separated from integration testing (unit vs. integration)

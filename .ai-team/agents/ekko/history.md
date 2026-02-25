@@ -309,3 +309,70 @@ Both modify the same state variables but serve different use cases. Manual joggi
 
 **Test Corrections (2025-02-23):**
 Fixed pixel coordinate sampling in head movement tests. Eyes render at `center_y - 50` (not at screen center), so directional movement tests needed Y coordinate adjustment to match actual eye position. This highlights importance of understanding render geometry when writing pixel-level tests.
+
+### Nose Rendering and Animation (Issue #19)
+
+**Implementation:** Added nose graphics system with triangle rendering and two animation modes (twitching and scrunching).
+
+**Nose Specifications:**
+- Shape: 40×50px white filled triangle, apex UP
+- Position: `center_y + 15` (centered between eyes at `center_y - 50` and mouth at `center_y + 80`)
+- Rendering: `pygame.draw.polygon()` with three vertices (apex top, base left, base right)
+- Projection mapping: White (255,255,255) on black background for 21:1 contrast
+
+**Animation Patterns:**
+- **Twitching**: ±8px horizontal oscillation, 5 complete cycles in 0.5 seconds
+  - Sine wave: `amplitude * sin(2π * 5 * progress)` where progress is 0.0-1.0
+  - Creates sniffing effect with rapid left-right motion
+- **Scrunching**: Vertical compression 100%→50%→100% over 0.8 seconds
+  - Sine wave compression: `scale = 1.0 - 0.5 * sin(π * progress)`
+  - At progress 0.0: scale 1.0 (neutral)
+  - At progress 0.5: scale 0.5 (max compression)
+  - At progress 1.0: scale 1.0 (returned to neutral)
+  - Creates disgust/smell reaction effect
+
+**Frame-Based Animation Pattern:**
+- Uses deterministic frame counting (`delta_time = 1/60`) instead of `time.time()`
+- Progress advances by `delta_time / duration` each frame
+- Auto-return to neutral when progress reaches 1.0
+- Guard pattern: `if self.is_twitching or self.is_scrunching: return` prevents overlapping animations
+- Orthogonal to expression state machine (nose animations don't affect expressions)
+
+**Rendering Integration:**
+- Added `_draw_nose(surface, center_x, center_y)` method
+- Called from `_render_pumpkin_face()` after drawing eyebrows, before drawing mouth
+- Nose follows projection offset automatically (receives offset-adjusted center coordinates)
+- Triangle vertices calculated with current offsets and scale applied:
+  - Apex: `(nose_x, nose_y - scaled_height)`
+  - Base left: `(nose_x - width/2, nose_y)`
+  - Base right: `(nose_x + width/2, nose_y)`
+
+**Animation State Variables:**
+- `nose_offset_x`, `nose_offset_y`: Current position offsets (twitch affects X)
+- `nose_scale`: Vertical scale factor (scrunch affects this)
+- `is_twitching`, `is_scrunching`: Boolean flags for active animation
+- `nose_animation_progress`: 0.0-1.0 progress tracker
+- `nose_animation_duration`: Duration in seconds (0.5 for twitch, 0.8 for scrunch)
+
+**Public API:**
+- `twitch_nose()`: Start twitching animation
+- `scrunch_nose()`: Start scrunching animation
+- `reset_nose()`: Immediately reset to neutral
+- Socket commands: `twitch_nose`, `scrunch_nose`, `reset_nose`
+
+**Verification:**
+- Created `test_nose_rendering.py` with 14 automated tests
+- All 57 tests pass (14 nose tests + 43 existing projection mapping tests)
+- Visual test script `test_nose_movement.py` for manual verification
+- Nose renders correctly on all 7 expression states
+- Nose follows head movement (projection offset) correctly
+- Animations complete and auto-reset as expected
+- Guard pattern prevents animation interruption
+
+**Graphics Pattern — Triangle Rendering with Scale:**
+This establishes the pattern for rendering scalable shapes with vertex math. Key insight: calculate base shape vertices, apply scale transforms, then add position offsets. For nose: `apex_y = base_y - (height * scale)` creates vertical compression effect while keeping base anchored. This differs from pupil rendering (circular motion) and eyebrow rendering (tilted lines) — each facial feature uses geometry appropriate to its animation needs.
+
+**Animation Pattern — Frame-Based Progress:**
+Nose animations use the same deterministic frame-based pattern as head movement (not time-based like old implementations). This ensures consistent behavior across different frame rates and simplifies testing. Progress advances by fixed increments each frame, making animation timing predictable and reproducible.
+
+📌 Team update (2026-02-23): Nose graphics and animations implemented for Issue #19

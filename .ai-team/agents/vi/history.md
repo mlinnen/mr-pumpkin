@@ -109,3 +109,59 @@
 - **Applied to center point:** Single offset affects all features uniformly (eyes, eyebrows, mouth move together)
 - **No negative coordinate prevention:** Clamping at ±500 is sufficient; features can safely move partially off-screen for edge cases
 - **Clean interface:** Simple method signatures that Ekko's UI controls can easily call from graphics layer
+
+### Nose Animation Backend (Issue #19)
+
+**What:** Implemented backend state management for nose animation control (twitch, scrunch, reset).
+
+**Key patterns used:**
+1. **Orthogonal animation state:** Nose animation is independent of expression state machine (follows same pattern as rolling eyes)
+2. **Time-based state tracking:** Uses `time.time()` for backend state management (animation_start_time, animation_end_time, animation_duration)
+3. **Frame-based graphics coordination:** `_update_nose_animation()` called from `update()` loop calculates progress and calls Ekko's graphics methods
+4. **Non-interrupting guards:** Cannot start new animation while one is in progress (checks `is_twitching` or `is_scrunching`)
+5. **Auto-return to neutral:** Animation automatically resets when progress >= 1.0
+6. **Socket command parsing:** String-based commands with optional magnitude parameter
+
+**File changes:**
+- `pumpkin_face.py`:
+  - Added state variables: `nose_offset_x`, `nose_offset_y`, `nose_scale`, `is_twitching`, `is_scrunching`, `nose_animation_progress`, `nose_animation_start_time`, `nose_animation_end_time`, `nose_animation_duration` (lines 93-102)
+  - Added backend methods: `_start_nose_twitch(magnitude=50)`, `_start_nose_scrunch(magnitude=50)`, `_reset_nose()` (lines 600-648)
+  - Updated `_update_nose_animation()`: Changed from frame-based delta_time to time-based tracking using `time.time()` (lines 846-870)
+  - Added 3 socket commands: `twitch_nose [magnitude]`, `scrunch_nose [magnitude]`, `reset_nose` (lines ~1318-1344)
+- `test_nose_commands.py`: Test script for command validation and non-interrupting behavior
+
+**Socket command parsing pattern:**
+- Command format: `"command_name"` or `"command_name parameter"`
+- Parse: `data.split()` to separate command from arguments
+- Validate: Try-except blocks catch ValueError/IndexError for malformed commands
+- Default values: Use `if len(parts) > 1 else default_value` pattern for optional parameters
+- Example: `magnitude = float(parts[1]) if len(parts) > 1 else 50.0`
+
+**State lifecycle pattern:**
+1. **Initialization:** All state variables set to defaults in `__init__` (zero offsets, neutral scale, flags False)
+2. **Start trigger:** Socket command calls `_start_nose_twitch()` or `_start_nose_scrunch()`
+3. **Guard check:** Method checks `if is_twitching or is_scrunching` and rejects if already animating
+4. **Capture state:** Records `animation_start_time = time.time()`, calculates `animation_end_time`, sets duration
+5. **Progress tracking:** `_update_nose_animation()` calculates `progress = elapsed / duration` each frame
+6. **Graphics update:** Calls Ekko's `_animate_nose_twitch()` or `_animate_nose_scrunch()` with current progress
+7. **Completion:** When `progress >= 1.0`, calls `_start_nose_reset()` to return to neutral
+8. **Reset:** Clears all flags, resets offsets/scale, nullifies time tracking variables
+
+**Non-interrupting guard implementation:**
+- Check at start of `_start_nose_twitch()` and `_start_nose_scrunch()`: `if self.is_twitching or self.is_scrunching: return`
+- Print message: `"Nose animation already in progress"` for debugging
+- No state changes if guard rejects
+- Exception: `reset_nose` command bypasses guard and immediately cancels any active animation
+
+**Coordination pattern with graphics layer (Ekko):**
+- Backend (Vi) manages: State flags (`is_twitching`, `is_scrunching`), time tracking, progress calculation
+- Graphics (Ekko) manages: Visual interpolation (`nose_offset_x`, `nose_scale`) via `_animate_nose_twitch()` and `_animate_nose_scrunch()`
+- Interface: Backend calls Ekko's animation methods each frame with updated `nose_animation_progress` (0.0 to 1.0)
+- Separation: Backend never directly modifies visual properties (offset_x, scale); only Ekko's methods do
+- Pattern matches rolling eyes: Backend tracks angle/duration/progress, graphics handles visual pupil positioning
+
+**Time-based vs frame-based:**
+- **Time-based (state):** `time.time()` used for start/end timestamps, `elapsed = current_time - start_time`
+- **Frame-based (graphics):** Progress 0.0-1.0 passed to Ekko's methods, which use sin/ease curves for interpolation
+- **Why both:** Time-based ensures consistent animation duration regardless of frame rate; frame-based allows smooth visual effects
+- **Implementation:** `_update_nose_animation()` converts time to progress, then calls frame-based graphics methods

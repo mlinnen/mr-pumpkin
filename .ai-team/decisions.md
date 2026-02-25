@@ -967,3 +967,562 @@ Both share underlying projection offset state, serve different use cases.
 
 **Interface contract:** Backend provides three methods (`jog_projection`, `set_projection_offset`, `reset_projection_offset`) with clear signatures. Graphics layer (Ekko) can call these directly or via socket commands.
 
+---
+
+### 2026-02-25: PR Base Branch Enforcement — Always dev, Never main
+
+**By:** Mike (via Copilot)
+
+**What:** All feature branch PRs must target `dev` branch, not `main`. Enforce at agent spawn level by adding `--base dev` to every `gh pr create` command and adding a safety warning block to agent prompts.
+
+**Why:** Prevent accidental main merges (happened multiple times). Agents will default to dev, with explicit warning about main-targeting branches.
+
+---
+
+### 2026-02-25: Issue #19 architecture — Nose Movement
+
+**By:** Jinx
+
+**What:** Proposed nose movement architecture integrating nose as a new facial feature with orthogonal animation state.
+
+**Why:** Feature design and team coordination for nose movement (twitch and scrunch animations)
+
+---
+
+## Design Summary
+
+### Integration with Expression System
+
+**Approach:** Nose is a **new facial feature** (like eyes, eyebrows, mouth) with **orthogonal animation state** (following the established pattern from eyebrows, blink, wink).
+
+- **Static component:** Nose baseline shape/position defined per expression
+- **Dynamic component:** Nose animation states (twitching, scrunching) overlay on baseline, independent of expression transitions
+- **Rendering order:** Eyes → Eyebrows → **Nose** → Mouth (Z-order for projection clarity)
+
+### Nose Movement Types
+
+**Primary movements** (requested in issue):
+1. **Twitch:** Quick lateral wiggle (left-right-center), 0.3-0.5 second duration
+2. **Scrunch:** Vertical compression + slight width expansion, 0.5-0.8 second duration
+3. **Curl:** Subtle upward tip movement (happy expressions), 0.4 second duration
+
+**Movement characteristics:**
+- **Non-interrupting:** Animations are one-shot effects, no queuing or interruption handling needed
+- **Capture-Animate-Restore pattern:** Each animation captures baseline, applies temporary offset, restores on completion
+- **Expression-independent:** Can trigger during any expression (nose baseline changes with expression, animation overlays on top)
+
+### State Variables and Animation Model
+
+**Core state (added to `PumpkinFace.__init__`):**
+```python
+# Nose position control (orthogonal to expression state machine)
+self.nose_offset_x = 0.0  # Horizontal offset, pixels
+self.nose_offset_y = 0.0  # Vertical offset, pixels
+self.nose_width_scale = 1.0  # Width multiplier for scrunch effect
+
+# Nose animation state
+self.is_nose_animating = False
+self.nose_animation_type = None  # 'twitch', 'scrunch', 'curl'
+self.nose_animation_progress = 0.0
+self.nose_animation_duration = 0.5  # seconds (varies by animation type)
+```
+
+---
+
+### 2026-02-24: Issue #19 graphics design — Nose rendering & animation
+
+**By:** Ekko
+
+**What:** Nose graphics architecture and animation framework
+
+**Why:** Graphics foundation for nose movement feature
+
+---
+
+## Design Decisions
+
+### Nose Shape
+
+**Design Choice:** Upward-facing triangle (pumpkin nose classic)
+
+**Dimensions:**
+- Shape: Isosceles triangle, apex pointing UP
+- Width (base): 40 pixels
+- Height: 50 pixels
+- Position: Centered horizontally between eyes and mouth
+- Y-coordinate: `center_y + 15` (15px below center, positioned between eyes at y-50 and mouth at y+80)
+
+**Rationale:**
+- **Pumpkin tradition:** Classic carved pumpkin noses are triangular (inverted pyramid)
+- **Apex UP orientation:** Creates upward-pointing nose for scrunching animation (tip can "scrunch" upward naturally)
+- **Size:** 40x50px is proportional to 40px eye radius and 300px mouth width — visible but not dominant
+- **Projection mapping:** Solid white filled triangle on black background (maximum contrast, no outlines)
+
+### Color Scheme
+
+**Colors:**
+- Fill: Pure white `(255, 255, 255)` — matches eye/mouth projection mapping standard
+- Background: Pure black `(0, 0, 0)` — no light emission around nose
+- No gradients or outlines — solid filled shape only
+
+**Rationale:**
+- Projection-first architecture (established 2026-02-19 decision)
+- 21:1 contrast ratio required for projection visibility
+- Consistent with existing feature rendering (`_draw_eyes`, `_draw_mouth`, `_draw_eyebrows`)
+
+### Position & Layout
+
+**Baseline Position:**
+- X: `center_x` (horizontally centered on face)
+- Y: `center_y + 15` (vertical midpoint between eyes and mouth)
+- Proportional reasoning:
+  - Eyes: `center_y - 50`
+  - Nose: `center_y + 15` (65px below eyes, 65px above mouth)
+  - Mouth: `center_y + 80`
+
+**Coordinate System Integration:**
+- Nose position calculated from offset-adjusted `center_x, center_y` (inherits projection offset)
+- Follows UI transform layering pattern (established in projection offset feature)
+- Nose automatically moves with head movement, projection jog, and all face-level transforms
+
+### Animation Types
+
+#### 1. Twitch Animation
+
+**Description:** Rapid horizontal jitter — subtle nervous/sniffing effect
+
+**Mechanism:**
+- Type: Oscillating horizontal offset from baseline
+- Offset range: ±8 pixels horizontal displacement
+- Frequency: 4-6 oscillations per second (fast twitch)
+- Duration: 0.5 seconds per twitch command
+- Waveform: Sine wave `offset_x = 8 * sin(progress * 2π * 5)` where progress ∈ [0, 1] over 0.5s
+  - 5 complete cycles in 0.5s = 10 Hz oscillation
+
+#### 2. Scrunch Animation
+
+**Description:** Vertical compression — "scrunching up" the nose
+
+**Mechanism:**
+- Type: Triangle height reduction with upward position shift
+- Height scale: 100% → 50% → 100% (compress, hold, release)
+- Position shift: Nose apex rises as it compresses (top stays fixed, base moves up)
+- Duration: 0.8 seconds (slower than twitch — more deliberate expression)
+- Phases:
+  1. Compress (0.0-0.35): height scales from 100% to 50%
+  2. Hold (0.35-0.65): height stays at 50%
+  3. Release (0.65-1.0): height returns to 100%
+
+#### 3. Composition
+
+**Decision:** NO — animations are mutually exclusive (non-interrupting guards)
+
+**Rationale:**
+- Twitch and scrunch modify different axes (X vs Y scale) but compose poorly visually
+- Simpler state machine: `if not (is_twitching or is_scrunching)` guard prevents overlap
+- User can chain animations sequentially (twitch command queues after scrunch completes)
+- Follows established pattern from rolling eyes (non-interrupting guard in `roll_clockwise()`)
+
+### Implementation Approach
+
+The graphics design established the following pattern:
+
+**Rendering Method:**
+- Baseline position: nose centered at `center_y + 15`
+- Apply twitch animation (horizontal jitter) when `is_twitching`
+- Apply scrunch animation (vertical compression) when `is_scrunching`
+- Draw filled white triangle with animated transforms applied
+
+**State Variables (added to `__init__`):**
+- `is_twitching`, `twitch_progress`, `twitch_duration` (0.5s)
+- `is_scrunching`, `scrunch_progress`, `scrunch_duration` (0.8s)
+
+**Animation Trigger Methods:**
+- `twitch_nose()` — Trigger nose twitch animation (horizontal jitter)
+- `scrunch_nose()` — Trigger nose scrunch animation (vertical compression)
+
+---
+
+### 2026-02-24: Issue #19 testing insights — Nose movement test coverage
+
+**By:** Mylo
+
+**What:** Comprehensive test suite for nose movement feature
+
+**Why:** Document testing decisions and patterns for future reference
+
+---
+
+## Test Suite Summary
+
+Created `test_nose_movement.py` with **45 tests** across 6 categories:
+- State management: 8 tests
+- Animations: 10 tests
+- Expression integration: 7 tests
+- Command integration: 6 tests
+- Edge cases: 8 tests
+- Rendering: 6 tests
+
+---
+
+## Testing Pattern Decisions
+
+### 1. Animation Progress Simulation
+
+**Decision:** Manually simulate frame-by-frame animation progress in tests, rather than using `update()` method.
+
+**Rationale:**
+- Deterministic: Tests control exact progress values for formula validation
+- Isolated: Tests don't depend on update loop implementation details
+- Clear: Each test shows explicit frame advancement logic
+
+### 2. Easing Validation Approach
+
+**Decision:** Verify non-linear motion by checking delta variance, not exact formula.
+
+**Rationale:**
+- Robust: Works regardless of specific easing function used
+- Simple: Tests variance rather than complex mathematical formula
+- Intent-focused: Validates "smoothness" rather than implementation details
+
+### 3. Guard Testing Pattern
+
+**Decision:** Tests simulate guard logic inline rather than calling command methods.
+
+**Rationale:**
+- Implementation-agnostic: Tests work even if command methods don't exist yet
+- Clear intent: Guard logic explicitly shown in test
+- Flexible: Easy to adapt if guard implementation changes
+
+### 4. Rendering Validation Sampling
+
+**Decision:** Use sparse pixel sampling (every 5-10 pixels) for rendering tests.
+
+**Rationale:**
+- Performance: Faster test execution
+- Sufficient: Sparse sampling catches projection compliance violations
+- Follows precedent: Matches test_head_movement.py pattern
+
+---
+
+## Edge Cases Discovered
+
+### 1. Animation Timeout Protection
+
+**Finding:** Animation progress can exceed 1.0 if update loop doesn't clean up properly.
+
+**Test coverage:** `test_nose_animation_timeout_does_not_hang` simulates 100 frames (1.67s) to verify cleanup.
+
+### 2. Reset Command Bypasses Guard
+
+**Finding:** Reset command must cancel animation immediately, even during active animation.
+
+**Test coverage:** `test_reset_cancels_active_animation_immediately` verifies guard bypass.
+
+**Design decision:** Reset command doesn't check `is_twitching or is_scrunching` guard.
+
+### 3. Composition with Head Movement
+
+**Finding:** Nose animation and head movement (projection offset) must compose independently.
+
+**Test coverage:**
+- `test_head_movement_during_nose_animation`
+- `test_concurrent_head_and_nose_movement`
+
+**Expected behavior:** Both state machines run simultaneously without conflict.
+
+### 4. Expression Change During Animation
+
+**Finding:** Expression changes should NOT interrupt or reset nose animation.
+
+**Test coverage:** `test_expression_change_during_nose_animation` verifies continuity.
+
+**Design rationale:** Nose is orthogonal to expression state machine (like eyebrows, gaze).
+
+---
+
+### 2026-02-24: Issue #19 test framework — Nose movement validation
+
+**By:** Mylo
+
+**What:** Test strategy and framework for nose movement with twitching and scrunching animations
+
+**Why:** Quality assurance and regression prevention for new nose feature
+
+---
+
+## Test Structure
+
+**Recommended approach:** Single integrated test file `test_nose_movement.py` (following pattern of test_eyebrow_animation.py)
+
+**Rationale:**
+- Nose is a single cohesive feature with related behaviors (similar to eyebrows)
+- State management, animations, and commands are tightly coupled
+- Splitting would create artificial boundaries and make refactoring harder
+- Easier to run and maintain as single suite
+
+**Test classes:**
+1. `TestNoseStateVariables` — State initialization, transitions, bounds
+2. `TestNoseAnimations` — Twitch/scrunch animation progress and lifecycle
+3. `TestNoseExpressionIntegration` — How expressions affect nose state
+4. `TestNoseCommands` — Socket command parsing, parameter validation
+5. `TestNoseEdgeCases` — Overlapping animations, rapid commands, expression changes during animation
+6. `TestNoseRendering` — Visual validation (projection compliance, position verification)
+
+---
+
+### 2026-02-24: Issue #19 backend design — Nose state & commands
+
+**By:** Vi
+
+**Issue:** #19 — Nose Movement
+
+**What:** Nose state management and command architecture
+
+**Why:** Backend foundation for nose movement feature
+
+---
+
+## Current System Review
+
+**State Management Pattern:**
+- Expression state machine: `current_expression`, `target_expression`, `transition_progress`
+- Orthogonal animations use `is_<action>` flags + `<action>_progress` counters (blink, wink, rolling)
+- Orthogonal persistent state: gaze angles, eyebrow offsets, projection offsets (independent of expressions)
+- Head movement uses smooth-state-animation pattern: 0.5s duration with ease-in-out-cubic easing
+
+**Animation Composition Rules:**
+1. Expression transitions run continuously (main state machine)
+2. Orthogonal animations (blink/wink/rolling) can overlay on any expression
+3. Persistent states (gaze, eyebrows, projection offset) survive expression changes
+4. Head movement animates projection offset smoothly over 0.5s
+5. Priority: blink/wink pause rolling animation (rolling_progress freezes)
+
+## Nose State Model
+
+### Design Decision: Orthogonal Animation State
+
+**Rationale:** Nose movement is a **temporary animation overlay** like rolling eyes, not persistent state like eyebrow offsets. Nose animations should:
+- Return to neutral position after completing
+- Not persist across expression changes
+- Be composable with other animations
+
+### State Variables
+
+```python
+# Nose animation state (add to __init__ around line 93, after head movement vars)
+self.is_animating_nose = False        # Animation active flag
+self.nose_animation_progress = 0.0    # 0.0 to 1.0
+self.nose_animation_duration = 0.5    # Match head movement duration (0.5s)
+self.nose_animation_type = None       # 'twitch' or 'scrunch' (None when idle)
+self.nose_start_x = 0                 # Starting X offset (pixels, captured at start)
+self.nose_start_y = 0                 # Starting Y offset (pixels, captured at start)
+self.nose_start_scale = 1.0           # Starting scale factor (captured at start)
+self.nose_target_x = 0                # Target X offset (pixels)
+self.nose_target_y = 0                # Target Y offset (pixels)
+self.nose_target_scale = 1.0          # Target scale factor
+self.nose_x = 0                       # Current X offset (pixels, interpolated)
+self.nose_y = 0                       # Current Y offset (pixels, interpolated)
+self.nose_scale = 1.0                 # Current scale factor (interpolated)
+```
+
+**Range Constraints:**
+- `nose_x`: [-30, +30] pixels (left/right shift, smaller than eyebrow range)
+- `nose_y`: [-30, +30] pixels (up/down shift)
+- `nose_scale`: [0.8, 1.2] (80% to 120% of base size)
+
+---
+
+### 2026-02-25: Issue #19 backend implementation — Nose Animation Backend
+
+**By:** Vi
+
+**Issue:** #19 — Nose Movement
+
+**Status:** ✅ Complete
+
+**What:** Implemented nose animation backend with time-based state tracking and frame-based graphics coordination.
+
+**Why:** Deliver backend state management and socket commands for nose movement feature.
+
+---
+
+## Implementation Summary
+
+### 1. State Variables (in `__init__`)
+
+All nose animation state variables added to PumpkinFace class initialization:
+- `nose_offset_x` = 0.0 (horizontal offset, ±30px range)
+- `nose_offset_y` = 0.0 (vertical offset, ±30px range)
+- `nose_scale` = 1.0 (scale factor, 0.8-1.2 range)
+- `is_twitching` = False (twitch animation active flag)
+- `is_scrunching` = False (scrunch animation active flag)
+- `nose_animation_progress` = 0.0 (animation progress 0.0-1.0)
+- `nose_animation_duration` = 0.0 (total duration in seconds)
+- `nose_animation_start_time` = None (timestamp when animation started)
+- `nose_animation_end_time` = None (timestamp when animation will end)
+
+### 2. Backend Methods
+
+Three core methods for nose animation control:
+
+**`_start_nose_twitch(magnitude=50.0)`**
+- Initiates twitching animation (rapid horizontal oscillation)
+- Duration: 0.5 seconds
+- Guards: Rejects if `is_twitching` or `is_scrunching` already True
+- Time tracking: Records `start_time = time.time()`, calculates `end_time`
+- Magnitude parameter: Reserved for future intensity scaling (default 50)
+
+**`_start_nose_scrunch(magnitude=50.0)`**
+- Initiates scrunching animation (vertical compression)
+- Duration: 0.8 seconds
+- Guards: Rejects if `is_twitching` or `is_scrunching` already True
+- Time tracking: Records `start_time = time.time()`, calculates `end_time`
+- Magnitude parameter: Reserved for future intensity scaling (default 50)
+
+**`_reset_nose()`**
+- Immediately cancels any active nose animation
+- Resets all state variables to defaults (offsets=0, scale=1, flags=False)
+- Clears time tracking variables (start_time=None, end_time=None)
+- Can be called anytime (no guards)
+
+### 3. Animation Update Logic
+
+Modified `_update_nose_animation()` to use time-based state tracking:
+
+**Time-based tracking:**
+```python
+import time
+current_time = time.time()
+elapsed = current_time - self.nose_animation_start_time
+self.nose_animation_progress = elapsed / self.nose_animation_duration
+```
+
+**Benefits:**
+- Consistent animation timing regardless of frame rate
+- More accurate (microsecond precision vs frame approximation)
+- Matches head movement pattern (Issue #18)
+
+**Graphics Integration:**
+- Progress (0.0-1.0) passed to Ekko's graphics methods
+- `_animate_nose_twitch()` handles visual interpolation (sin waves)
+- `_animate_nose_scrunch()` handles visual interpolation (ease curves)
+
+### 4. Socket Commands
+
+Three socket commands added to `_run_socket_server()`:
+
+**`twitch_nose [magnitude]`**
+- Format: "twitch_nose" or "twitch_nose 75"
+- Default magnitude: 50.0
+- Calls: `_start_nose_twitch(magnitude)`
+- Response: "Twitching nose (magnitude=50)" or "Nose animation already in progress"
+
+**`scrunch_nose [magnitude]`**
+- Format: "scrunch_nose" or "scrunch_nose 100"
+- Default magnitude: 50.0
+- Calls: `_start_nose_scrunch(magnitude)`
+- Response: "Scrunching nose (magnitude=50)" or "Nose animation already in progress"
+
+**`reset_nose`**
+- Format: "reset_nose" (no parameters)
+- Calls: `_reset_nose()`
+- Response: "Resetting nose to neutral" or "Nose reset to neutral"
+
+### 5. Integration with Update Loop
+
+`_update_nose_animation()` called from `update()` method:
+- Called after head movement updates
+- Before expression transition updates
+- Runs every frame to track animation progress
+- Calls graphics methods (`_animate_nose_twitch`, `_animate_nose_scrunch`)
+- Auto-resets when animation completes
+
+## Pattern Compliance
+
+✅ **Orthogonal animation state:** Independent from expression state machine  
+✅ **Non-interrupting guards:** Reject new commands during active animation  
+✅ **Time-based state tracking:** Uses `time.time()` for backend state  
+✅ **Frame-based graphics:** Progress passed to graphics layer for interpolation  
+✅ **Auto-return to neutral:** Animation completes and resets automatically  
+✅ **Socket command parsing:** Follows established pattern from turn_left/right/up/down  
+✅ **No breaking changes:** All existing tests pass, no changes to other features  
+
+---
+
+### 2026-02-25: Issue #19 implementation decisions — Nose Animation Backend
+
+**By:** Vi
+
+**Issue:** #19 — Nose Movement
+
+**What:** Backend design decisions for nose animation implementation
+
+**Why:** Document key implementation choices for future reference
+
+---
+
+## Decision: Time-Based State Management with Frame-Based Graphics Coordination
+
+**Context:** Implemented nose animation backend with two types: twitch (rapid horizontal oscillation) and scrunch (vertical compression). Need to choose between purely frame-based (delta_time accumulation) or time-based (timestamp tracking) for state management.
+
+**Choice:** Time-based state tracking with frame-based graphics interpolation.
+
+**Implementation:**
+- Backend state uses `time.time()` for `animation_start_time`, `animation_end_time`, `animation_duration`
+- Progress calculated as: `elapsed / duration` where `elapsed = time.time() - start_time`
+- Graphics layer methods receive progress (0.0-1.0) and handle visual interpolation
+
+**Rationale:**
+1. **Consistent timing:** Animation duration independent of frame rate fluctuations
+2. **Matches head movement pattern:** Head animation also uses time-based tracking (Issue #18)
+3. **Orthogonal animation pattern:** Same as rolling eyes — backend manages lifecycle, graphics handles visuals
+4. **Precision:** `time.time()` provides microsecond precision vs frame-based approximation (delta_time = 1/60)
+
+---
+
+## Decision: Non-Interrupting Guards with Reset Override
+
+**Context:** Need to handle case where user sends second animation command while first is in progress.
+
+**Choice:** Reject new animations during active animation, except `reset_nose` which immediately cancels.
+
+**Implementation:**
+```python
+def _start_nose_twitch(self, magnitude=50.0):
+    if self.is_twitching or self.is_scrunching:
+        print("Nose animation already in progress")
+        return
+    # ... start animation
+```
+
+**Rationale:**
+1. **Follows rolling eyes pattern:** Non-interrupting guards prevent visual glitches from mid-animation state changes
+2. **User clarity:** Clear feedback ("already in progress") vs silent failure
+3. **Reset escape hatch:** `reset_nose` provides way to immediately cancel misbehaving animation
+4. **State consistency:** Prevents race conditions from overlapping animations
+
+---
+
+## Decision: Optional Magnitude Parameter with Sensible Default
+
+**Context:** Socket commands need to support both quick commands (`twitch_nose`) and customizable intensity (`twitch_nose 75`).
+
+**Choice:** Optional magnitude parameter with default value 50.
+
+**Implementation:**
+```python
+# Socket command parsing
+parts = data.split()
+magnitude = float(parts[1]) if len(parts) > 1 else 50.0
+self._start_nose_twitch(magnitude)
+```
+
+**Rationale:**
+1. **Usability:** Most users want quick command without parameters
+2. **Flexibility:** Power users can fine-tune animation intensity
+3. **Matches existing pattern:** Turn_left/right/up/down commands use same optional parameter pattern
+4. **Safe defaults:** magnitude=50 provides noticeable but not extreme animation
+
+**Note:** While magnitude parameter is parsed and passed, current graphics implementation (Ekko's layer) uses fixed animation curves. The parameter is reserved for future enhancement where magnitude could scale the animation amplitude.
+
