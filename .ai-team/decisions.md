@@ -806,3 +806,164 @@ libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 
 ✅ Design approved for implementation  
 ✅ Parallel development ready (Ekko graphics, Vi backend, Mylo testing)
+
+
+---
+
+## Session Checkpoint — 2026-02-24 20:30:48
+
+### 2026-02-22: Eyebrow Clipping Fixed - Removed Hardcoded Coordinate Clamp
+
+**By:** Ekko  
+**What:** Fixed eyebrow disappearance at high projection offsets by replacing hardcoded `y=350` clamp with screen-edge-relative clamp (`y=0`)  
+**Why:** The hardcoded absolute coordinate clamp broke when projection offset shifted the coordinate system. Eyebrows are positioned relative to eyes (which include offset), so clamping must be relative to actual screen bounds, not arbitrary fixed values. This ensures eyebrows remain visible across the full ±500 pixel projection offset range.
+
+**Impact:**
+- Eyebrows now render correctly at all projection offset values
+- Maintains existing collision detection to prevent eyebrow/eye overlap
+- All 43 projection mapping tests continue to pass
+- Pattern established: avoid absolute coordinate clamps when coordinate system can shift
+
+**Files changed:**
+- `pumpkin_face.py`: Line 371-373 (eyebrow floor clamp logic)
+- `test_eyebrow_clipping.py`: New test file for extreme offset scenarios
+
+---
+
+### 2026-02-24: Animated Head Movement via Smooth Projection Offset Transitions
+
+**By:** Ekko (Graphics Dev)
+
+**What:** Implemented smooth animated head movement system that creates 3D illusion by interpolating projection offset over time. Head turns left, right, up, and down with ease-in-out animation spanning 0.5 seconds.
+
+**Why:** 
+- Issue #17 requested 3D head movement illusion with smooth transitions
+- Manual projection jogging (arrow keys) provided instant offset changes but no animation
+- Smooth animation enhances perceived 3D effect and provides performative capabilities
+- Separates alignment/calibration use case (instant jog) from runtime performance (animated turns)
+
+**Technical Approach:**
+- Animation state: `is_moving_head`, progress tracker, start/target positions
+- Ease-in-out cubic interpolation: `3t² - 2t³` for natural motion
+- Duration: 0.5 seconds at 60 FPS (30 frames per turn)
+- Update loop integration: Runs independently alongside blink/wink/roll animations
+- Boundary clamping: ±500px limits enforced at animation start
+
+**Pattern Established:**
+This creates the "smooth state transition" animation pattern for orthogonal state variables:
+1. Capture current state as start position
+2. Set target state with boundary enforcement
+3. Interpolate with easing function over fixed duration
+4. Update state variable each frame in update() loop
+5. Set exact target value on completion (prevents drift)
+
+Similar to rolling eyes (rotates 360° from current angle, returns to exact start), but applied to spatial offset instead of angular motion.
+
+**Socket Commands Added:**
+- `turn_left [amount]`, `turn_right [amount]`, `turn_up [amount]`, `turn_down [amount]`
+- `center_head` (returns to 0, 0)
+- Default amount: 50px
+- Supports custom amounts: `turn_left 100` shifts 100px left
+
+**Alternative Considered:**
+Could have extended manual jog system with animation flag, but decided separate methods provide clearer API:
+- `jog_projection()`: Instant offset for calibration
+- `turn_head_*()`: Animated movement for performance
+Both share underlying projection offset state, serve different use cases.
+
+**Impact:**
+- Graphics rendering unchanged (projection offset already implemented)
+- New animation runs in update() loop without interfering with expression transitions
+- Socket server extended with 5 new commands
+- Test script (`test_animated_head_movement.py`) validates smooth movement
+
+**Future Considerations:**
+- Could add animation speed parameter (currently fixed at 0.5s)
+- Could support compound movements (diagonal turns with single command)
+- Could add easing presets (linear, ease-in, ease-out, bounce)
+
+---
+
+### 2026-02-22: Mouth rendering signature updated to accept offset-adjusted coordinates
+
+**By:** Ekko
+
+**What:** Modified `_draw_mouth()` method signature to accept `cx` and `cy` parameters, matching the pattern used by other rendering methods. Updated surprised and scared mouth rendering to use these coordinates instead of hardcoded absolute screen positions.
+
+**Why:** Fixed mouth clipping bug where surprised/scared expressions would render mouths at absolute screen coordinates, ignoring projection offset. This caused mouths to drop off-screen when projection was jogged to high Y offsets. By accepting offset-adjusted coordinates as parameters, mouth rendering now maintains consistency with the projection offset system, ensuring all facial features move together as a unit when projection alignment is adjusted.
+
+**Impact:** Surprised and scared expressions now work correctly at all projection offsets. Reinforces the coordinate system consistency pattern where rendering methods accept transformed coordinates rather than accessing raw screen dimensions.
+
+---
+
+### 2026-02-22: Projection Offset Applied at Rendering Root
+
+**By:** Ekko  
+**What:** Projection offset for alignment jog is applied to center coordinates in `draw()` method, before any feature position calculations.  
+**Why:** Applying transformation at the highest level ensures all rendered features (eyes, eyebrows, mouth) automatically inherit the offset uniformly. This avoids having to modify each individual drawing method and maintains consistency across all visual elements. The offset is orthogonal to expression state and animation state, persisting across all transitions and animations.
+
+**Implementation Details:**
+- State: `projection_offset_x`, `projection_offset_y` (integers, clamped ±500px)
+- Rendering: `center_x = (width // 2) + projection_offset_x` in `draw()` method
+- UI: Arrow keys nudge 5px, `0` key resets to (0, 0)
+- Backend: Socket commands (`jog_offset`, `set_offset`, `projection_reset`) for programmatic control
+
+---
+
+### 2026-02-22: Head Movement Test Strategy — Projection Offset Validation
+
+**By:** Mylo (Tester)
+
+**What:** Created comprehensive test suite (71 tests) for 3D head movement illusion (Issue #17) using projection offset system. Tests cover state management, directional movement validation, animation orthogonality, transition smoothness, projection mapping compliance, edge cases, and performance.
+
+**Why:** 
+- **Proactive parallel development**: Tests written while Ekko implements the projection offset shifting feature, enabling immediate validation once implementation lands
+- **3D illusion correctness**: Head movement creates parallax effect by shifting entire face rendering — requires pixel-level validation that features move cohesively as a unit
+- **Projection mapping safety**: Offset shifts must not introduce gray pixels or break contrast ratio at extreme positions (±500px boundaries)
+- **Edge case prevention**: Extreme offsets may clip features off-screen, but must not crash or corrupt rendering state
+- **Performance gates**: 60fps smooth animation requires frame time <50ms even with continuous offset updates
+
+**Test Architecture:**
+1. **State Variables**: Validates jog (relative) vs set (absolute) semantics, cumulative behavior, boundary clamping (±500px), reset to origin
+2. **Directional Movement**: Pixel sampling validates left/right/up/down/diagonal shifts — white features appear at new position, old position becomes black
+3. **Orthogonality**: Projection offset persists across expression changes, blink/wink, gaze, eyebrow adjustments (independent state system)
+4. **Smoothness**: Multiple small jogs simulate 60fps animation, rapid direction changes validate stability
+5. **Projection Compliance**: Binary color validation (pure black/white), contrast ratio ≥15:1 at all offsets, all 7 expressions tested
+6. **Edge Cases**: Extreme positions, corner positions, combined extreme states, rapid reset cycles, zero offset equivalence
+7. **Performance**: Frame time measurement, 60fps sustained updates for 1 second
+
+**Key patterns established:**
+- **Pixel-level movement validation**: Sample before/after to verify feature displacement
+- **Sparse 50px grid sampling**: Efficient projection compliance checks across entire 1920x1080 canvas
+- **Cumulative jog testing**: Validates that small incremental movements accumulate correctly for smooth animation
+- **Parametrized expression testing**: Single test multiplied across all 7 expressions to ensure universal offset support
+
+**Expected implementation contract:**
+- `projection_offset_x`, `projection_offset_y` state variables (integers, ±500px range)
+- `jog_projection_offset(dx, dy)` — relative movement (accumulates)
+- `set_projection_offset(x, y)` — absolute positioning (replaces)
+- `reset_projection_offset()` — return to (0, 0)
+- Offsets applied to center_x/center_y in draw() method before feature rendering
+
+**Test file**: `test_head_movement.py` — 71 tests, 7 classes organized by concern
+
+**Impact**: Establishes quality gates for head movement animation, ensures projection mapping safety at extreme positions, validates orthogonal state system, catches clipping/performance issues before release.
+
+---
+
+### 2026-02-22: Projection Offset as Global Rendering Transform
+
+**By:** Vi (Backend Dev)
+
+**What:** Implemented projection offset adjustment as a global transform applied to the center point in `draw()`, affecting all rendered features uniformly.
+
+**Why:**
+1. **Single source of truth:** Applying offset at center point (`center_x`, `center_y`) ensures all features (eyes, eyebrows, mouth) move together consistently
+2. **Orthogonal to all other state:** Projection offset is independent of expression transitions, gaze, eyebrows, blink, wink, rolling eyes — it's purely a rendering concern
+3. **Clamped to ±500px:** Prevents extreme offsets while allowing significant adjustment for physical projection alignment on foam pumpkins
+4. **Dual control modes:** Both relative (`jog_offset`) and absolute (`set_offset`) commands provide flexibility for UI controls and calibration scripts
+
+**Pattern established:** Projection offset follows same orthogonal state pattern as gaze control and eyebrow control — state persists across expression changes and is managed independently of expression state machine.
+
+**Interface contract:** Backend provides three methods (`jog_projection`, `set_projection_offset`, `reset_projection_offset`) with clear signatures. Graphics layer (Ekko) can call these directly or via socket commands.
+
