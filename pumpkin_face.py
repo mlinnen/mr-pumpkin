@@ -90,6 +90,17 @@ class PumpkinFace:
         self.head_target_x = 0  # Target X position for animation
         self.head_target_y = 0  # Target Y position for animation
         
+        # Nose animation state (orthogonal to expression state machine)
+        self.nose_offset_x = 0.0  # Current horizontal offset (±8px for twitch)
+        self.nose_offset_y = 0.0  # Current vertical offset
+        self.nose_scale = 1.0  # Vertical scale factor (0.5-1.0 for scrunch)
+        self.is_twitching = False  # Twitching animation active
+        self.is_scrunching = False  # Scrunching animation active
+        self.nose_animation_progress = 0.0  # Animation progress (0.0-1.0)
+        self.nose_animation_start_time = None  # When animation started (time.time())
+        self.nose_animation_end_time = None  # When animation will end
+        self.nose_animation_duration = 0.0  # Total duration in seconds
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
@@ -131,6 +142,9 @@ class PumpkinFace:
         
         # Draw eyebrows
         self._draw_eyebrows(surface, left_eye_pos, right_eye_pos)
+        
+        # Draw nose (between eyebrows and mouth)
+        self._draw_nose(surface, center_x, center_y)
         
         # Draw mouth
         self._draw_mouth(surface, mouth_points, center_x, center_y)
@@ -333,6 +347,37 @@ class PumpkinFace:
             (brow_y_gap, angle_offset) tuple. Defaults to NEUTRAL if not found.
         """
         return EYEBROW_BASELINES.get(expression, (-55, 0))
+    
+    def _draw_nose(self, surface: pygame.Surface, center_x: int, center_y: int):
+        """Draw nose as white filled triangle with current position/scale applied.
+        
+        Args:
+            surface: Surface to draw on
+            center_x: Center X coordinate (with projection offset)
+            center_y: Center Y coordinate (with projection offset)
+        """
+        # Nose specifications: 40x50px triangle, apex UP
+        nose_width = 40
+        nose_height = 50
+        
+        # Base position: center_y + 15 (between eyes and mouth)
+        nose_base_y = center_y + 15
+        
+        # Apply animation offsets
+        nose_x = center_x + self.nose_offset_x
+        nose_y = nose_base_y + self.nose_offset_y
+        
+        # Calculate triangle vertices with vertical scale applied
+        # Apex UP: top vertex at (nose_x, nose_y - scaled_height)
+        # Base: two bottom vertices at (nose_x ± width/2, nose_y)
+        scaled_height = nose_height * self.nose_scale
+        
+        apex = (int(nose_x), int(nose_y - scaled_height))
+        base_left = (int(nose_x - nose_width / 2), int(nose_y))
+        base_right = (int(nose_x + nose_width / 2), int(nose_y))
+        
+        # Draw filled white triangle
+        pygame.draw.polygon(surface, self.FEATURE_COLOR, [apex, base_left, base_right])
     
     def _draw_eyebrows(self, surface: pygame.Surface, left_pos: Tuple[int, int], right_pos: Tuple[int, int]):
         """Draw eyebrows with expression-based baselines, blink/wink lift, and user offsets.
@@ -551,6 +596,55 @@ class PumpkinFace:
     def center_head(self):
         """Return head to center position (0, 0) smoothly."""
         self._start_head_movement(0, 0)
+    
+    def _start_nose_twitch(self, magnitude: float = 50.0):
+        """Initiate nose twitching animation.
+        
+        Args:
+            magnitude: Animation intensity (default 50, affects horizontal offset range)
+        """
+        import time
+        if self.is_twitching or self.is_scrunching:
+            print("Nose animation already in progress")
+            return
+        
+        self.is_twitching = True
+        self.nose_animation_duration = 0.5  # 0.5 seconds
+        self.nose_animation_start_time = time.time()
+        self.nose_animation_end_time = self.nose_animation_start_time + self.nose_animation_duration
+        self.nose_animation_progress = 0.0
+        print(f"Started nose twitch (magnitude={magnitude})")
+    
+    def _start_nose_scrunch(self, magnitude: float = 50.0):
+        """Initiate nose scrunching animation.
+        
+        Args:
+            magnitude: Animation intensity (default 50, affects scale range)
+        """
+        import time
+        if self.is_twitching or self.is_scrunching:
+            print("Nose animation already in progress")
+            return
+        
+        self.is_scrunching = True
+        self.nose_animation_duration = 0.8  # 0.8 seconds
+        self.nose_animation_start_time = time.time()
+        self.nose_animation_end_time = self.nose_animation_start_time + self.nose_animation_duration
+        self.nose_animation_progress = 0.0
+        print(f"Started nose scrunch (magnitude={magnitude})")
+    
+    def _reset_nose(self):
+        """Cancel active nose animation and return to neutral state."""
+        self.is_twitching = False
+        self.is_scrunching = False
+        self.nose_offset_x = 0.0
+        self.nose_offset_y = 0.0
+        self.nose_scale = 1.0
+        self.nose_animation_progress = 0.0
+        self.nose_animation_start_time = None
+        self.nose_animation_end_time = None
+        self.nose_animation_duration = 0.0
+        print("Nose reset to neutral")
 
     def set_expression(self, expression: Expression):
         if expression != self.current_expression:
@@ -704,6 +798,65 @@ class PumpkinFace:
         """
         return (self.left_gaze_x, self.left_gaze_y, self.right_gaze_x, self.right_gaze_y)
     
+    def _animate_nose_twitch(self):
+        """Update twitching animation progress (±8px horizontal oscillation, 5 cycles)."""
+        if not self.is_twitching:
+            return
+        
+        # 5 complete cycles over 0.5s = 10 Hz frequency
+        # sin(2π * 5 * t) where t is 0.0-1.0 gives 5 complete cycles
+        amplitude = 8.0  # ±8px
+        frequency = 5.0  # 5 complete cycles
+        angle = 2.0 * math.pi * frequency * self.nose_animation_progress
+        self.nose_offset_x = amplitude * math.sin(angle)
+    
+    def _animate_nose_scrunch(self):
+        """Update scrunching animation progress (vertical scale 100%→50%→100%)."""
+        if not self.is_scrunching:
+            return
+        
+        # Ease in-out: compress to 50% at midpoint, return to 100% at end
+        # Use sin wave for smooth compression: 1.0 - 0.5 * sin(π * t) where t is 0.0-1.0
+        # At t=0: scale = 1.0 (neutral)
+        # At t=0.5: scale = 0.5 (max compression)
+        # At t=1.0: scale = 1.0 (returned to neutral)
+        compression_amount = 0.5 * math.sin(math.pi * self.nose_animation_progress)
+        self.nose_scale = 1.0 - compression_amount
+    
+    def _update_nose_animation(self):
+        """Update nose animation state each frame (called from update() loop)."""
+        if self.is_twitching:
+            delta_time = 1.0 / 60.0  # Assume 60 FPS
+            self.nose_animation_progress += delta_time / self.nose_animation_duration
+            
+            if self.nose_animation_progress >= 1.0:
+                # Animation complete: auto-return to neutral
+                self._reset_nose()
+            else:
+                self._animate_nose_twitch()
+        
+        elif self.is_scrunching:
+            delta_time = 1.0 / 60.0  # Assume 60 FPS
+            self.nose_animation_progress += delta_time / self.nose_animation_duration
+            
+            if self.nose_animation_progress >= 1.0:
+                # Animation complete: auto-return to neutral
+                self._reset_nose()
+            else:
+                self._animate_nose_scrunch()
+    
+    def twitch_nose(self):
+        """Start nose twitching animation."""
+        self._start_nose_twitch()
+    
+    def scrunch_nose(self):
+        """Start nose scrunching animation."""
+        self._start_nose_scrunch()
+    
+    def reset_nose(self):
+        """Reset nose to neutral position."""
+        self._reset_nose()
+    
     def update(self):
         # Handle blink animation
         if self.is_blinking:
@@ -783,6 +936,9 @@ class PumpkinFace:
                 # Interpolate between start and target
                 self.projection_offset_x = int(self.head_start_x + (self.head_target_x - self.head_start_x) * eased_t)
                 self.projection_offset_y = int(self.head_start_y + (self.head_target_y - self.head_start_y) * eased_t)
+        
+        # Handle nose animations
+        self._update_nose_animation()
         
         # Handle expression transitions
         if self.transition_progress < 1.0:
@@ -1115,6 +1271,32 @@ class PumpkinFace:
                         if data == "center_head":
                             self.center_head()
                             print("Centering head position")
+                            continue
+                        
+                        # Handle nose animation commands
+                        if data == "twitch_nose" or data.startswith("twitch_nose "):
+                            try:
+                                parts = data.split()
+                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
+                                self._start_nose_twitch(magnitude)
+                                print(f"Twitching nose (magnitude={magnitude})")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing twitch_nose command: {e}")
+                            continue
+                        
+                        if data == "scrunch_nose" or data.startswith("scrunch_nose "):
+                            try:
+                                parts = data.split()
+                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
+                                self._start_nose_scrunch(magnitude)
+                                print(f"Scrunching nose (magnitude={magnitude})")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing scrunch_nose command: {e}")
+                            continue
+                        
+                        if data == "reset_nose":
+                            self._reset_nose()
+                            print("Resetting nose to neutral")
                             continue
                         
                         try:
