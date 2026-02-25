@@ -81,6 +81,15 @@ class PumpkinFace:
         self.projection_offset_y = 0  # pixels, vertical offset
         self.jog_step = 5  # pixels per keypress
         
+        # Head movement animation state (smooth projection offset transitions)
+        self.is_moving_head = False
+        self.head_movement_progress = 0.0
+        self.head_movement_duration = 0.5  # seconds for smooth head turn
+        self.head_start_x = 0  # Starting X position for animation
+        self.head_start_y = 0  # Starting Y position for animation
+        self.head_target_x = 0  # Target X position for animation
+        self.head_target_y = 0  # Target Y position for animation
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
@@ -487,6 +496,61 @@ class PumpkinFace:
         self.projection_offset_x = 0
         self.projection_offset_y = 0
         print("Projection offset reset to (0, 0)")
+    
+    def _start_head_movement(self, target_x: int, target_y: int):
+        """Internal method to start smooth head movement animation.
+        
+        Args:
+            target_x: Target horizontal offset in pixels
+            target_y: Target vertical offset in pixels
+        """
+        def clamp(v): return max(-500, min(500, int(v)))
+        self.is_moving_head = True
+        self.head_movement_progress = 0.0
+        self.head_start_x = self.projection_offset_x
+        self.head_start_y = self.projection_offset_y
+        self.head_target_x = clamp(target_x)
+        self.head_target_y = clamp(target_y)
+    
+    def turn_head_left(self, amount: int = 50):
+        """Turn head to the left by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift left (default 50)
+        """
+        target_x = self.projection_offset_x - amount
+        self._start_head_movement(target_x, self.projection_offset_y)
+    
+    def turn_head_right(self, amount: int = 50):
+        """Turn head to the right by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift right (default 50)
+        """
+        target_x = self.projection_offset_x + amount
+        self._start_head_movement(target_x, self.projection_offset_y)
+    
+    def turn_head_up(self, amount: int = 50):
+        """Turn head upward by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift up (default 50)
+        """
+        target_y = self.projection_offset_y - amount
+        self._start_head_movement(self.projection_offset_x, target_y)
+    
+    def turn_head_down(self, amount: int = 50):
+        """Turn head downward by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift down (default 50)
+        """
+        target_y = self.projection_offset_y + amount
+        self._start_head_movement(self.projection_offset_x, target_y)
+    
+    def center_head(self):
+        """Return head to center position (0, 0) smoothly."""
+        self._start_head_movement(0, 0)
 
     def set_expression(self, expression: Expression):
         if expression != self.current_expression:
@@ -698,6 +762,27 @@ class PumpkinFace:
         elif self.is_blinking or self.is_winking:
             # Rolling animation paused during blink or wink
             pass
+        
+        # Handle head movement animation
+        if self.is_moving_head:
+            delta_time = 1.0 / 60.0  # Assume 60 FPS
+            self.head_movement_progress += delta_time / self.head_movement_duration
+            
+            if self.head_movement_progress >= 1.0:
+                # Complete: set to exact target position
+                self.projection_offset_x = self.head_target_x
+                self.projection_offset_y = self.head_target_y
+                self.is_moving_head = False
+                self.head_movement_progress = 0.0
+            else:
+                # Smooth interpolation using ease-in-out cubic
+                t = self.head_movement_progress
+                # Ease-in-out: 3t^2 - 2t^3
+                eased_t = t * t * (3.0 - 2.0 * t)
+                
+                # Interpolate between start and target
+                self.projection_offset_x = int(self.head_start_x + (self.head_target_x - self.head_start_x) * eased_t)
+                self.projection_offset_y = int(self.head_start_y + (self.head_target_y - self.head_start_y) * eased_t)
         
         # Handle expression transitions
         if self.transition_progress < 1.0:
@@ -984,6 +1069,52 @@ class PumpkinFace:
                                 self.set_projection_offset(x, y)
                             except (ValueError, IndexError) as e:
                                 print(f"Error parsing set_offset command: {e}")
+                            continue
+                        
+                        # Handle head movement commands
+                        if data == "turn_left" or data.startswith("turn_left "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_left(amount)
+                                print(f"Turning head left by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_left command: {e}")
+                            continue
+                        
+                        if data == "turn_right" or data.startswith("turn_right "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_right(amount)
+                                print(f"Turning head right by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_right command: {e}")
+                            continue
+                        
+                        if data == "turn_up" or data.startswith("turn_up "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_up(amount)
+                                print(f"Turning head up by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_up command: {e}")
+                            continue
+                        
+                        if data == "turn_down" or data.startswith("turn_down "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_down(amount)
+                                print(f"Turning head down by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_down command: {e}")
+                            continue
+                        
+                        if data == "center_head":
+                            self.center_head()
+                            print("Centering head position")
                             continue
                         
                         try:

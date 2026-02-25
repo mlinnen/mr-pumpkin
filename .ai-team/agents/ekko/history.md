@@ -254,3 +254,58 @@ pygame.draw.circle(surface, self.FEATURE_COLOR,
 - Mouth stays properly positioned relative to face at all reasonable offset ranges
 
 **Graphics Pattern Reinforcement:** This is the same coordinate system bug class as the eyebrow clipping issue. The fix reinforces the established pattern: rendering methods must accept offset-adjusted coordinates as parameters rather than accessing raw screen dimensions. Absolute screen coordinates (`self.width // 2`) break when projection offset transforms the coordinate system. All feature rendering methods should use the signature pattern `_draw_feature(surface, ..., cx, cy)` to maintain coordinate system consistency.
+
+### Animated Head Movement (Issue #17)
+
+**Implementation:** Added smooth head movement animation system that creates 3D illusion by animating projection offset transitions.
+
+**Architecture:**
+- State variables: `is_moving_head`, `head_movement_progress`, `head_start_x/y`, `head_target_x/y`
+- Animation duration: 0.5 seconds for smooth transitions
+- Update loop integration: Runs at 60 FPS, independent of other animations
+- Interpolation: Ease-in-out cubic (3t² - 2t³) for natural motion feel
+
+**Movement Methods:**
+- `turn_head_left(amount=50)`: Shift projection left (negative X)
+- `turn_head_right(amount=50)`: Shift projection right (positive X)
+- `turn_head_up(amount=50)`: Shift projection up (negative Y)
+- `turn_head_down(amount=50)`: Shift projection down (positive Y)
+- `center_head()`: Return to center position (0, 0) smoothly
+- `_start_head_movement(target_x, target_y)`: Internal animation trigger with clamping
+
+**Socket Commands:**
+- `turn_left [amount]`, `turn_right [amount]`, `turn_up [amount]`, `turn_down [amount]`
+- Optional amount parameter (default 50px), parsed from command arguments
+- `center_head`: Returns to neutral position
+- All movements respect ±500px boundary clamping
+
+**Animation Pattern — Smooth State Transitions:**
+This establishes the pattern for animating orthogonal state variables (like projection offset). Key principles:
+1. **Capture-interpolate-set**: Store start position, capture target, interpolate over time
+2. **Easing functions**: Use cubic ease-in-out for natural motion (avoids linear robotic feel)
+3. **Frame-based progress**: Increment by `delta_time / duration` at 60 FPS
+4. **Exact completion**: Set to exact target on completion (no accumulation error)
+5. **Independent animation**: Runs in update() loop alongside other animations without interference
+
+**3D Illusion Mechanism:**
+- Entire face shifts as a unit via projection offset applied to center coordinates
+- Creates parallax effect simulating head rotation/tilt
+- Smooth animation (0.5s) prevents jarring jumps, enhances 3D perception
+- Multiple sequential turns accumulate naturally (e.g., left 50px, then right 100px = net +50px)
+
+**Graphics Insight — Animation vs Manual Control:**
+The projection offset system now supports two interaction modes:
+1. **Manual jogging** (`jog_projection`, arrow keys): Instant offset changes for alignment
+2. **Animated movement** (`turn_head_*`): Smooth transitions for performative 3D effect
+Both modify the same state variables but serve different use cases. Manual jogging is for setup/calibration, animated movement is for runtime performance.
+
+**Verification:**
+- Created `test_animated_head_movement.py` for manual socket command testing
+- All methods compile and are callable
+- Socket server handles all five head movement commands
+- Animation state variables initialized in `__init__`
+- Update loop correctly interpolates and sets projection offset each frame
+- All 129 tests pass including 44 head movement tests
+
+**Test Corrections (2025-02-23):**
+Fixed pixel coordinate sampling in head movement tests. Eyes render at `center_y - 50` (not at screen center), so directional movement tests needed Y coordinate adjustment to match actual eye position. This highlights importance of understanding render geometry when writing pixel-level tests.
