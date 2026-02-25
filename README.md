@@ -133,7 +133,23 @@ While the application is running:
 - `4` → Angry
 - `5` → Surprised
 - `6` → Scared
+- `7` → Sleeping
 - `ESC` → Exit fullscreen
+
+**Projection Alignment (Jog Controls):**
+- `Arrow Keys` → Nudge projection in any direction (5px steps)
+- `0` → Reset projection offset to center
+
+**Animation Controls:**
+- `B` → Blink
+- `L` → Wink left
+- `R` → Wink right
+- `C` → Roll eyes clockwise
+- `X` → Roll eyes counter-clockwise
+- `U` → Raise both eyebrows
+- `J` → Lower both eyebrows
+- `[` → Raise left eyebrow (Shift+[ to lower)
+- `]` → Raise right eyebrow (Shift+] to lower)
 
 ## Customization
 

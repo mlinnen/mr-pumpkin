@@ -1,4 +1,6 @@
-# Squad: .ai-team/ never ships to preview/main.
-# merge=ours keeps preview's deleted state when merging from dev.
-# Requires once-per-clone: git config merge.ours.driver true
+# Squad: .ai-team/ and .ai-team-templates/ are dev-only.
+# These directories should NOT be merged into preview/main.
+# We use a 'keep-ours' strategy: any attempt to add/modify these files is ignored.
+# The ours merge driver (see git config) resolves all conflicts in favor of the current branch.
 .ai-team/** merge=ours
+.ai-team-templates/** merge=ours
