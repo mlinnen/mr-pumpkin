@@ -13,6 +13,7 @@
 ## Learnings
 
 📌 Team update (2026-02-19): Projection mapping color scheme and test strategy finalized — decided by Ekko, Mylo
+📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen
 
 ### Pupil Rotation Implementation (Rolling Eyes Bug Fix)
 

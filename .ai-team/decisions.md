@@ -1526,3 +1526,50 @@ self._start_nose_twitch(magnitude)
 
 **Note:** While magnitude parameter is parsed and passed, current graphics implementation (Ekko's layer) uses fixed animation curves. The parameter is reserved for future enhancement where magnitude could scale the animation amplitude.
 
+
+
+---
+
+### 2026-02-25: Feature Branch Workflow Standard (consolidated)
+
+**By:** Mike Linnen (via Copilot)
+
+**What:** All code changes must be made on feature branches, never directly on main/master. Always create a feature branch before starting work on any modification. Keep the repository clean — commit all outstanding changes before starting new work.
+
+**Why:** User directive captured for team memory. Feature branches ensure clean history, enable parallel work, and allow for proper code review before merging. Repository cleanliness prevents state conflicts and enables other team members to start work confidently.
+
+**Team standards:**
+- Create feature branch for every change before writing code
+- Main/master branch remains clean and ready for releases
+- Commit all outstanding changes before starting new work
+- No uncommitted (WIP) changes left in working directory between sessions
+
+---
+
+### 2026-02-24: Test Suite Reorganization Verified
+
+**By:** Mylo
+
+**What:** Verified all 189 tests work correctly after relocation to tests/ directory during Issue #32 repository reorganization.
+
+**Why:** Ensure test infrastructure remains fully functional after repository restructuring. Validate that pytest discovery, imports, fixtures, and execution work correctly from new location.
+
+**Test Results:**
+- ✅ All 189 tests pass (100% success rate)
+- ✅ No import errors or path issues
+- ✅ pytest discovers tests from repo root with 	ests/ argument
+- ✅ Execution time: 181.93 seconds (~3 minutes)
+
+**Test Coverage Confirmed:**
+- Eyebrow animation: 39 tests
+- Head movement: 88 tests
+- Nose movement: 45 tests
+- Projection mapping: 44 tests
+- Clipping/visibility: 3 tests
+- Command parsing: 2 tests
+- Animated movement: 1 test
+
+**Infrastructure Validated:**
+- 	ests/conftest.py provides shared fixtures correctly
+- All pygame initialization working properly
+- No broken imports in any test module

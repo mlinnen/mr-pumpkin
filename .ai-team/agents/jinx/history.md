@@ -12,6 +12,8 @@
 
 ## Learnings
 
+📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen
+
 *Patterns, conventions, and decisions discovered during work.*
 
 ### .ai-team/ Branch Tracking Policy (2026-02-20)
