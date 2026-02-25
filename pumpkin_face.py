@@ -76,6 +76,31 @@ class PumpkinFace:
         self.eyebrow_left_offset = 0.0   # pixels, clamped [-50, +50]
         self.eyebrow_right_offset = 0.0  # pixels, clamped [-50, +50]
         
+        # Projection offset state (for alignment/jog)
+        self.projection_offset_x = 0  # pixels, horizontal offset
+        self.projection_offset_y = 0  # pixels, vertical offset
+        self.jog_step = 5  # pixels per keypress
+        
+        # Head movement animation state (smooth projection offset transitions)
+        self.is_moving_head = False
+        self.head_movement_progress = 0.0
+        self.head_movement_duration = 0.5  # seconds for smooth head turn
+        self.head_start_x = 0  # Starting X position for animation
+        self.head_start_y = 0  # Starting Y position for animation
+        self.head_target_x = 0  # Target X position for animation
+        self.head_target_y = 0  # Target Y position for animation
+        
+        # Nose animation state (orthogonal to expression state machine)
+        self.nose_offset_x = 0.0  # Current horizontal offset (±8px for twitch)
+        self.nose_offset_y = 0.0  # Current vertical offset
+        self.nose_scale = 1.0  # Vertical scale factor (0.5-1.0 for scrunch)
+        self.is_twitching = False  # Twitching animation active
+        self.is_scrunching = False  # Scrunching animation active
+        self.nose_animation_progress = 0.0  # Animation progress (0.0-1.0)
+        self.nose_animation_start_time = None  # When animation started (time.time())
+        self.nose_animation_end_time = None  # When animation will end
+        self.nose_animation_duration = 0.0  # Total duration in seconds
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
@@ -104,8 +129,9 @@ class PumpkinFace:
         # Black background for projection
         surface.fill(self.BACKGROUND_COLOR)
         
-        center_x = self.width // 2
-        center_y = self.height // 2
+        # Apply projection offset to center coordinates
+        center_x = (self.width // 2) + self.projection_offset_x
+        center_y = (self.height // 2) + self.projection_offset_y
         
         # Calculate eye and mouth positions based on expression
         left_eye_pos, right_eye_pos = self._get_eye_positions(center_x, center_y)
@@ -117,8 +143,11 @@ class PumpkinFace:
         # Draw eyebrows
         self._draw_eyebrows(surface, left_eye_pos, right_eye_pos)
         
+        # Draw nose (between eyebrows and mouth)
+        self._draw_nose(surface, center_x, center_y)
+        
         # Draw mouth
-        self._draw_mouth(surface, mouth_points)
+        self._draw_mouth(surface, mouth_points, center_x, center_y)
     
     def _get_eye_positions(self, cx: int, cy: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         eye_y_offset = -50
@@ -319,6 +348,37 @@ class PumpkinFace:
         """
         return EYEBROW_BASELINES.get(expression, (-55, 0))
     
+    def _draw_nose(self, surface: pygame.Surface, center_x: int, center_y: int):
+        """Draw nose as white filled triangle with current position/scale applied.
+        
+        Args:
+            surface: Surface to draw on
+            center_x: Center X coordinate (with projection offset)
+            center_y: Center Y coordinate (with projection offset)
+        """
+        # Nose specifications: 40x50px triangle, apex UP
+        nose_width = 40
+        nose_height = 50
+        
+        # Base position: center_y + 15 (between eyes and mouth)
+        nose_base_y = center_y + 15
+        
+        # Apply animation offsets
+        nose_x = center_x + self.nose_offset_x
+        nose_y = nose_base_y + self.nose_offset_y
+        
+        # Calculate triangle vertices with vertical scale applied
+        # Apex UP: top vertex at (nose_x, nose_y - scaled_height)
+        # Base: two bottom vertices at (nose_x ± width/2, nose_y)
+        scaled_height = nose_height * self.nose_scale
+        
+        apex = (int(nose_x), int(nose_y - scaled_height))
+        base_left = (int(nose_x - nose_width / 2), int(nose_y))
+        base_right = (int(nose_x + nose_width / 2), int(nose_y))
+        
+        # Draw filled white triangle
+        pygame.draw.polygon(surface, self.FEATURE_COLOR, [apex, base_left, base_right])
+    
     def _draw_eyebrows(self, surface: pygame.Surface, left_pos: Tuple[int, int], right_pos: Tuple[int, int]):
         """Draw eyebrows with expression-based baselines, blink/wink lift, and user offsets.
         
@@ -362,9 +422,11 @@ class PumpkinFace:
         left_brow_y = int(left_pos[1] + baseline_gap + self.eyebrow_left_offset - blink_lift - left_wink_lift)
         right_brow_y = int(right_pos[1] + baseline_gap + self.eyebrow_right_offset - blink_lift - right_wink_lift)
         
-        # Apply floor clamp (prevent eyebrows from going too high off screen)
-        left_brow_y = max(350, left_brow_y)
-        right_brow_y = max(350, right_brow_y)
+        # Apply relative floor clamp (prevent eyebrows from going above screen top)
+        # Floor must account for projection offset - eyes moved down, so eyebrows' valid range also shifts
+        screen_floor = 0  # Top edge of screen
+        left_brow_y = max(screen_floor, left_brow_y)
+        right_brow_y = max(screen_floor, right_brow_y)
         
         # Render each eyebrow as tilted line
         brow_width_half = 35  # half of 70px width
@@ -391,15 +453,15 @@ class PumpkinFace:
         if brow_bottom_right < eye_top_right - 5:
             pygame.draw.line(surface, self.FEATURE_COLOR, start_right, end_right, thickness)
     
-    def _draw_mouth(self, surface: pygame.Surface, points: list):
+    def _draw_mouth(self, surface: pygame.Surface, points: list, cx: int, cy: int):
         if not points or len(points) < 2:
             if self.current_expression == Expression.SURPRISED:
                 # O-shaped mouth - white filled circle
-                pygame.draw.circle(surface, self.FEATURE_COLOR, (self.width // 2, self.height // 2 + 80), 30)
+                pygame.draw.circle(surface, self.FEATURE_COLOR, (cx, cy + 80), 30)
             elif self.current_expression == Expression.SCARED:
                 # Scared mouth - white filled ellipse
                 pygame.draw.ellipse(surface, self.FEATURE_COLOR, 
-                                   (self.width // 2 - 40, self.height // 2 + 70, 80, 50))
+                                   (cx - 40, cy + 70, 80, 50))
             return
         
         # Draw thick white lines for mouth curves
@@ -449,6 +511,140 @@ class PumpkinFace:
         """Reset both eyebrows to neutral position."""
         self.eyebrow_left_offset = 0.0
         self.eyebrow_right_offset = 0.0
+
+    def jog_projection(self, dx: int, dy: int):
+        """Adjust projection offset by delta pixels. Clamped to [-500, +500].
+        
+        Args:
+            dx: Horizontal offset change in pixels (positive = right)
+            dy: Vertical offset change in pixels (positive = down)
+        """
+        def clamp(v): return max(-500, min(500, int(v)))
+        self.projection_offset_x = clamp(self.projection_offset_x + dx)
+        self.projection_offset_y = clamp(self.projection_offset_y + dy)
+        print(f"Projection offset: ({self.projection_offset_x}, {self.projection_offset_y})")
+    
+    def set_projection_offset(self, x: int, y: int):
+        """Set absolute projection offset in pixels. Clamped to [-500, +500].
+        
+        Args:
+            x: Horizontal offset in pixels (positive = right)
+            y: Vertical offset in pixels (positive = down)
+        """
+        def clamp(v): return max(-500, min(500, int(v)))
+        self.projection_offset_x = clamp(x)
+        self.projection_offset_y = clamp(y)
+        print(f"Projection offset set to: ({self.projection_offset_x}, {self.projection_offset_y})")
+    
+    def reset_projection_offset(self):
+        """Reset projection offset to center (0, 0)."""
+        self.projection_offset_x = 0
+        self.projection_offset_y = 0
+        print("Projection offset reset to (0, 0)")
+    
+    def _start_head_movement(self, target_x: int, target_y: int):
+        """Internal method to start smooth head movement animation.
+        
+        Args:
+            target_x: Target horizontal offset in pixels
+            target_y: Target vertical offset in pixels
+        """
+        def clamp(v): return max(-500, min(500, int(v)))
+        self.is_moving_head = True
+        self.head_movement_progress = 0.0
+        self.head_start_x = self.projection_offset_x
+        self.head_start_y = self.projection_offset_y
+        self.head_target_x = clamp(target_x)
+        self.head_target_y = clamp(target_y)
+    
+    def turn_head_left(self, amount: int = 50):
+        """Turn head to the left by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift left (default 50)
+        """
+        target_x = self.projection_offset_x - amount
+        self._start_head_movement(target_x, self.projection_offset_y)
+    
+    def turn_head_right(self, amount: int = 50):
+        """Turn head to the right by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift right (default 50)
+        """
+        target_x = self.projection_offset_x + amount
+        self._start_head_movement(target_x, self.projection_offset_y)
+    
+    def turn_head_up(self, amount: int = 50):
+        """Turn head upward by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift up (default 50)
+        """
+        target_y = self.projection_offset_y - amount
+        self._start_head_movement(self.projection_offset_x, target_y)
+    
+    def turn_head_down(self, amount: int = 50):
+        """Turn head downward by shifting projection offset.
+        
+        Args:
+            amount: Pixels to shift down (default 50)
+        """
+        target_y = self.projection_offset_y + amount
+        self._start_head_movement(self.projection_offset_x, target_y)
+    
+    def center_head(self):
+        """Return head to center position (0, 0) smoothly."""
+        self._start_head_movement(0, 0)
+    
+    def _start_nose_twitch(self, magnitude: float = 50.0):
+        """Initiate nose twitching animation.
+        
+        Args:
+            magnitude: Animation intensity (default 50, affects horizontal offset range)
+        """
+        import time
+        if self.is_twitching or self.is_scrunching:
+            print("Nose animation already in progress")
+            return
+        
+        self.is_twitching = True
+        self.nose_animation_duration = 0.5  # 0.5 seconds
+        self.nose_animation_start_time = time.time()
+        self.nose_animation_end_time = self.nose_animation_start_time + self.nose_animation_duration
+        self.nose_animation_progress = 0.0
+        print(f"Started nose twitch (magnitude={magnitude})")
+    
+    def _start_nose_scrunch(self, magnitude: float = 50.0):
+        """Initiate nose scrunching animation.
+        
+        Args:
+            magnitude: Animation intensity (default 50, affects scale range)
+        """
+        import time
+        if self.is_twitching or self.is_scrunching:
+            print("Nose animation already in progress")
+            return
+        
+        self.is_scrunching = True
+        self.nose_animation_duration = 0.8  # 0.8 seconds
+        self.nose_animation_start_time = time.time()
+        self.nose_animation_end_time = self.nose_animation_start_time + self.nose_animation_duration
+        self.nose_animation_progress = 0.0
+        print(f"Started nose scrunch (magnitude={magnitude})")
+    
+    def _reset_nose(self):
+        """Cancel active nose animation and return to neutral state."""
+        self.is_twitching = False
+        self.is_scrunching = False
+        self.nose_offset_x = 0.0
+        self.nose_offset_y = 0.0
+        self.nose_scale = 1.0
+        self.nose_animation_progress = 0.0
+        self.nose_animation_start_time = None
+        self.nose_animation_end_time = None
+        self.nose_animation_duration = 0.0
+        print("Nose reset to neutral")
 
     def set_expression(self, expression: Expression):
         if expression != self.current_expression:
@@ -602,6 +798,65 @@ class PumpkinFace:
         """
         return (self.left_gaze_x, self.left_gaze_y, self.right_gaze_x, self.right_gaze_y)
     
+    def _animate_nose_twitch(self):
+        """Update twitching animation progress (±8px horizontal oscillation, 5 cycles)."""
+        if not self.is_twitching:
+            return
+        
+        # 5 complete cycles over 0.5s = 10 Hz frequency
+        # sin(2π * 5 * t) where t is 0.0-1.0 gives 5 complete cycles
+        amplitude = 8.0  # ±8px
+        frequency = 5.0  # 5 complete cycles
+        angle = 2.0 * math.pi * frequency * self.nose_animation_progress
+        self.nose_offset_x = amplitude * math.sin(angle)
+    
+    def _animate_nose_scrunch(self):
+        """Update scrunching animation progress (vertical scale 100%→50%→100%)."""
+        if not self.is_scrunching:
+            return
+        
+        # Ease in-out: compress to 50% at midpoint, return to 100% at end
+        # Use sin wave for smooth compression: 1.0 - 0.5 * sin(π * t) where t is 0.0-1.0
+        # At t=0: scale = 1.0 (neutral)
+        # At t=0.5: scale = 0.5 (max compression)
+        # At t=1.0: scale = 1.0 (returned to neutral)
+        compression_amount = 0.5 * math.sin(math.pi * self.nose_animation_progress)
+        self.nose_scale = 1.0 - compression_amount
+    
+    def _update_nose_animation(self):
+        """Update nose animation state each frame (called from update() loop)."""
+        if self.is_twitching:
+            delta_time = 1.0 / 60.0  # Assume 60 FPS
+            self.nose_animation_progress += delta_time / self.nose_animation_duration
+            
+            if self.nose_animation_progress >= 1.0:
+                # Animation complete: auto-return to neutral
+                self._reset_nose()
+            else:
+                self._animate_nose_twitch()
+        
+        elif self.is_scrunching:
+            delta_time = 1.0 / 60.0  # Assume 60 FPS
+            self.nose_animation_progress += delta_time / self.nose_animation_duration
+            
+            if self.nose_animation_progress >= 1.0:
+                # Animation complete: auto-return to neutral
+                self._reset_nose()
+            else:
+                self._animate_nose_scrunch()
+    
+    def twitch_nose(self):
+        """Start nose twitching animation."""
+        self._start_nose_twitch()
+    
+    def scrunch_nose(self):
+        """Start nose scrunching animation."""
+        self._start_nose_scrunch()
+    
+    def reset_nose(self):
+        """Reset nose to neutral position."""
+        self._reset_nose()
+    
     def update(self):
         # Handle blink animation
         if self.is_blinking:
@@ -660,6 +915,30 @@ class PumpkinFace:
         elif self.is_blinking or self.is_winking:
             # Rolling animation paused during blink or wink
             pass
+        
+        # Handle head movement animation
+        if self.is_moving_head:
+            delta_time = 1.0 / 60.0  # Assume 60 FPS
+            self.head_movement_progress += delta_time / self.head_movement_duration
+            
+            if self.head_movement_progress >= 1.0:
+                # Complete: set to exact target position
+                self.projection_offset_x = self.head_target_x
+                self.projection_offset_y = self.head_target_y
+                self.is_moving_head = False
+                self.head_movement_progress = 0.0
+            else:
+                # Smooth interpolation using ease-in-out cubic
+                t = self.head_movement_progress
+                # Ease-in-out: 3t^2 - 2t^3
+                eased_t = t * t * (3.0 - 2.0 * t)
+                
+                # Interpolate between start and target
+                self.projection_offset_x = int(self.head_start_x + (self.head_target_x - self.head_start_x) * eased_t)
+                self.projection_offset_y = int(self.head_start_y + (self.head_target_y - self.head_start_y) * eased_t)
+        
+        # Handle nose animations
+        self._update_nose_animation()
         
         # Handle expression transitions
         if self.transition_progress < 1.0:
@@ -781,6 +1060,16 @@ class PumpkinFace:
                 self.lower_eyebrow_right()
             else:
                 self.raise_eyebrow_right()
+        elif key == pygame.K_UP:
+            self.jog_projection(0, -self.jog_step)
+        elif key == pygame.K_DOWN:
+            self.jog_projection(0, self.jog_step)
+        elif key == pygame.K_LEFT:
+            self.jog_projection(-self.jog_step, 0)
+        elif key == pygame.K_RIGHT:
+            self.jog_projection(self.jog_step, 0)
+        elif key == pygame.K_0:
+            self.reset_projection_offset()
     
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -911,6 +1200,103 @@ class PumpkinFace:
                                 print(f"Right eyebrow set to: {val}")
                             except (ValueError, IndexError) as e:
                                 print(f"Error parsing eyebrow_right command: {e}")
+                            continue
+                        
+                        # Handle projection offset commands
+                        if data == "projection_reset":
+                            self.reset_projection_offset()
+                            continue
+                        
+                        if data.startswith("jog_offset "):
+                            try:
+                                parts = data.split()
+                                dx = int(parts[1])
+                                dy = int(parts[2])
+                                self.jog_projection(dx, dy)
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing jog_offset command: {e}")
+                            continue
+                        
+                        if data.startswith("set_offset "):
+                            try:
+                                parts = data.split()
+                                x = int(parts[1])
+                                y = int(parts[2])
+                                self.set_projection_offset(x, y)
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing set_offset command: {e}")
+                            continue
+                        
+                        # Handle head movement commands
+                        if data == "turn_left" or data.startswith("turn_left "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_left(amount)
+                                print(f"Turning head left by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_left command: {e}")
+                            continue
+                        
+                        if data == "turn_right" or data.startswith("turn_right "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_right(amount)
+                                print(f"Turning head right by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_right command: {e}")
+                            continue
+                        
+                        if data == "turn_up" or data.startswith("turn_up "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_up(amount)
+                                print(f"Turning head up by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_up command: {e}")
+                            continue
+                        
+                        if data == "turn_down" or data.startswith("turn_down "):
+                            try:
+                                parts = data.split()
+                                amount = int(parts[1]) if len(parts) > 1 else 50
+                                self.turn_head_down(amount)
+                                print(f"Turning head down by {amount}px")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing turn_down command: {e}")
+                            continue
+                        
+                        if data == "center_head":
+                            self.center_head()
+                            print("Centering head position")
+                            continue
+                        
+                        # Handle nose animation commands
+                        if data == "twitch_nose" or data.startswith("twitch_nose "):
+                            try:
+                                parts = data.split()
+                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
+                                self._start_nose_twitch(magnitude)
+                                print(f"Twitching nose (magnitude={magnitude})")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing twitch_nose command: {e}")
+                            continue
+                        
+                        if data == "scrunch_nose" or data.startswith("scrunch_nose "):
+                            try:
+                                parts = data.split()
+                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
+                                self._start_nose_scrunch(magnitude)
+                                print(f"Scrunching nose (magnitude={magnitude})")
+                            except (ValueError, IndexError) as e:
+                                print(f"Error parsing scrunch_nose command: {e}")
+                            continue
+                        
+                        if data == "reset_nose":
+                            self._reset_nose()
+                            print("Resetting nose to neutral")
                             continue
                         
                         try:
