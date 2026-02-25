@@ -12,6 +12,9 @@
 
 ## Learnings
 
+📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
+📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
+
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
 ### Release Package Architecture (Issue #3)
@@ -165,3 +168,27 @@
 - **Frame-based (graphics):** Progress 0.0-1.0 passed to Ekko's methods, which use sin/ease curves for interpolation
 - **Why both:** Time-based ensures consistent animation duration regardless of frame rate; frame-based allows smooth visual effects
 - **Implementation:** `_update_nose_animation()` converts time to progress, then calls frame-based graphics methods
+
+### Test Organization (Issue #32)
+
+**What:** Reorganized test files into proper Python package structure for cleaner distribution and development workflows.
+
+**Key changes:**
+- **Test directory structure:** Created `tests/` directory with `__init__.py` and `conftest.py`
+- **File relocation:** Moved all 11 `test_*.py` files from repo root to `tests/` subdirectory
+- **Requirements split:** Separated production (`requirements.txt`) from development dependencies (`requirements-dev.txt`)
+- **Package exclusion:** Updated `scripts/package_release.py` to exclude test files from release ZIP archives
+
+**Files modified:**
+- `requirements.txt`: Removed pytest (now production-only: pygame)
+- `requirements-dev.txt`: New file with `-r requirements.txt` + pytest>=7.0.0
+- `scripts/package_release.py`: Removed `test_projection_mapping.py` from include list
+- `tests/conftest.py`: Adds parent directory to `sys.path` for clean imports
+
+**Design rationale:**
+- **Standard Python convention:** Test files belong in `tests/` directory, not repo root
+- **Clean releases:** Distribution packages should not include developer tools or test suites
+- **Import strategy:** `conftest.py` ensures tests can import `pumpkin_face` module without path hacks in each test file
+- **Dev vs prod deps:** Users installing from ZIP don't need pytest; developers clone repo and use `requirements-dev.txt`
+
+**pytest behavior:** All tests continue to pass unchanged. Pytest automatically discovers tests in `tests/` directory when run from repo root.

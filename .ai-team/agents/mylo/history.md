@@ -12,7 +12,9 @@
 
 ## Learnings
 
-📌 Team update (2026-02-19): Projection mapping color scheme and test strategy finalized — decided by Ekko, Mylo
+📌 Team update (2026-02-19): Projection mapping color scheme and test strategy finalized — decided by Ekko, Mylo  
+📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
+📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 
@@ -134,3 +136,32 @@
 - Tolerance for frame counts: ±2 frames acceptable for 60fps timing (system variance)
 - Rendering tests use sparse sampling (every 5-10 pixels) for performance
 - Animation formula testing separated from integration testing (unit vs. integration)
+
+### Test Directory Organization (Issue #32) - 2026-02-24
+**Test suite reorganization verified successfully**
+
+**Test migration status:**
+- All 189 tests relocated from repo root to `tests/` directory
+- pytest discovers tests correctly from new location
+- No import errors or path issues detected
+- All tests pass: 100% success rate (189/189 passed in 181.93 seconds)
+
+**Test inventory by module:**
+- Eyebrow animation: 39 tests (state, orthogonality, commands, rendering, integration, edge cases)
+- Head movement: 88 tests (state, directions, orthogonality, smoothness, projection, edge cases, performance)
+- Nose movement: 45 tests (state, animations, expression integration, commands, edge cases, rendering)
+- Projection mapping: 44 tests (colors, contrast, expressions, features, sleeping, blink animation)
+- Clipping/visibility: 3 tests (eyebrow, mouth)
+- Command parsing: 2 tests (nose commands, projection offset commands)
+- Animated movement: 1 test
+
+**Test infrastructure location:**
+- Primary test directory: `tests/` (contains all test_*.py files)
+- Shared fixtures: `tests/conftest.py` (pygame initialization, surface fixtures)
+- Test discovery: pytest run from repo root with `tests/` argument
+
+**Quality assurance:**
+- No broken imports after relocation
+- All fixtures resolve correctly
+- Pygame initialization stable across all test modules
+- Test execution time: ~3 minutes for full suite
