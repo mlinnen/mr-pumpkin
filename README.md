@@ -54,6 +54,16 @@ sudo apt-get update
 sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 ```
 
+### Development Setup
+
+To set up a development environment with testing capabilities:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+This installs all production dependencies plus pytest for running the test suite.
+
 ## Usage
 
 ### Run the pumpkin face application:
@@ -163,25 +173,29 @@ Edit `pumpkin_face.py` to customize:
 
 - **pumpkin_face.py**: Main application with rendering and network server
 - **client_example.py**: Example client for sending commands
-- **test_projection_mapping.py**: Test suite for projection mapping feature
-- **requirements.txt**: Python dependencies (pygame, pytest)
+- **tests/**: Test suite directory with all test modules
+- **requirements.txt**: Production dependencies (pygame only)
+- **requirements-dev.txt**: Development dependencies (includes pytest for testing)
 
 ## Testing
 
 Run the test suite to validate projection mapping and other features:
 
 ```bash
-# Install test dependencies
-pip install -r requirements.txt
+# Install development dependencies (if not already installed)
+pip install -r requirements-dev.txt
 
 # Run all tests
-pytest test_projection_mapping.py -v
+pytest
+
+# Run specific test file
+pytest tests/test_projection_mapping.py -v
 
 # Run specific test class
-pytest test_projection_mapping.py::TestProjectionMappingColors -v
+pytest tests/test_projection_mapping.py::TestProjectionMappingColors -v
 
 # Run with detailed output
-pytest test_projection_mapping.py -vv
+pytest -vv
 ```
 
 The test suite validates:
