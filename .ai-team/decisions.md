@@ -255,13 +255,17 @@ These tests were written BEFORE implementation landed (parallel to Ekko's work o
 
 ---
 
-### 2026-02-20: .ai-team/ tracking policy
+### 2026-02-20: .ai-team/ tracking policy (SUPERSEDED)
 
 **By:** Jinx
 
-**What:** .ai-team/ and .ai-team-templates/ are tracked on dev but NOT on preview or main. These directories are in .gitignore on preview and main. When merging dev→preview, untrack them with `git rm -r --cached .ai-team/ .ai-team-templates/` before committing the merge.
+**Status:** ⚠️ SUPERSEDED by Issue #40 (2026-02-26)
 
-**Why:** .ai-team/ is squad internal state — it should not ship with the product.
+**Original Decision:** .ai-team/ and .ai-team-templates/ are tracked on dev but NOT on preview or main. These directories are in .gitignore on preview and main. When merging dev→preview, untrack them with `git rm -r --cached .ai-team/ .ai-team-templates/` before committing the merge.
+
+**Original Rationale:** .ai-team/ is squad internal state — it should not ship with the product.
+
+**Policy Evolution:** On 2026-02-26, this decision was reversed. All guards blocking .ai-team/ from tracking on preview and main branches were removed (.gitignore entries, squad-main-guard.yml workflow, and squad-preview.yml validation checks). The new policy: .ai-team/ now flows through normal git workflow on all branches, enabling team evolution history to be preserved and shared across branches. This is tracked in Issue #40 and implemented in PR #41.
 
 ---
 
