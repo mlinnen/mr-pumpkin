@@ -15,20 +15,27 @@ Usage:
       - record cancel: Discard current recording
       - record status: Show recording state (is_recording, command_count, duration_ms)
       - list: Show available recordings
+    Or playback commands:
+      - play <filename>: Start playing a recording
+      - pause: Pause current playback
+      - resume: Resume from paused state
+      - stop: Stop playback
+      - seek <position_ms>: Jump to position in recording
+      - timeline_status: Show playback state (state, filename, position, duration)
 """
 
 import socket
 import json
 
 def send_command(command: str):
-    """Send command and handle response (for recording/status commands)"""
+    """Send command and handle response (for recording/status/playback commands)"""
     try:
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect(('localhost', 5000))
         client.send(command.encode('utf-8'))
         
         # For commands that return JSON responses, read the response
-        if command in ["recording_status", "list_recordings"] or command == "list":
+        if command in ["recording_status", "list_recordings", "timeline_status"] or command == "list":
             response = client.recv(4096).decode('utf-8').strip()
             client.close()
             
@@ -49,11 +56,24 @@ def send_command(command: str):
                     else:
                         for rec in data:
                             print(f"  - {rec['filename']}: {rec['command_count']} commands, {rec['duration_ms']} ms")
+                elif actual_command == "timeline_status":
+                    print(f"Playback Status:")
+                    print(f"  State: {data['state']}")
+                    print(f"  Filename: {data.get('filename', '(none)')}")
+                    print(f"  Position: {data['position_ms']} ms")
+                    print(f"  Duration: {data['duration_ms']} ms")
+                    print(f"  Is Playing: {data['is_playing']}")
+                    if data.get('is_recording'):
+                        print(f"  Recording: Active")
             except json.JSONDecodeError:
                 print(f"Response: {response}")
         else:
+            response = client.recv(1024).decode('utf-8').strip()
             client.close()
-            print(f"Sent: {command}")
+            if response:
+                print(f"Response: {response}")
+            else:
+                print(f"Sent: {command}")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -73,6 +93,13 @@ if __name__ == "__main__":
     print("  record cancel - Discard recording")
     print("  record status - Show recording state")
     print("  list - Show available recordings")
+    print("Playback commands:")
+    print("  play <filename> - Start playing a recording")
+    print("  pause - Pause playback")
+    print("  resume - Resume from paused state")
+    print("  stop - Stop playback")
+    print("  seek <position_ms> - Jump to position in recording")
+    print("  timeline_status - Show playback state")
     print("Type 'quit' to exit\n")
     
     while True:
