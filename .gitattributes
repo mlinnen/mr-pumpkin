@@ -1,9 +1,7 @@
-# Squad: .ai-team/ and .ai-team-templates/ are dev-only.
-# These directories should NOT be merged into preview/main.
-# Setting merge=ours means: in a merge, keep preview's version (which is: these dirs don't exist).
-# This prevents .ai-team/ from being added when merging from dev.
-.ai-team/** merge=ours
-.ai-team-templates/** merge=ours
-
-# Preserve this branch's .gitattributes during merges from other branches
-.gitattributes merge=ours
+# Squad: .ai-team/ append-only files use union merge to enable conflict-free merging.
+# Decisions, histories, and logs are append-only — both sides of a merge only add content.
+# Using merge=union combines all lines from both branches automatically.
+.ai-team/decisions.md merge=union
+.ai-team/agents/*/history.md merge=union
+.ai-team/log/** merge=union
+.ai-team/orchestration-log/** merge=union
