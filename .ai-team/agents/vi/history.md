@@ -192,3 +192,174 @@
 - **Dev vs prod deps:** Users installing from ZIP don't need pytest; developers clone repo and use `requirements-dev.txt`
 
 **pytest behavior:** All tests continue to pass unchanged. Pytest automatically discovers tests in `tests/` directory when run from repo root.
+
+### Timeline Data Structure & Playback Engine (Issue #34, WI-1 & WI-2)
+
+**What:** Implemented core timeline data structure and frame-based playback engine for recording and playing back TCP command sequences.
+
+**Key files:**
+- `timeline.py` — Timeline, TimelineEntry, Playback, PlaybackState classes
+
+**Timeline Format (JSON):**
+Chose JSON for human-readability and forward compatibility:
+```json
+{
+  "version": "1.0",
+  "duration_ms": 5000,
+  "commands": [
+    {"time_ms": 0, "command": "set_expression", "args": {"expression": "happy"}},
+    {"time_ms": 1000, "command": "blink"},
+    {"time_ms": 3000, "command": "play_timeline", "args": {"filename": "other.json"}}
+  ]
+}
+```
+
+**Design decisions:**
+1. **Millisecond timestamps:** Provides sub-second precision while staying compatible with 60 FPS frame timing (~16.67ms per frame)
+2. **Frame-based playback:** Integrates with game loop via `update(dt_ms)` called each frame — no separate threads needed
+3. **Flat file naming:** All recordings in `~/.mr-pumpkin/recordings/` with unique filenames (no subdirectories)
+4. **Nested playback support:** Commands can include `play_timeline` to trigger other recordings
+5. **Graceful error handling:** Invalid commands during playback stop execution and return error messages
+6. **Callback pattern:** Playback engine calls `command_callback(command, args)` for each command — decouples from PumpkinFace internals
+
+**Frame-based timing pattern (60 FPS):**
+- Each frame passes delta time (`dt_ms`) to `playback.update(dt_ms)`
+- Playback advances `current_position_ms += dt_ms`
+- Commands execute when `cmd.time_ms <= current_position_ms`
+- Timing precision: within one frame (~16.67ms at 60 FPS)
+- No drift: position tracked independently of frame rate fluctuations
+
+**State machine:**
+- `PlaybackState.STOPPED` — No active playback, position at 0
+- `PlaybackState.PLAYING` — Advancing through timeline, executing commands
+- `PlaybackState.PAUSED` — Position frozen, no command execution
+
+**Execution tracking:**
+- `_last_executed_index` prevents re-execution of commands during seek or pause/resume
+- Seek updates this index to skip already-executed commands before target position
+- Invalid command stops playback immediately (fail-fast pattern)
+
+**File storage:**
+- Default: `~/.mr-pumpkin/recordings/` (cross-platform via `pathlib.Path.home()`)
+- Auto-creates directory on first save
+- JSON files with `.json` extension (auto-appended if omitted)
+- Atomic operations: rename/delete check existence first
+
+**Playback control methods:**
+- `play(filename)` — Load timeline and start from beginning
+- `stop()` — Reset to position 0, state = STOPPED
+- `pause()` / `resume()` — Freeze/unfreeze position advancement
+- `seek(position_ms)` — Jump to arbitrary position, update execution index
+- `update(dt_ms)` — Advance playback, execute commands, return errors
+
+**Status query methods:**
+- `get_status()` — Returns dict with state, filename, position, duration, is_playing
+- `get_duration(filename)` — Query duration without loading into playback
+- `list_recordings()` — Scan directory, return metadata for all valid timelines
+
+**File management methods:**
+- `delete_recording(filename)` — Remove file (raises FileNotFoundError if missing)
+- `rename_recording(old, new)` — Rename file (raises FileExistsError if collision)
+
+**Testability patterns:**
+- All state is queryable (state, position, duration)
+- Callback injection for command execution (easy to mock)
+- Timeline serialization is lossless (round-trip save/load)
+- Errors returned as strings (not just logged)
+
+**Lessons learned:**
+1. **Frame-based > thread-based:** Simpler state management, no race conditions, integrates cleanly with existing game loop
+2. **Callback decoupling:** Playback engine doesn't know about PumpkinFace — testable in isolation
+3. **Index tracking prevents re-execution:** Critical for pause/resume and seek — without it, commands execute multiple times
+4. **Millisecond precision sufficient:** 60 FPS gives ~16ms granularity, matches human perception for animations
+5. **Fail-fast on errors:** Invalid command immediately stops playback — prevents cascading failures
+6. **Flat file structure simplifies:** No directory tree logic, unique names enforced by filesystem
+
+### Seek, Recording, and File Management (Issue #34, WI-3 through WI-6)
+
+**What:** Extended timeline.py with seek functionality, recording session capture, playback status queries, and file management operations.
+
+**Key additions:**
+- `RecordingSession` class — Command capture for creating timelines
+- `FileManager` class — File operations (upload, download, delete, rename, list)
+- Enhanced `Playback.seek()` — Fast-forward/rewind with state preservation
+- `Playback.get_status()` — Query playback state, position, duration
+- `update()` execution order fix — Commands execute before end-of-playback check
+
+**Seek implementation (WI-3):**
+- Clamps position to [0, duration_ms] range automatically
+- Updates `_last_executed_index` to track which commands were already executed
+- Works in all playback states (STOPPED, PLAYING, PAUSED)
+- Seeking forward skips intermediate commands (no execution)
+- Seeking backward doesn't re-execute already-run commands
+- State machine preserved: seeking while PLAYING keeps state PLAYING, seeking while PAUSED keeps state PAUSED
+
+**Recording session pattern (WI-5):**
+- `start()` — Capture start time as milliseconds (using `time.time() * 1000`)
+- `record_command(cmd, args)` — Store command with relative timestamp
+- `stop(filename=None)` — Save timeline to JSON file
+- Auto-naming: If filename is None, uses `recording_YYYY-MM-DD_HHMMSS.json` format
+- Validation: Raises ValueError if no commands captured, FileExistsError if filename collision
+- `cancel()` — Discard recording without saving
+- All timestamps relative to recording start (not absolute wall clock)
+
+**File management API (WI-4):**
+- `list_recordings()` — Returns list with filename, size_bytes, created_at, duration_ms
+- `download_timeline(filename)` — Return raw JSON string (validates JSON before returning)
+- `upload_timeline(filename, json_content)` — Parse and validate JSON structure, then save
+- `delete_timeline(filename)` — Remove file from disk (raises FileNotFoundError if missing)
+- `rename_timeline(old, new)` — Atomic rename operation (checks both existence and collision)
+- All methods auto-append `.json` extension if omitted
+- All operations scoped to `~/.mr-pumpkin/recordings/` directory
+
+**Status query pattern (WI-6):**
+- `get_status()` returns dict: `{"state": "playing", "filename": "test.json", "position_ms": 1234, "duration_ms": 5000, "is_playing": True}`
+- State values: "stopped", "playing", "paused" (from PlaybackState enum)
+- `is_playing` convenience field: True only when state == PLAYING
+- All fields always present (filename can be None when stopped)
+
+**Critical bug fix — Command execution order:**
+- **Problem:** Original `update()` checked `position >= duration` BEFORE executing commands, causing commands at exact duration timestamp to never execute
+- **Solution:** Moved end-of-playback check to AFTER command execution loop
+- **Impact:** Commands at final timestamp now execute correctly before playback stops
+- **Pattern:** Execute → then check end, not check end → then execute
+
+**Seek state machine integration:**
+- Seek updates position without changing state (PLAYING stays PLAYING, PAUSED stays PAUSED)
+- `_last_executed_index` reset to -1, then recalculated by scanning commands before new position
+- Commands with `time_ms < position_ms` marked as already executed
+- No commands are executed during seek operation itself (position jumps instantly)
+- Next `update()` call will execute commands from new position forward
+
+**Recording timestamp capture:**
+- Start time captured as `time.time() * 1000` (milliseconds since epoch)
+- Each command timestamp = `current_time_ms - start_time_ms` (relative offset)
+- Ensures timeline is self-contained (not dependent on wall clock)
+- Compatible with playback engine's millisecond-based timing
+
+**File operations error handling:**
+- `FileNotFoundError` — Consistent across delete, rename, download when file missing
+- `FileExistsError` — Consistent across upload, rename, record stop when name collision
+- `ValueError` — Invalid JSON structure or empty recording
+- Clear error messages include filename for debugging
+
+**Design decisions:**
+1. **Separate RecordingSession from Playback:** Recording is write-only, playback is read-only — different concerns, different classes
+2. **Separate FileManager from Playback:** File ops are pure I/O, playback is state machine — cleaner separation of concerns
+3. **Auto-append .json extension:** User convenience — `"test"` and `"test.json"` both work identically
+4. **Timestamp-based auto-naming:** Avoids filename collisions, human-readable, sortable by creation time
+5. **Execute-then-check order in update():** Ensures final command executes, matches user expectation that duration includes all commands
+6. **Seek doesn't re-execute:** Fast-forward/rewind is instant position change, not "fast playback" — commands between old/new position are skipped
+
+**Testing approach:**
+- `test_timeline_features.py` — 5 comprehensive tests covering all WI-3 through WI-6 features
+- Tests use temporary directories for isolated file operations
+- Validates edge cases: seek clamping, empty recordings, duplicate filenames, invalid JSON
+- Confirms command execution order fix (final command executes)
+- All 332 existing tests still pass — no regressions
+
+**TCP integration readiness:**
+- RecordingSession can wrap any command sent to PumpkinFace (set_expression, blink, etc.)
+- FileManager provides complete CRUD operations for remote timeline management
+- Playback status queries enable real-time progress monitoring over TCP
+- Seek enables scrubbing UI controls (progress bar drag, skip forward/back buttons)
