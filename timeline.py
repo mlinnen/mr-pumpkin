@@ -5,6 +5,8 @@ This module provides:
 - Timeline: JSON-based command sequence with frame-based timing
 - PlaybackState: State tracking for timeline execution
 - Playback: Frame-based playback engine integrated with 60 FPS game loop
+- RecordingSession: Command capture for creating timelines
+- FileManager: File operations for timeline management
 
 Design decisions:
 - Frame-based timing at 60 FPS (~16.67ms per frame)
@@ -17,6 +19,7 @@ Design decisions:
 import json
 import os
 import time
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -292,11 +295,6 @@ class Playback:
         # Advance position
         self.current_position_ms += dt_ms
         
-        # Check if reached end
-        if self.current_position_ms >= self.timeline.duration_ms:
-            self.stop()
-            return []
-        
         # Execute commands in current time window
         errors = []
         for i, cmd in enumerate(self.timeline.commands):
@@ -319,6 +317,10 @@ class Playback:
                     # Invalid command stops playback
                     self.stop()
                     break
+        
+        # Check if reached end (after executing commands)
+        if self.current_position_ms >= self.timeline.duration_ms:
+            self.stop()
         
         return errors
     
@@ -408,6 +410,257 @@ class Playback:
     
     def rename_recording(self, old_name: str, new_name: str):
         """Rename a recording file.
+        
+        Args:
+            old_name: Current filename
+            new_name: New filename
+            
+        Raises:
+            FileNotFoundError: If old file doesn't exist
+            FileExistsError: If new filename already exists
+        """
+        if not old_name.endswith('.json'):
+            old_name = f"{old_name}.json"
+        if not new_name.endswith('.json'):
+            new_name = f"{new_name}.json"
+        
+        old_path = self.recordings_dir / old_name
+        new_path = self.recordings_dir / new_name
+        
+        if not old_path.exists():
+            raise FileNotFoundError(f"Recording not found: {old_name}")
+        if new_path.exists():
+            raise FileExistsError(f"Recording already exists: {new_name}")
+        
+        old_path.rename(new_path)
+
+
+class RecordingSession:
+    """Recording session for capturing command sequences.
+    
+    Captures commands with timestamps to create timelines.
+    
+    Attributes:
+        is_recording: Whether recording is active
+        commands: List of captured TimelineEntry objects
+        start_time: Timestamp when recording started (milliseconds)
+    """
+    
+    def __init__(self, recordings_dir: Optional[Path] = None):
+        """Initialize recording session.
+        
+        Args:
+            recordings_dir: Directory for timeline files (default: ~/.mr-pumpkin/recordings)
+        """
+        if recordings_dir is None:
+            home = Path.home()
+            self.recordings_dir = home / '.mr-pumpkin' / 'recordings'
+        else:
+            self.recordings_dir = Path(recordings_dir)
+        
+        self.is_recording = False
+        self.commands: List[TimelineEntry] = []
+        self.start_time: Optional[float] = None
+    
+    def start(self):
+        """Begin command capture."""
+        self.is_recording = True
+        self.commands = []
+        self.start_time = time.time() * 1000  # Convert to milliseconds
+    
+    def stop(self, filename: Optional[str] = None) -> str:
+        """Stop recording and save timeline.
+        
+        Args:
+            filename: Name for saved file (auto-generated if None)
+            
+        Returns:
+            Filename of saved recording
+            
+        Raises:
+            ValueError: If no commands were recorded
+            FileExistsError: If filename already exists
+        """
+        if not self.is_recording:
+            return ""
+        
+        self.is_recording = False
+        
+        if not self.commands:
+            raise ValueError("Cannot save recording with no commands")
+        
+        # Auto-generate filename if not provided
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            filename = f"recording_{timestamp}"
+        
+        # Add .json extension if not present
+        if not filename.endswith('.json'):
+            filename = f"{filename}.json"
+        
+        filepath = self.recordings_dir / filename
+        
+        # Check if file exists
+        if filepath.exists():
+            raise FileExistsError(f"Recording already exists: {filename}")
+        
+        # Create timeline and save
+        timeline = Timeline(commands=self.commands)
+        timeline.save(filepath)
+        
+        return filename
+    
+    def record_command(self, command: str, args: Optional[Dict[str, Any]] = None):
+        """Record a command with current timestamp.
+        
+        Args:
+            command: Command string
+            args: Optional command arguments
+        """
+        if not self.is_recording:
+            return
+        
+        # Calculate time relative to recording start
+        current_time = time.time() * 1000  # Convert to milliseconds
+        time_ms = int(current_time - self.start_time)
+        
+        entry = TimelineEntry(time_ms, command, args)
+        self.commands.append(entry)
+    
+    def cancel(self):
+        """Cancel recording without saving."""
+        self.is_recording = False
+        self.commands = []
+        self.start_time = None
+
+
+class FileManager:
+    """File operations for timeline management.
+    
+    Provides download, upload, delete, rename, and list operations.
+    """
+    
+    def __init__(self, recordings_dir: Optional[Path] = None):
+        """Initialize file manager.
+        
+        Args:
+            recordings_dir: Directory for timeline files (default: ~/.mr-pumpkin/recordings)
+        """
+        if recordings_dir is None:
+            home = Path.home()
+            self.recordings_dir = home / '.mr-pumpkin' / 'recordings'
+        else:
+            self.recordings_dir = Path(recordings_dir)
+    
+    def list_recordings(self) -> List[Dict[str, Any]]:
+        """List all available recordings.
+        
+        Returns:
+            List of dictionaries with filename, size, created_at, duration
+        """
+        if not self.recordings_dir.exists():
+            return []
+        
+        recordings = []
+        for filepath in self.recordings_dir.glob('*.json'):
+            try:
+                timeline = Timeline.load(filepath)
+                stat = filepath.stat()
+                recordings.append({
+                    "filename": filepath.name,
+                    "size_bytes": stat.st_size,
+                    "created_at": stat.st_ctime,
+                    "duration_ms": timeline.duration_ms
+                })
+            except Exception:
+                # Skip invalid files
+                continue
+        
+        return recordings
+    
+    def download_timeline(self, filename: str) -> str:
+        """Download timeline as JSON string.
+        
+        Args:
+            filename: Name of timeline file
+            
+        Returns:
+            JSON string of timeline contents
+            
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            ValueError: If file is invalid JSON
+        """
+        if not filename.endswith('.json'):
+            filename = f"{filename}.json"
+        
+        filepath = self.recordings_dir / filename
+        if not filepath.exists():
+            raise FileNotFoundError(f"Recording not found: {filename}")
+        
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            # Validate it's valid JSON
+            json.loads(content)
+            return content
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in timeline file: {e}")
+    
+    def upload_timeline(self, filename: str, json_content: str):
+        """Upload timeline from JSON string.
+        
+        Args:
+            filename: Name for saved file
+            json_content: JSON string containing timeline data
+            
+        Raises:
+            FileExistsError: If filename already exists
+            ValueError: If JSON is invalid or structure is wrong
+        """
+        if not filename.endswith('.json'):
+            filename = f"{filename}.json"
+        
+        filepath = self.recordings_dir / filename
+        
+        # Check if file exists
+        if filepath.exists():
+            raise FileExistsError(f"Recording already exists: {filename}")
+        
+        # Validate JSON structure by parsing
+        try:
+            data = json.loads(json_content)
+            timeline = Timeline.from_dict(data)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}")
+        except Exception as e:
+            raise ValueError(f"Invalid timeline structure: {e}")
+        
+        # Save to file
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(json_content)
+    
+    def delete_timeline(self, filename: str):
+        """Delete a timeline file.
+        
+        Args:
+            filename: Name of file to delete
+            
+        Raises:
+            FileNotFoundError: If file doesn't exist
+        """
+        if not filename.endswith('.json'):
+            filename = f"{filename}.json"
+        
+        filepath = self.recordings_dir / filename
+        if not filepath.exists():
+            raise FileNotFoundError(f"Recording not found: {filename}")
+        
+        filepath.unlink()
+    
+    def rename_timeline(self, old_name: str, new_name: str):
+        """Rename a timeline file.
         
         Args:
             old_name: Current filename
