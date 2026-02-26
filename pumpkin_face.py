@@ -1921,8 +1921,12 @@ class PumpkinFace:
                         try:
                             expression = Expression(data)
                             self.set_expression(expression)
+                            response = f"OK Expression changed to {data}"
+                            client_socket.sendall((response + '\n').encode('utf-8'))
                             print(f"Expression changed to: {data}")
                         except ValueError:
+                            response = f"ERROR Unknown expression: {data}"
+                            client_socket.sendall((response + '\n').encode('utf-8'))
                             print(f"Unknown expression: {data}")
                     
                     client_socket.close()
