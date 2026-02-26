@@ -1218,61 +1218,69 @@ class PumpkinFace:
     def run(self):
         pygame.init()
         
-        # Get monitor information
-        monitors = pygame.display.get_desktop_sizes()
-        print(f"Available monitors: {len(monitors)}")
-        for i, monitor_size in enumerate(monitors):
-            print(f"  Monitor {i}: {monitor_size[0]}x{monitor_size[1]}")
-        
-        if self.monitor >= len(monitors):
-            print(f"Error: Monitor {self.monitor} not found. Using monitor 0.")
-            self.monitor = 0
-        
-        # Get monitor info and position
-        monitor_size = monitors[self.monitor]
-        
-        if self.fullscreen:
-            self.width, self.height = monitor_size
-            
-            # Calculate monitor position based on index
-            monitor_x = 0
-            for i in range(self.monitor):
-                monitor_x += monitors[i][0]
-            
-            # Set position for fullscreen
-            import os
-            os.environ['SDL_VIDEO_WINDOW_POS'] = f'{monitor_x},0'
-            
-            # Create fullscreen window
-            screen = pygame.display.set_mode(monitor_size, pygame.FULLSCREEN)
-            print(f"Running FULLSCREEN on monitor {self.monitor} - {self.width}x{self.height}")
-        else:
-            # Windowed mode - use default size or smaller if monitor is smaller
-            self.width = min(self.width, monitor_size[0])
-            self.height = min(self.height, monitor_size[1])
-            
-            # Calculate position to center window on selected monitor
-            monitor_x = 0
-            for i in range(self.monitor):
-                monitor_x += monitors[i][0]
-            
-            window_x = monitor_x + (monitor_size[0] - self.width) // 2
-            window_y = (monitor_size[1] - self.height) // 2
-            
-            import os
-            os.environ['SDL_VIDEO_WINDOW_POS'] = f'{window_x},{window_y}'
-            
-            # Create windowed window
-            screen = pygame.display.set_mode((self.width, self.height))
-            print(f"Running WINDOWED on monitor {self.monitor} - {self.width}x{self.height}")
-        
-        pygame.display.set_caption("Mr. Pumpkin")
-        
-        # Start network server
+        # Start network server FIRST (before display initialization)
+        # This ensures socket server is ready even if display fails
         server_thread = threading.Thread(target=self._run_socket_server, daemon=True)
         server_thread.start()
+        print("Socket server listening on port 5000")
         
-        print("Press ESC to exit or send socket commands to port 5000")
+        # Try to create display, but continue if it fails (headless mode)
+        screen = None
+        try:
+            # Get monitor information
+            monitors = pygame.display.get_desktop_sizes()
+            print(f"Available monitors: {len(monitors)}")
+            for i, monitor_size in enumerate(monitors):
+                print(f"  Monitor {i}: {monitor_size[0]}x{monitor_size[1]}")
+            
+            if self.monitor >= len(monitors):
+                print(f"Error: Monitor {self.monitor} not found. Using monitor 0.")
+                self.monitor = 0
+            
+            # Get monitor info and position
+            monitor_size = monitors[self.monitor]
+            
+            if self.fullscreen:
+                self.width, self.height = monitor_size
+                
+                # Calculate monitor position based on index
+                monitor_x = 0
+                for i in range(self.monitor):
+                    monitor_x += monitors[i][0]
+                
+                # Set position for fullscreen
+                import os
+                os.environ['SDL_VIDEO_WINDOW_POS'] = f'{monitor_x},0'
+                
+                # Create fullscreen window
+                screen = pygame.display.set_mode(monitor_size, pygame.FULLSCREEN)
+                print(f"Running FULLSCREEN on monitor {self.monitor} - {self.width}x{self.height}")
+            else:
+                # Windowed mode - use default size or smaller if monitor is smaller
+                self.width = min(self.width, monitor_size[0])
+                self.height = min(self.height, monitor_size[1])
+                
+                # Calculate position to center window on selected monitor
+                monitor_x = 0
+                for i in range(self.monitor):
+                    monitor_x += monitors[i][0]
+                
+                window_x = monitor_x + (monitor_size[0] - self.width) // 2
+                window_y = (monitor_size[1] - self.height) // 2
+                
+                import os
+                os.environ['SDL_VIDEO_WINDOW_POS'] = f'{window_x},{window_y}'
+                
+                # Create windowed window
+                screen = pygame.display.set_mode((self.width, self.height))
+                print(f"Running WINDOWED on monitor {self.monitor} - {self.width}x{self.height}")
+            
+            pygame.display.set_caption("Mr. Pumpkin")
+            print("Press ESC to exit or send socket commands to port 5000")
+        except Exception as e:
+            print(f"Warning: Could not initialize display: {e}")
+            print("Running in headless mode - socket server only")
+            # Continue without display (for CI/headless environments)
         
         while self.running:
             for event in pygame.event.get():
@@ -1284,8 +1292,9 @@ class PumpkinFace:
                     self._handle_keyboard_input(event.key)
             
             self.update()
-            self.draw(screen)
-            pygame.display.flip()
+            if screen is not None:
+                self.draw(screen)
+                pygame.display.flip()
             self.clock.tick(60)
         
         pygame.quit()
