@@ -165,3 +165,92 @@
 - All fixtures resolve correctly
 - Pygame initialization stable across all test modules
 - Test execution time: ~3 minutes for full suite
+
+### Timeline Playback Tests (Issue #34) - 2026-02-25
+**Proactive testing approach**: Wrote comprehensive test suite while Vi builds timeline engine (WI-1 & WI-2)
+
+**Test file created:**
+- `tests/test_timeline.py` — 6 test classes, 60+ test cases covering all playback functionality
+
+**Test coverage structure:**
+1. **Timeline Loading & Saving** (9 tests):
+   - Valid/invalid JSON loading with proper exception handling
+   - File not found → FileNotFoundError
+   - Save/load round-trip lossless verification
+   - Timeline structure validation (version, duration_ms, commands)
+   - Command timestamp monotonicity checking
+
+2. **Seeking Operations** (9 tests):
+   - Seek within bounds, to start, to end
+   - Bounds clamping (negative → 0, beyond duration → duration_ms)
+   - Seek while paused (position updates, no command execution)
+   - Bidirectional seeking (forward/backward)
+   - Seek while playing (maintains playback state)
+
+3. **Playback State Machine** (8 tests):
+   - Initial state: STOPPED
+   - State transitions: play() → PLAYING, pause() → PAUSED, stop() → STOPPED
+   - Resume from pause: play() after pause() → PLAYING
+   - Edge cases: multiple stop calls, pause from stopped (no-op)
+   - Play from playing (restart behavior)
+
+4. **Playback Timing** (8 tests):
+   - Frame-based execution at 60 FPS (16.67ms per frame)
+   - Rapid update() calls with small dt accumulate correctly
+   - Large single dt executes all due commands in range
+   - Frame boundary accuracy: ±1 frame tolerance
+   - Paused/stopped playback does not advance time
+   - Commands execute in chronological order
+   - No duplicate command execution
+
+5. **Playback Status Queries** (8 tests):
+   - get_status() returns: position_ms, duration_ms, is_playing, state
+   - get_progress() returns percentage (0-100) at start/middle/end
+   - Status accuracy during playback
+
+6. **Edge Cases** (10 tests):
+   - Empty timeline (no commands)
+   - Single-command timeline
+   - Rapid pause/resume cycles (state integrity)
+   - Seek while playing (continues playback)
+   - Auto-stop at timeline end
+   - Invalid command handling (graceful failure)
+   - Nested playback file references
+   - Zero-duration timeline (all commands at t=0)
+   - Playback reset on stop
+   - update(0) no-op behavior
+
+**Testing patterns established:**
+- **Fixture strategy**: Sample timeline data as pytest fixtures (simple, empty, single-command, complex)
+- **Temporary files**: Fixtures for JSON files with automatic cleanup
+- **Frame-based timing**: 60 FPS constant (FRAME_MS = 16.67) with tolerance (±2ms variance)
+- **State transition testing**: Verify state enum values and is_playing() boolean
+- **Command execution tracking**: Assert executed_commands list for verification
+
+**Key assumptions documented in tests:**
+- Timeline class location: `src/timeline.py` or similar (to be determined by Vi)
+- Playback state queryable for assertions (get_status(), get_progress())
+- Commands are data-only (no graphics layer dependency in unit tests)
+- 60 FPS = 16.67ms per frame (allow ±2ms tolerance for system variance)
+- Invalid commands during playback → graceful stop or skip with logging
+
+**Frame-based timing precision:**
+- Frame duration: 16.67ms (60 FPS)
+- Tolerance: ±2ms for single frame, ±1 frame for multi-frame sequences
+- Accumulation testing: 60 frames * 16.67ms should equal ~1000ms ± tolerance
+- Large dt jump: Single update(2000.0) should execute all commands in [0, 2000ms]
+
+**Edge case discoveries:**
+- **Empty timelines**: Valid use case, should play without errors
+- **Zero-duration timelines**: All commands at t=0 execute immediately on play()
+- **Seeking boundaries**: Negative times clamp to 0, beyond-duration clamps to duration_ms
+- **Pause/seek independence**: Can seek while paused without executing commands
+- **Auto-stop behavior**: Playback auto-stops when reaching timeline end
+- **State machine guards**: Multiple stop() calls are safe (idempotent)
+
+**Collaboration workflow:**
+- Tests written in parallel with Vi's implementation (WI-1 & WI-2)
+- All tests currently contain placeholder `pass` statements
+- Tests will activate once Vi's Timeline and TimelinePlayback classes land
+- No commits until implementation ready for validation
+- May require minor adjustments based on actual API design choices

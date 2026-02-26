@@ -1573,3 +1573,229 @@ self._start_nose_twitch(magnitude)
 - 	ests/conftest.py provides shared fixtures correctly
 - All pygame initialization working properly
 - No broken imports in any test module
+
+---
+
+
+---
+
+# Timeline Testing Strategy
+
+**By:** Mylo (Tester)  
+**Date:** 2026-02-25  
+**Context:** Issue #34 — Record and playback timeline feature  
+**Related Work:** Vi (WI-1, WI-2 timeline implementation)
+
+---
+
+## Decision
+
+Established comprehensive test-first approach for timeline playback feature with 60+ test cases across 6 categories, covering all aspects of timeline loading, seeking, state management, timing precision, and edge cases.
+
+## Rationale
+
+**Proactive testing enables parallel development:**
+- Vi can build Timeline and TimelinePlayback classes (WI-1, WI-2) while tests define the contract
+- Tests serve as executable specification documenting expected behavior
+- Reduces integration risk by catching API design issues early
+- Enables immediate validation when implementation lands
+
+**Frame-based timing precision:**
+- 60 FPS = 16.67ms per frame is the timing foundation
+- Tolerance of ±2ms per frame accounts for system variance
+- Tests validate both incremental updates (small dt) and jump updates (large dt)
+- Ensures commands execute at correct timestamps within one frame accuracy
+
+**Edge case coverage:**
+- Empty timelines, single-command timelines, zero-duration timelines
+- Bounds checking (negative seeks, beyond-duration seeks)
+- Rapid state changes (pause/resume cycles)
+- Invalid command handling (graceful degradation)
+- Auto-stop behavior at timeline end
+
+## Test Structure
+
+### 6 Test Classes (60+ tests):
+
+1. **TestTimelineLoading** (9 tests) — File I/O, JSON validation, structure validation
+2. **TestTimelineSeeking** (9 tests) — Seek operations, bounds clamping, state preservation
+3. **TestPlaybackStateMachine** (8 tests) — STOPPED/PLAYING/PAUSED transitions
+4. **TestPlaybackTiming** (8 tests) — 60 FPS frame-based execution, command ordering
+5. **TestPlaybackStatus** (8 tests) — Status queries (position, duration, progress)
+6. **TestEdgeCases** (10 tests) — Corner cases, error handling, boundary conditions
+
+### Testing Patterns:
+
+- **Fixtures**: Sample timeline data (simple, empty, single-command, complex)
+- **Temporary files**: JSON files with automatic cleanup
+- **Constants**: FRAME_MS = 16.67, FRAME_TOLERANCE_MS = 2.0
+- **Assertions**: State enum checks, command execution tracking, timing verification
+
+## Timing Precision Standards
+
+```python
+FRAME_MS = 16.67  # 60 FPS frame duration
+FRAME_TOLERANCE_MS = 2.0  # System variance allowance
+
+# Examples:
+# - 60 frames * 16.67ms = ~1000ms (±2ms)
+# - Command at t=1000ms executes when position >= 1000ms
+# - Frame boundary: ±1 frame tolerance for multi-frame sequences
+```
+
+## Assumptions for Vi's Implementation
+
+1. **Module location**: `timeline.py` or `src/timeline.py`
+2. **Core classes**: `Timeline`, `TimelinePlayback`, `PlaybackState` (enum)
+3. **Public API**:
+   - `Timeline.load(path)` → Timeline instance
+   - `Timeline.save(path)` → void
+   - `TimelinePlayback(timeline)` → playback controller
+   - Playback methods: `play()`, `pause()`, `stop()`, `seek(ms)`, `update(dt_ms)`
+   - Status methods: `get_status()`, `get_progress()`, `is_playing()`
+4. **State tracking**: `executed_commands` list for test assertions
+5. **Error handling**: ValueError for invalid JSON/structure, FileNotFoundError for missing files
+
+## Collaboration Workflow
+
+1. Tests written proactively (complete before implementation)
+2. All tests currently use `pass` placeholders (inactive)
+3. Tests activate when Vi's implementation lands
+4. May require minor API adjustments based on actual design
+5. **No commits until implementation ready** — tests validate first, then commit together
+
+## Success Metrics
+
+- ✅ 60+ test cases covering all requirements from ISSUE_34_PLAN.md
+- ✅ Frame-based timing precision documented and testable
+- ✅ Edge cases discovered and documented in test suite
+- ✅ Tests serve as executable specification for Vi
+- ⏳ 80%+ code coverage target (measure after implementation)
+- ⏳ All tests pass when Vi's implementation completes
+
+---
+
+**Status:** Tests written, awaiting Vi's Timeline implementation  
+**Next Step:** Vi implements WI-1 & WI-2, then activate tests for validation
+# Timeline Design & Playback Architecture (Issue #34)
+
+**By:** Vi (Backend Dev)  
+**Date:** 2026-02-14  
+**Status:** Implemented (WI-1, WI-2)
+
+---
+
+## Decision: Frame-Based Playback with Millisecond Timestamps
+
+**What:** Timeline playback uses frame-based execution integrated with the 60 FPS game loop, with commands timestamped in milliseconds.
+
+**Why:**
+1. **No new threads:** Integrates cleanly with existing `pygame.time.Clock` loop — avoids race conditions and state synchronization complexity
+2. **Precise enough:** 60 FPS provides ~16.67ms granularity, which matches human perception for animations
+3. **Simple state machine:** Playback state (STOPPED/PLAYING/PAUSED) is synchronous with rendering — no async coordination needed
+4. **Testable:** Frame-based updates can be driven manually in tests without mocking threads or timers
+
+**How it works:**
+- Each frame calls `playback.update(dt_ms)` with delta time since last frame
+- Playback advances `current_position_ms += dt_ms`
+- Commands execute when `cmd.time_ms <= current_position_ms`
+- Invalid commands stop playback immediately (fail-fast)
+
+**Alternative considered:** Thread-based playback with `time.sleep()` between commands
+- **Rejected because:** Requires thread synchronization with main loop, complicates pause/resume, harder to test
+
+---
+
+## Decision: JSON Timeline Format with Nested Playback Support
+
+**What:** Timelines are stored as JSON files with versioned schema, supporting nested playback (one timeline triggers another).
+
+**Schema:**
+```json
+{
+  "version": "1.0",
+  "duration_ms": 5000,
+  "commands": [
+    {"time_ms": 0, "command": "set_expression", "args": {"expression": "happy"}},
+    {"time_ms": 3000, "command": "play_timeline", "args": {"filename": "other.json"}}
+  ]
+}
+```
+
+**Why JSON:**
+1. **Human-readable:** Users can hand-edit timelines, debug command sequences
+2. **Forward-compatible:** `version` field allows future schema evolution
+3. **Nested playback:** Commands can reference other timeline files for composition
+4. **Standard tooling:** Every language/platform can parse JSON
+
+**Alternative considered:** CSV (flat list of timestamp,command pairs)
+- **Rejected because:** Cannot represent nested arguments, no schema versioning, harder to nest timelines
+
+---
+
+## Decision: Flat File Naming in `~/.mr-pumpkin/recordings/`
+
+**What:** All recordings stored in single directory with unique filenames (no subdirectories).
+
+**Why:**
+1. **Simplicity:** Easier to list, rename, delete — no directory traversal logic
+2. **Filesystem enforces uniqueness:** Rename operations fail atomically if collision detected
+3. **Cross-platform:** `pathlib.Path.home()` resolves `~` correctly on Windows/Linux/macOS
+4. **User-accessible:** Hidden `.mr-pumpkin` directory follows Unix conventions, users can browse/backup easily
+
+**Alternative considered:** Support subdirectories for organization
+- **Rejected because:** Adds complexity for file management commands, not needed for MVP
+
+---
+
+## Decision: Callback Pattern for Command Execution
+
+**What:** Playback engine accepts `set_command_callback(fn)` to decouple from PumpkinFace internals.
+
+**Why:**
+1. **Testability:** Tests can inject mock callbacks to verify command execution without running full app
+2. **Separation of concerns:** Timeline module knows nothing about PumpkinFace — can be reused/tested in isolation
+3. **Error handling:** Callback exceptions are caught, logged, and stop playback gracefully
+
+**Pattern:**
+```python
+def execute_command(command: str, args: dict):
+    # PumpkinFace implementation
+    ...
+
+playback = Playback()
+playback.set_command_callback(execute_command)
+playback.play("sequence.json")
+```
+
+---
+
+## Decision: Invalid Commands Stop Playback Immediately
+
+**What:** If a command execution raises an exception during playback, playback stops and returns error message.
+
+**Why:**
+1. **Fail-fast prevents cascading failures:** Bad command at 1s shouldn't corrupt state for commands at 2s
+2. **Clear error messages:** Playback engine returns list of errors from `update()` for logging/debugging
+3. **User control:** Stopped state allows user to fix timeline file and restart cleanly
+
+**Alternative considered:** Skip invalid commands, continue playback
+- **Rejected because:** Silent failures are harder to debug, may leave app in unexpected state
+
+---
+
+## Implications for Future Work
+
+1. **Mylo (Testing):** Can write unit tests for timeline module without mocking pygame or PumpkinFace
+2. **Ekko (Graphics):** Timeline commands can trigger any expression/animation — no graphics layer changes needed
+3. **Jinx (Lead):** WI-3 (socket commands) and WI-4+ can build on this foundation without changing core design
+4. **Performance:** Large timelines (10K+ commands) should benchmark well — linear scan is O(n) but frame budget is 16ms
+
+---
+
+## Open Questions for Future Iterations
+
+1. **Playback speed control:** Should we support 2x, 0.5x speed? (Not in MVP)
+2. **Record filtering:** Should users selectively record commands? (Not in MVP)
+3. **Undo recording:** Should `record_cancel` exist to discard without saving? (Not in MVP)
+4. **File size limits:** Should we cap timeline file size or command count? (Not in MVP)
