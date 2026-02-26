@@ -1,6 +1,9 @@
 # Squad: .ai-team/ and .ai-team-templates/ are dev-only.
 # These directories should NOT be merged into preview/main.
-# We use a 'keep-ours' strategy: any attempt to add/modify these files is ignored.
-# The ours merge driver (see git config) resolves all conflicts in favor of the current branch.
+# Setting merge=ours means: in a merge, keep preview's version (which is: these dirs don't exist).
+# This prevents .ai-team/ from being added when merging from dev.
 .ai-team/** merge=ours
 .ai-team-templates/** merge=ours
+
+# Preserve this branch's .gitattributes during merges from other branches
+.gitattributes merge=ours
