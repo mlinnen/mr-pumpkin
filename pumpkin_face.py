@@ -1359,33 +1359,45 @@ class PumpkinFace:
                         
                         # Handle blink command
                         if data == "blink":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.blink()
                             print("Blink animation triggered")
                             continue
                         
                         # Handle wink commands
                         if data == "wink_left":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.wink_left()
                             print("Left wink animation triggered")
                             continue
                         elif data == "wink_right":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.wink_right()
                             print("Right wink animation triggered")
                             continue
                         
                         # Handle rolling eyes commands
                         if data == "roll_clockwise":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.roll_clockwise()
                             print("Rolling eyes clockwise")
                             continue
                         
                         if data == "roll_counterclockwise":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.roll_counterclockwise()
                             print("Rolling eyes counter-clockwise")
                             continue
                         
                         # Handle gaze command
                         if data.startswith("gaze "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 args = [float(x) for x in parts[1:]]
@@ -1406,41 +1418,57 @@ class PumpkinFace:
                         
                         # Handle eyebrow commands
                         if data == "eyebrow_raise":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.raise_eyebrows()
                             print("Eyebrows raised")
                             continue
                         
                         if data == "eyebrow_lower":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.lower_eyebrows()
                             print("Eyebrows lowered")
                             continue
                         
                         if data == "eyebrow_raise_left":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.raise_eyebrow_left()
                             print("Left eyebrow raised")
                             continue
                         
                         if data == "eyebrow_lower_left":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.lower_eyebrow_left()
                             print("Left eyebrow lowered")
                             continue
                         
                         if data == "eyebrow_raise_right":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.raise_eyebrow_right()
                             print("Right eyebrow raised")
                             continue
                         
                         if data == "eyebrow_lower_right":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.lower_eyebrow_right()
                             print("Right eyebrow lowered")
                             continue
                         
                         if data == "eyebrow_reset":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.reset_eyebrows()
                             print("Eyebrows reset to neutral")
                             continue
                         
                         if data.startswith("eyebrow "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 val = float(parts[1])
@@ -1451,6 +1479,8 @@ class PumpkinFace:
                             continue
                         
                         if data.startswith("eyebrow_left "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 val = float(parts[1])
@@ -1461,6 +1491,8 @@ class PumpkinFace:
                             continue
                         
                         if data.startswith("eyebrow_right "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 val = float(parts[1])
@@ -1472,10 +1504,14 @@ class PumpkinFace:
                         
                         # Handle projection offset commands
                         if data == "projection_reset":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.reset_projection_offset()
                             continue
                         
                         if data.startswith("jog_offset "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 dx = int(parts[1])
@@ -1486,6 +1522,8 @@ class PumpkinFace:
                             continue
                         
                         if data.startswith("set_offset "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 x = int(parts[1])
@@ -1497,6 +1535,8 @@ class PumpkinFace:
                         
                         # Handle head movement commands
                         if data == "turn_left" or data.startswith("turn_left "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 amount = int(parts[1]) if len(parts) > 1 else 50
@@ -1507,6 +1547,8 @@ class PumpkinFace:
                             continue
                         
                         if data == "turn_right" or data.startswith("turn_right "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 amount = int(parts[1]) if len(parts) > 1 else 50
@@ -1517,6 +1559,8 @@ class PumpkinFace:
                             continue
                         
                         if data == "turn_up" or data.startswith("turn_up "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 amount = int(parts[1]) if len(parts) > 1 else 50
@@ -1527,6 +1571,8 @@ class PumpkinFace:
                             continue
                         
                         if data == "turn_down" or data.startswith("turn_down "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 amount = int(parts[1]) if len(parts) > 1 else 50
@@ -1537,12 +1583,16 @@ class PumpkinFace:
                             continue
                         
                         if data == "center_head":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self.center_head()
                             print("Centering head position")
                             continue
                         
                         # Handle nose animation commands
                         if data == "twitch_nose" or data.startswith("twitch_nose "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 magnitude = float(parts[1]) if len(parts) > 1 else 50.0
@@ -1553,6 +1603,8 @@ class PumpkinFace:
                             continue
                         
                         if data == "scrunch_nose" or data.startswith("scrunch_nose "):
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             try:
                                 parts = data.split()
                                 magnitude = float(parts[1]) if len(parts) > 1 else 50.0
@@ -1563,6 +1615,8 @@ class PumpkinFace:
                             continue
                         
                         if data == "reset_nose":
+                            if self.recording_session.is_recording:
+                                self._capture_command_for_recording(data)
                             self._reset_nose()
                             print("Resetting nose to neutral")
                             continue
@@ -1570,7 +1624,7 @@ class PumpkinFace:
                         # ===== TIMELINE COMMANDS =====
                         
                         # Recording commands
-                        if data == "record_start":
+                        if data == "record_start" or data == "record start":
                             if self.recording_session.is_recording:
                                 response = "ERROR Recording already in progress"
                             elif self.timeline_playback.state.value == "playing":
@@ -1582,10 +1636,15 @@ class PumpkinFace:
                             print(response)
                             continue
                         
-                        if data.startswith("record_stop"):
+                        if data.startswith("record_stop") or data.startswith("record stop"):
                             try:
-                                parts = data.split(maxsplit=1)
-                                filename = parts[1] if len(parts) > 1 else None
+                                # Handle both "record_stop filename" and "record stop filename"
+                                if data.startswith("record_stop"):
+                                    parts = data.split(maxsplit=1)
+                                    filename = parts[1] if len(parts) > 1 else None
+                                else:  # "record stop filename"
+                                    parts = data.split(maxsplit=2)
+                                    filename = parts[2] if len(parts) > 2 else None
                                 
                                 # Validate filename (no path separators)
                                 if filename and ('/' in filename or '\\' in filename):
@@ -1594,8 +1653,12 @@ class PumpkinFace:
                                     print(response)
                                     continue
                                 
-                                saved_filename = self.recording_session.stop(filename)
-                                response = f"OK Saved to {saved_filename}"
+                                # Check if recording is active
+                                if not self.recording_session.is_recording:
+                                    response = "ERROR No active recording"
+                                else:
+                                    saved_filename = self.recording_session.stop(filename)
+                                    response = f"OK Saved to {saved_filename}"
                             except ValueError as e:
                                 response = f"ERROR {e}"
                             except FileExistsError as e:
@@ -1607,7 +1670,7 @@ class PumpkinFace:
                             print(response)
                             continue
                         
-                        if data == "record_cancel":
+                        if data == "record_cancel" or data == "record cancel":
                             if not self.recording_session.is_recording:
                                 response = "ERROR No active recording"
                             else:
@@ -1738,7 +1801,7 @@ class PumpkinFace:
                             continue
                         
                         # File management commands
-                        if data == "list_recordings":
+                        if data == "list_recordings" or data == "list":
                             recordings = self.timeline_playback.list_recordings()
                             response = json.dumps(recordings)
                             client_socket.sendall((response + '\n').encode('utf-8'))
@@ -1823,17 +1886,17 @@ class PumpkinFace:
                         
                         # Check for manual override during playback
                         # Timeline commands don't trigger pause, but animation/expression commands do
-                        is_timeline_command = data in ["record_start", "record_cancel", "pause", "resume", 
-                                                       "stop", "timeline_status", "recording_status", 
-                                                       "list_recordings"] or \
-                                             data.startswith(("record_stop", "play ", "seek ", 
+                        is_timeline_command = data in ["record_start", "record start", "record_cancel", "record cancel", 
+                                                       "pause", "resume", "stop", "timeline_status", 
+                                                       "recording_status", "list_recordings", "list"] or \
+                                             data.startswith(("record_stop", "record stop", "play ", "seek ", 
                                                              "delete_recording ", "rename_recording "))
                         
                         if not is_timeline_command and self.timeline_playback.state.value == "playing":
                             self.timeline_playback.pause()
                             print("Playback paused for manual override")
                         
-                        # Capture command if recording
+                        # Capture command if recording (for expression commands that reach this point)
                         if self.recording_session.is_recording and not is_timeline_command:
                             self._capture_command_for_recording(data)
                         

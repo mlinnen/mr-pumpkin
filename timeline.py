@@ -368,7 +368,7 @@ class Playback:
         """List all available recordings.
         
         Returns:
-            List of dictionaries with filename, size, created_at, duration
+            List of dictionaries with filename, size, created_at, duration, command_count
         """
         if not self.recordings_dir.exists():
             return []
@@ -382,7 +382,8 @@ class Playback:
                     "filename": filepath.name,
                     "size_bytes": stat.st_size,
                     "created_at": stat.st_ctime,
-                    "duration_ms": timeline.duration_ms
+                    "duration_ms": timeline.duration_ms,
+                    "command_count": len(timeline.commands)
                 })
             except Exception:
                 # Skip invalid files
@@ -556,7 +557,7 @@ class FileManager:
         """List all available recordings.
         
         Returns:
-            List of dictionaries with filename, size, created_at, duration
+            List of dictionaries with filename, size, created_at, duration, command_count
         """
         if not self.recordings_dir.exists():
             return []
@@ -570,7 +571,8 @@ class FileManager:
                     "filename": filepath.name,
                     "size_bytes": stat.st_size,
                     "created_at": stat.st_ctime,
-                    "duration_ms": timeline.duration_ms
+                    "duration_ms": timeline.duration_ms,
+                    "command_count": len(timeline.commands)
                 })
             except Exception:
                 # Skip invalid files
