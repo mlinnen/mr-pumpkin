@@ -254,3 +254,93 @@
 - Tests will activate once Vi's Timeline and TimelinePlayback classes land
 - No commits until implementation ready for validation
 - May require minor adjustments based on actual API design choices
+
+### Extended Timeline Tests (Issue #34 - WI-3 through WI-6) - 2026-02-25
+**Extended test suite**: Added 30 new tests across 3 new test classes for seeking, recording, and file management
+
+**Test class additions:**
+1. **TestPlaybackSeeking** (9 tests - WI-3):
+   - Extended existing placeholder class with comprehensive seeking coverage
+   - Tests for seek without execution (paused state)
+   - Seek during playback continuation from new position
+   - Boundary conditions: seek(0), seek(duration), seek(-100), seek(duration+1000)
+   - Multiple rapid seeks in succession (stress test)
+   - Frame-exact timing at command boundaries
+   
+2. **TestRecording** (7 tests - WI-5):
+   - record_start() session initialization
+   - record_stop(filename) disk persistence
+   - Command order and timing preservation in recordings
+   - At-least-one-command validation
+   - Auto-generated timestamp filenames (record_stop(None))
+   - FileExistsError on duplicate filenames
+   - Invalid filename character rejection (/, \, :, *, ?, ", <, >, |)
+   
+3. **TestFileManagement** (11 tests - WI-4):
+   - list_recordings() returns timeline inventory
+   - Empty list when no recordings exist
+   - upload_timeline(name, json) creates new file
+   - Invalid JSON validation (ValueError)
+   - download_timeline(name) returns JSON content
+   - FileNotFoundError for nonexistent downloads/deletes/renames
+   - delete_timeline(name) removes file from disk
+   - rename_timeline(old, new) file renaming
+   - FileExistsError on rename collision
+   
+4. **TestPlaybackStatus** (extended from 8 to 10 tests - WI-6):
+   - get_status() returns dict with all required fields: file, position_ms, duration_ms, is_playing, state
+   - Status accuracy verification after each state change (STOPPED → PLAYING → PAUSED → STOPPED)
+   - is_playing: True during playback, False during pause
+   - Position tracking across complex play/pause/seek cycles
+   - Extended original status tests with field completeness validation
+
+**Test patterns for file I/O:**
+- **tmp_path fixture usage:** pytest's built-in tmp_path provides isolated temporary directories per test
+- **File existence assertions:** Use Path.exists() after create/delete operations
+- **JSON round-trip validation:** Write file, read back, assert equality
+- **Exception testing:** pytest.raises(ExceptionType, match="pattern") for error validation
+- **Cleanup strategy:** tmp_path auto-cleans after test; no manual teardown needed
+- **Mock file systems:** Not used - actual file I/O tests preferred for integration validation
+
+**Fixture patterns for recording/file management:**
+- **tmp_path:** Isolated directory for each test (pytest built-in)
+- **simple_timeline_data:** Reused from original WI-1/WI-2 fixtures
+- **File creation in tests:** Explicit file writes using Path.write_text() or json.dump()
+- **Parametrization opportunity:** Could parametrize invalid filenames list for efficiency
+
+**Edge cases discovered during extended testing:**
+- **Recording validation:** Empty recordings (no commands) should raise ValueError
+- **Filename sanitization:** Platform-specific invalid characters (Windows: <>:"|?*\/, Unix: /)
+- **Timestamp naming collisions:** Auto-generated filenames need microsecond precision or UUID
+- **Atomic file operations:** rename_timeline() should be atomic (OS-level move, not copy+delete)
+- **File manager directory scoping:** TimelineFileManager(directory) constrains operations to safe path
+- **JSON validation depth:** upload_timeline() must validate structure before accepting (version, duration_ms, commands)
+- **Concurrent recording:** record_start() when already recording should raise RuntimeError
+- **Seek during boundary conditions:** Seeking to exact command timestamp (t=1000) requires clear execution semantics
+
+**Frame-seeking precision expectations:**
+- **Exact boundary seeks:** seek(1000) to command at t=1000 requires execution policy decision
+  - Option A: Command executes when position >= timestamp (inclusive)
+  - Option B: Command executes when position > timestamp (exclusive)
+  - Recommendation: Inclusive (>=) matches intuitive playback behavior
+- **Frame tolerance remains:** ±2ms per frame for timing, but seek positions are exact integers
+- **Clamping behavior:** Negative seeks → 0, beyond-duration seeks → duration_ms (deterministic)
+- **Rapid seek stability:** Multiple rapid seeks should maintain consistent state (last seek wins)
+
+**API design implications for Vi:**
+- **TimelineRecorder class:** New class needed for WI-5 recording functionality
+  - Methods: record_start(), record_command(t, cmd), record_stop(filename=None), is_recording()
+  - State tracking: start_time, recorded_commands list
+- **TimelineFileManager class:** New class needed for WI-4 file operations
+  - Constructor: TimelineFileManager(directory_path)
+  - Methods: list_recordings(), upload_timeline(), download_timeline(), delete_timeline(), rename_timeline()
+  - Path safety: All operations scoped to configured directory
+- **get_status() structure:** Must return dict with keys: file, position_ms, duration_ms, is_playing, state
+- **Exception hierarchy:** Use Python built-ins (FileNotFoundError, FileExistsError, ValueError, RuntimeError)
+
+**Test organization summary:**
+- **Total test count:** 72 tests across 8 test classes
+- **WI coverage:** WI-1 through WI-6 fully tested
+- **Fixtures:** 5 timeline data fixtures + tmp_path for file I/O
+- **All tests placeholder:** Ready to activate when Vi's implementation lands
+- **No commits yet:** Awaiting implementation before validation run

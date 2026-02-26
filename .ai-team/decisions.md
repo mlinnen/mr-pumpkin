@@ -1799,3 +1799,158 @@ playback.play("sequence.json")
 2. **Record filtering:** Should users selectively record commands? (Not in MVP)
 3. **Undo recording:** Should `record_cancel` exist to discard without saving? (Not in MVP)
 4. **File size limits:** Should we cap timeline file size or command count? (Not in MVP)
+# Decision: Timeline Testing Strategy & API Expectations
+
+**Date:** 2026-02-25  
+**Author:** Mylo (Tester)  
+**Status:** Proposed  
+**Affects:** Vi (Backend), timeline.py implementation
+
+---
+
+## Context
+
+Extended test suite for Issue #34 (WI-3 through WI-6) uncovered important API design decisions and testing patterns for timeline recording and file management functionality.
+
+---
+
+## Testing Insights
+
+### 1. Frame-Seeking Precision at Command Boundaries
+
+**Issue:** When seek(1000) lands exactly on a command at t=1000, should it execute?
+
+**Recommendation:** Use **inclusive** comparison (position >= timestamp)
+- Matches intuitive playback behavior
+- Consistent with "play from this point" mental model
+- Test case: `test_seek_to_exact_command_boundary()` validates this
+
+**Alternative:** Exclusive comparison (position > timestamp) would require fractional advance to trigger.
+
+---
+
+### 2. Recording API Design Requirements
+
+Tests assume the following API for recording:
+
+```python
+class TimelineRecorder:
+    def record_start(self) -> None
+    def record_command(self, timestamp_ms: int, command: str) -> None
+    def record_stop(self, filename: str | None = None, directory: str = "./recordings") -> str
+    def is_recording(self) -> bool
+```
+
+**Key behaviors:**
+- `record_stop(None)` auto-generates timestamp-based filename
+- `record_stop()` validates at least one command recorded (raises ValueError if empty)
+- Duplicate filename raises FileExistsError
+- Invalid filename characters raise ValueError
+
+---
+
+### 3. File Management API Design Requirements
+
+Tests assume the following API for file operations:
+
+```python
+class TimelineFileManager:
+    def __init__(self, directory: str)
+    def list_recordings(self) -> list[str]
+    def upload_timeline(self, name: str, data: dict) -> None
+    def download_timeline(self, name: str) -> dict
+    def delete_timeline(self, name: str) -> None
+    def rename_timeline(self, old_name: str, new_name: str) -> None
+```
+
+**Key behaviors:**
+- All operations scoped to configured directory (path safety)
+- upload_timeline() validates JSON structure before accepting
+- Appropriate exceptions: FileNotFoundError, FileExistsError, ValueError
+- list_recordings() returns filenames only (not full paths)
+
+---
+
+### 4. get_status() Return Structure
+
+Tests expect this exact structure:
+
+```python
+{
+    "file": str | None,           # Current timeline filename or None
+    "position_ms": int,            # Current playback position
+    "duration_ms": int,            # Total timeline duration
+    "is_playing": bool,            # True if PLAYING state
+    "state": str                   # "STOPPED" | "PLAYING" | "PAUSED"
+}
+```
+
+---
+
+### 5. Exception Hierarchy
+
+Use Python built-in exceptions (no custom exception classes needed):
+- `FileNotFoundError` — nonexistent file operations
+- `FileExistsError` — duplicate filename conflicts
+- `ValueError` — invalid data (JSON, filenames, empty recordings)
+- `RuntimeError` — invalid state transitions (e.g., record_start() while already recording)
+
+---
+
+## File I/O Testing Patterns Established
+
+1. **Use pytest's tmp_path fixture** — isolated directories per test, auto-cleanup
+2. **Test actual file I/O** — prefer real files over mocks for integration confidence
+3. **Round-trip validation** — write → read → assert equality
+4. **Exception testing** — pytest.raises() with match="" for error message validation
+5. **Explicit file creation** — Path.write_text() or json.dump() in test setup
+
+---
+
+## Edge Cases to Handle
+
+1. **Concurrent recording protection:** record_start() while already recording → RuntimeError
+2. **Filename sanitization:** Reject platform-specific invalid characters (Windows: `<>:"|?*\/`, Unix: `/`)
+3. **Timestamp collision avoidance:** Auto-generated filenames need microsecond precision or UUID
+4. **Atomic rename:** rename_timeline() should use OS-level move (not copy+delete)
+5. **Empty recording validation:** record_stop() with zero commands → ValueError
+6. **Rapid seek stability:** Multiple consecutive seeks maintain consistent state (last wins)
+
+---
+
+## Recommendation for Vi
+
+**Before implementing:**
+1. Review test_timeline.py test expectations (72 tests, all currently placeholders)
+2. Confirm API structure matches test assumptions (or adjust tests)
+3. Decide on seek boundary behavior (inclusive >= recommended)
+
+**During implementation:**
+1. Activate tests incrementally as classes are built
+2. Run `pytest tests/test_timeline.py -v` to verify expectations
+
+**After implementation:**
+1. Mylo will validate all 72 tests pass
+2. Coordinate commit with passing test suite
+
+---
+
+## Open Questions
+
+1. **Directory structure:** Where should recordings default to? (`./recordings/`? `./data/timelines/`?)
+2. **File format versioning:** Should FileManager validate timeline version field?
+3. **Nested playback:** Tests include `test_nested_playback_reference_accessible()` — is nested playback in scope for Issue #34?
+
+---
+
+## Impact
+
+- **Vi:** API expectations documented; implementation can proceed confidently
+- **Mylo:** Testing patterns established for future file I/O features
+- **Project:** Clear error handling and edge case expectations
+
+---
+
+## Status: Awaiting Vi's Implementation
+
+Tests written and ready. No commit until implementation lands and tests pass.
