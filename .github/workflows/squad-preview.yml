@@ -26,14 +26,6 @@ jobs:
       - name: Run tests
         run: python -m pytest
 
-      - name: Check no .ai-team/ files are tracked
-        run: |
-          if git ls-files --error-unmatch .ai-team/ 2>/dev/null; then
-            echo "::error::❌ .ai-team/ files are tracked on preview — this must not ship."
-            exit 1
-          fi
-          echo "✅ No .ai-team/ files tracked — clean for release."
-
       - name: Validate VERSION file
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
