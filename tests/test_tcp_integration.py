@@ -113,6 +113,7 @@ def cleanup_test_recordings(recordings_dir):
     for attempt in range(3):
         try:
             tcp_send("reset", timeout=1.0)
+            time.sleep(0.05)  # Give server time to process reset
             break
         except:
             if attempt < 2:

@@ -1636,6 +1636,8 @@ class PumpkinFace:
                         if data == "reset":
                             self.recording_session.cancel()
                             self.timeline_playback.stop()
+                            self.timeline_playback.filename = None  # Clear loaded filename
+                            self.timeline_playback.timeline = None  # Clear loaded timeline
                             response = "OK Reset complete"
                             client_socket.sendall((response + '\n').encode('utf-8'))
                             print(response)
