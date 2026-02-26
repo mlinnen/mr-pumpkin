@@ -102,15 +102,27 @@ def cleanup_test_recordings(recordings_dir):
     """Clean up test recordings before and after each test.
     
     Removes any files starting with 'test_' to avoid pollution between tests.
+    Also resets the server state to ensure clean test isolation.
     """
     def cleanup():
         if recordings_dir.exists():
             for file in recordings_dir.glob('test_*.json'):
                 file.unlink()
     
-    cleanup()  # Before test
+    # Reset server state and cleanup files before test
+    for attempt in range(3):
+        try:
+            tcp_send("reset", timeout=1.0)
+            break
+        except:
+            if attempt < 2:
+                time.sleep(0.1)
+            # Last attempt silently fails if server not ready
+    
+    cleanup()  
     yield
-    cleanup()  # After test
+    # Cleanup after test
+    cleanup()
 
 
 def tcp_send(cmd: str, timeout: float = 2.0) -> str:
@@ -366,10 +378,12 @@ class TestBasicPlayback:
     
     def test_playback_state_transitions(self, pumpkin_server, recordings_dir):
         """Verify playback state: STOPPED → PLAYING → STOPPED."""
-        # Record a 500ms sequence
+        # Record a sequence with multiple commands
         tcp_send("record_start")
         tcp_send("happy")
-        time.sleep(0.5)
+        time.sleep(0.3)
+        tcp_send("sad")
+        time.sleep(0.3)
         tcp_send("record_stop test_state_transitions")
         
         # Initial state: STOPPED
@@ -664,17 +678,19 @@ class TestStatusQueries:
     
     def test_timeline_status_while_playing(self, pumpkin_server, recordings_dir):
         """timeline_status during playback should show PLAYING state."""
-        # Create recording
+        # Create recording with multiple commands to ensure nonzero duration
         tcp_send("record_start")
         tcp_send("neutral")
-        time.sleep(0.5)
+        time.sleep(0.3)
+        tcp_send("happy")
+        time.sleep(0.3)
         tcp_send("record_stop test_status_playing")
         
         # Start playback
         tcp_send("play test_status_playing")
         time.sleep(0.1)
         
-        # Query status
+        # Query status (should still be playing since recording was 0.6s)
         response = tcp_send("timeline_status")
         status = parse_json_response(response)
         
@@ -690,7 +706,9 @@ class TestStatusQueries:
         """timeline_status when paused should show PAUSED state."""
         tcp_send("record_start")
         tcp_send("neutral")
-        time.sleep(0.5)
+        time.sleep(0.3)
+        tcp_send("happy")
+        time.sleep(0.3)
         tcp_send("record_stop test_status_paused")
         
         tcp_send("play test_status_paused")

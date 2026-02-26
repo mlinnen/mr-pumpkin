@@ -1632,6 +1632,15 @@ class PumpkinFace:
                         
                         # ===== TIMELINE COMMANDS =====
                         
+                        # Reset command (clears recording and playback state)
+                        if data == "reset":
+                            self.recording_session.cancel()
+                            self.timeline_playback.stop()
+                            response = "OK Reset complete"
+                            client_socket.sendall((response + '\n').encode('utf-8'))
+                            print(response)
+                            continue
+                        
                         # Recording commands
                         if data == "record_start" or data == "record start":
                             if self.recording_session.is_recording:
