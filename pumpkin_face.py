@@ -1903,6 +1903,45 @@ class PumpkinFace:
                             print(response)
                             continue
                         
+                        if data.startswith("download_timeline "):
+                            try:
+                                parts = data.split(maxsplit=1)
+                                if len(parts) < 2:
+                                    response = "ERROR Missing filename"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    print(response)
+                                    continue
+                                
+                                filename = parts[1]
+                                
+                                # Validate filename (no path separators)
+                                if '/' in filename or '\\' in filename:
+                                    response = "ERROR Invalid filename: path separators not allowed"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    print(response)
+                                    continue
+                                
+                                # Download the timeline JSON
+                                json_content = self.file_manager.download_timeline(filename)
+                                if not filename.endswith('.json'):
+                                    filename = f"{filename}.json"
+                                response = json_content
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(f"Downloaded {filename}")
+                            except FileNotFoundError:
+                                response = f"ERROR File not found: {filename}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except ValueError as e:
+                                response = f"ERROR Invalid timeline: {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except Exception as e:
+                                response = f"ERROR {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            continue
+                        
                         if data.startswith("upload_timeline "):
                             try:
                                 parts = data.split(maxsplit=1)
@@ -1968,7 +2007,7 @@ class PumpkinFace:
                                                        "pause", "resume", "stop", "timeline_status", 
                                                        "recording_status", "list_recordings", "list"] or \
                                              data.startswith(("record_stop", "record stop", "play ", "seek ", 
-                                                             "delete_recording ", "rename_recording ", "upload_timeline "))
+                                                             "delete_recording ", "rename_recording ", "upload_timeline ", "download_timeline "))
                         
                         if not is_timeline_command and self.timeline_playback.state.value == "playing":
                             self.timeline_playback.pause()
