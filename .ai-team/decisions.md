@@ -1964,3 +1964,222 @@ This protocol design:
 - 2026-02-21: Gaze Control API Mismatch — Test vs Implementation
 - 2026-02-21: Rolling Eyes Gaze Integration Fix
 - 2026-02-21: Rolling Eyes Gaze Sequencing Fix
+
+---
+
+
+---
+
+
+---
+
+### 2026-02-27: Issue triage — Round 1
+**By:** Jinx
+**What:** Triaged issues #43, #39, #33, #20 and set routing/priority
+**Why:** Ralph activated for continuous backlog management
+
+---
+
+## Issue #43: Convert to websockets instead of straight sockets
+- **Route to:** Vi (Backend Dev)
+- **Priority:** P1 (should have)
+- **Type:** Backend / Infrastructure
+- **Blocker?** No — straightforward protocol upgrade
+- **Dependencies:** None
+- **Next step:** Vi to evaluate websocket library options (websockets, aiohttp) and propose minimal migration path. Current TCP socket server works fine; this is about enabling browser-based UIs.
+- **Complexity estimate:** 6-8 hours (library integration, protocol adaptation, backward compatibility testing)
+- **Notes:** Enables future web-based control panels. Consider maintaining TCP socket backward compatibility or documenting breaking change. Vi should evaluate whether to run both protocols simultaneously or phase out TCP.
+
+---
+
+## Issue #39: Create a mr-pumpkin skill for LLM-driven recording generation
+- **Route to:** Vi (Backend Dev) + Mylo (Tester)
+- **Priority:** P2 (nice to have)
+- **Type:** Feature / Integration / DevOps
+- **Blocker?** No — but requires architectural review first
+- **Dependencies:** None, but synergizes with #44 (upload timeline) which is complete
+- **Next step:** Jinx to define skill interface contract (input: natural language prompt, output: valid timeline JSON). Then Vi builds skill script that generates timeline JSON from LLM response, Mylo validates against existing timeline schema.
+- **Complexity estimate:** 12-16 hours (LLM integration, prompt engineering, JSON schema generation, validation)
+- **Notes:** This is a **tooling/automation feature**, not a core pumpkin_face.py feature. Deliverable is a CLI script (e.g., `scripts/generate_recording.py --prompt "happy dance"`) that writes JSON files compatible with `upload_timeline` command. Requires:
+  1. LLM API integration (OpenAI/Anthropic/local model)
+  2. Prompt template that teaches LLM the timeline JSON schema
+  3. Validation against existing recording schema (version 1.0)
+  4. Upload capability via existing socket command
+- **Architectural decision needed:** Which LLM provider? Local vs. cloud? How to handle API keys? Mike's preference required.
+
+---
+
+## Issue #33: Automatic updates
+- **Route to:** Vi (Backend Dev)
+- **Priority:** P1 (should have)
+- **Type:** DevOps / Infrastructure
+- **Blocker?** Yes — architectural decision required on update strategy
+- **Dependencies:** None
+- **Next step:** Jinx to decide: (1) External script that polls GitHub API and manages process lifecycle, OR (2) Built-in update mechanism in pumpkin_face.py. Then Vi implements chosen approach.
+- **Complexity estimate:** 16-20 hours (GitHub API integration, version comparison, download/extraction, process management, cross-platform compatibility, rollback strategy)
+- **Notes:** This is critical for deployment stability but has architectural implications:
+  - **External script approach:** Separate updater.py that runs independently (cron/Task Scheduler), polls GitHub Releases API, downloads ZIP, stops pumpkin_face.py via PID, extracts new version, restarts. Pros: clean separation, no runtime overhead. Cons: extra process to manage.
+  - **Built-in approach:** pumpkin_face.py checks for updates on startup or periodic interval, downloads in background, restarts itself. Pros: single binary. Cons: complicates core application, cross-platform process replacement is tricky.
+  - **Recommendation:** External script for cleaner separation of concerns. Vi to implement Python script that uses GitHub API, handles version comparison (parse VERSION file from release), manages download/extract/restart lifecycle, logs to ~/.mr-pumpkin/update.log.
+  - **Platform concerns:** Windows (taskkill + Task Scheduler), Linux/macOS (kill + cron), Raspberry Pi (systemd service restart). Cross-platform process management is non-trivial.
+  - **Rollback:** Backup current installation before extraction, restore on failure.
+
+---
+
+## Issue #20: Lip-Syncing
+- **Route to:** Ekko (Graphics Dev) + Vi (Backend Dev)
+- **Priority:** P2 (nice to have)
+- **Type:** Feature / Graphics / Backend
+- **Blocker?** Yes — major architectural review required
+- **Dependencies:** None, but may require external audio analysis library (aubio, librosa, phoneme recognition)
+- **Next step:** Jinx to architect lip-sync system: (1) Audio input mechanism, (2) Phoneme/viseme mapping, (3) Mouth shape vocabulary, (4) Real-time vs. pre-computed approach. Then Ekko designs mouth shapes, Vi implements audio analysis pipeline.
+- **Complexity estimate:** 40-60 hours (audio analysis, phoneme detection, mouth shape design, timing synchronization, projection-safe rendering)
+- **Notes:** This is a **major feature** with significant scope:
+  - **Audio input:** Real-time microphone vs. pre-recorded file? Socket command to start/stop lip-sync mode?
+  - **Phoneme detection:** Audio analysis to detect vowel/consonant shapes (A, E, I, O, U, M, B, F, V, etc.). Requires phoneme recognition library or pre-computed viseme timing.
+  - **Mouth shapes:** Current mouth is expression-based (happy curve, sad frown, etc.). Lip-sync requires 8-12 distinct mouth shapes (visemes) for phonemes. Ekko must design projection-safe white outlines for each.
+  - **Synchronization:** Frame-accurate timing between audio playback and mouth shape changes. 60fps rendering means 16ms windows.
+  - **Projection constraints:** All mouth shapes must be pure white outlines on black background (no fills, no anti-aliasing).
+  - **Integration:** New animation mode orthogonal to expressions (like blink/wink). Lip-sync overrides expression mouth, preserves expression eyes/eyebrows.
+  - **Recording compatibility:** Should lip-sync timings be recordable in timeline JSON? Requires schema extension.
+- **Recommendation:** This is a P2 feature because it's complex, requires external dependencies (audio analysis), and significantly expands the rendering pipeline. Should be tackled after P0/P1 features are stable. Consider phased approach: (1) Manual viseme control via socket commands first (no audio analysis), (2) Pre-computed viseme timing from file, (3) Real-time audio analysis last.
+
+---
+
+## Summary
+
+**Routing breakdown:**
+- Vi (Backend Dev): #43, #39 (with Mylo), #33, #20 (with Ekko)
+- Ekko (Graphics Dev): #20 (with Vi)
+- Mylo (Tester): #39 (with Vi)
+- Jinx (Lead): Architectural decisions for #39, #33, #20 before team starts work
+
+**Priority distribution:**
+- P0 (blocking release): None
+- P1 (should have): #43 (websockets), #33 (auto-updates)
+- P2 (nice to have): #39 (LLM skill), #20 (lip-sync)
+
+**Blockers:**
+- #39: Needs LLM provider decision from Mike
+- #33: Needs update strategy decision (external vs. built-in)
+- #20: Needs full architectural design (audio input, phoneme mapping, mouth shape vocabulary)
+
+**Recommended execution order:**
+1. #43 (websockets) — clean backend work, enables browser UIs
+2. #33 (auto-updates) — after architectural decision, critical for deployment
+3. #39 (LLM skill) — after Mike clarifies LLM provider preference
+4. #20 (lip-sync) — last, most complex, requires phased approach
+
+**Next actions for Jinx:**
+- Schedule architectural design session for #33 (update strategy)
+- Schedule architectural design session for #20 (lip-sync system)
+- Clarify with Mike: LLM provider preference for #39 (OpenAI? Anthropic? Local model?)
+- Unblock Vi to start #43 immediately (no architectural decisions needed)
+
+---
+
+# Recording File Upload Implementation
+
+**Date:** 2026-02-25  
+**Decision Owner:** Vi (Backend Dev)  
+**Issue:** #44 - Allow users to upload recording files with validation
+
+## What
+
+Implemented `upload_timeline` socket command that allows clients to upload JSON recording files to the server with full validation.
+
+## Why
+
+Users need a way to programmatically upload pre-recorded or externally-generated timeline files. The implementation leverages the existing `FileManager` validation infrastructure to ensure only valid timeline files are accepted.
+
+## Design Decisions
+
+### 1. Multi-line JSON Protocol (READY/END_UPLOAD Handshake)
+
+**Decision:** Use explicit READY and END_UPLOAD markers rather than expecting JSON on a single line.
+
+**Rationale:**
+- Timeline JSON files can be multi-line for readability
+- Socket protocol is line-based, but JSON may contain newlines
+- Handshake approach is explicit and prevents accidental data truncation
+- Easy for clients to implement: read READY, send JSON, send END_UPLOAD marker
+
+**Pattern:**
+```
+Client: upload_timeline <filename>
+Server: READY
+Client: <json content (multiple lines)>
+Client: END_UPLOAD
+Server: OK Uploaded <filename>.json
+```
+
+### 2. Leverage Existing FileManager Validation
+
+**Decision:** Use `FileManager.upload_timeline()` which already validates JSON structure.
+
+**Rationale:**
+- DRY principle - validation logic already exists and is tested
+- Consistent error messages across all upload paths
+- Simplifies socket handler to focus on protocol, not validation logic
+- FileManager already handles file system operations and collision detection
+
+### 3. Add FileManager to PumpkinFace Initialization
+
+**Decision:** Create `self.file_manager = FileManager()` in `__init__`.
+
+**Rationale:**
+- Consistent with existing patterns (timeline_playback, recording_session)
+- Single instance reused across all socket commands
+- Centralized file management state (if needed for future features)
+
+### 4. Include upload_timeline in Timeline Commands List
+
+**Decision:** Add "upload_timeline" to the list of commands that don't pause playback.
+
+**Rationale:**
+- Uploading a file is a file management operation, not an expression/animation command
+- User might want to prepare a recording while playback is active
+- Consistent with other timeline management commands (list, rename, delete)
+
+## Implementation Details
+
+### Error Handling
+
+All errors return explicit messages to help clients debug:
+- Missing filename: `ERROR Missing filename`
+- Path traversal attempt: `ERROR Invalid filename: path separators not allowed`
+- File collision: `ERROR File already exists: <filename>`
+- Invalid JSON: `ERROR Invalid timeline: <error details>`
+- Connection loss: `ERROR Connection lost while reading JSON`
+
+### Client-Side Implementation
+
+Added `upload_timeline(filename, json_file_path)` to client_example.py:
+1. Validates local file exists
+2. Reads file contents
+3. Connects to server
+4. Sends command, waits for READY
+5. Transmits JSON content
+6. Sends END_UPLOAD marker
+7. Displays server response
+
+### Security Considerations
+
+- Path separator validation prevents directory traversal (e.g., `../../etc/passwd`)
+- No shell commands or file operations beyond .json reading
+- FileManager ensures only valid timeline structure is saved
+- File permissions handled by OS filesystem
+
+## Testing
+
+- All 362 existing tests pass (no regressions)
+- Protocol validated with client_example.py example
+- Error paths covered (invalid JSON, file exists, missing args)
+- Integration with existing recording/playback/file management infrastructure verified
+
+## Future Extensions
+
+- Support for gzip compression (large timeline files)
+- Batch upload (multiple files in one connection)
+- Streaming large files (don't read entire file into memory)
+- Download/export timeline with validation

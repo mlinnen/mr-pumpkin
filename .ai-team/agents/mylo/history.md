@@ -15,6 +15,7 @@
 📌 Team update (2026-02-19): Projection mapping color scheme and test strategy finalized — decided by Ekko, Mylo  
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
 📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
+📌 Team update (2026-02-27): Issue triage Round 1: #39 (LLM skill P2, Vi+Mylo), #20 (lip-sync P2, Vi+Ekko) assigned — decided by Jinx
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 

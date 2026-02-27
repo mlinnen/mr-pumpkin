@@ -106,3 +106,20 @@
 - SLEEPING preservation: user offsets preserved during SLEEPING — brows reappear at previous position when expression changes
 
 **Key insight:** Derived transient animation (computed, not stored) is the cleanest way to satisfy Capture-Animate-Restore for effects that are purely functions of existing animation progress. No new state variables, no restoration logic, zero risk of desync.
+
+### Issue Triage — Round 1 (2026-02-27)
+
+**Backend infrastructure dominates backlog:**
+- Issue #43 (websockets) is clean protocol upgrade — enables browser-based UIs without changing core architecture
+- Issue #33 (auto-updates) requires decision on external updater script vs. built-in mechanism — external script preferred for separation of concerns
+- Issue #39 (LLM skill) is tooling/automation layer, not core feature — generates timeline JSON from natural language prompts
+- Issue #20 (lip-sync) is major feature expansion requiring audio analysis, phoneme mapping, and new mouth shape vocabulary
+
+**Architectural decisions required before work starts:**
+- Auto-updates: External script approach recommended (cleaner separation, avoids complicating core application with process management)
+- Lip-sync: Needs full system design covering audio input mechanism, phoneme detection library, viseme-to-mouth-shape mapping, and projection-safe rendering constraints
+- LLM skill: Requires Mike's decision on LLM provider (OpenAI/Anthropic/local model) and API key management strategy
+
+**Routing pattern:** Backend-heavy backlog routes primarily to Vi, with Ekko on graphics for lip-sync and Mylo on validation for LLM skill. All three P2 features (auto-updates, LLM skill, lip-sync) require architectural review before implementation.
+
+**Priority insight:** P1 features (#43 websockets, #33 auto-updates) are infrastructure improvements that don't expand expression vocabulary or animation system. P2 features (#39 LLM skill, #20 lip-sync) add user-facing capabilities but have higher complexity and external dependencies.

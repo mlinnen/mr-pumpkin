@@ -14,6 +14,7 @@
 
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
 📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
+📌 Team update (2026-02-27): Issue triage Round 1: #43 (websockets P1), #39 (LLM skill P2, Vi+Mylo), #33 (auto-updates P1), #20 (lip-sync P2, Vi+Ekko) — decided by Jinx
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
