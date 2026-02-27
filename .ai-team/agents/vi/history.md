@@ -406,3 +406,128 @@ Chose JSON for human-readability and forward compatibility:
 - Connection lost → "ERROR Connection lost while reading JSON"
 
 **Testing:** All 362 existing tests pass with no regressions. Feature integrates cleanly with existing recording/playback infrastructure.
+
+### WebSocket Migration Analysis (Issue #43)
+
+**What:** Analyzed TCP socket implementation for WebSocket migration to enable browser-based control panels.
+
+**Current socket architecture:**
+- **Footprint:** 680 lines (lines 1352-2035 in pumpkin_face.py)
+- **Protocol:** Text-based, newline-delimited (`\n` terminated), UTF-8 encoded
+- **Server:** Single-threaded blocking socket, one client at a time, runs in daemon thread
+- **Port:** 5000 (localhost only)
+- **Command format:** Case-insensitive string commands (`"blink"`, `"happy"`, `"gaze 45 -30"`)
+- **Response format:** `"OK <message>\n"` or `"ERROR <message>\n"`, JSON strings for status queries
+- **Special protocol:** `upload_timeline` uses stateful handshake (READY/END_UPLOAD markers) for multi-line JSON transfer
+
+**State sharing pattern:**
+- Socket handler (daemon thread) directly modifies PumpkinFace instance state variables via method calls
+- No explicit mutex/lock protection (relies on Python GIL for thread safety)
+- Game loop (main thread) runs at 60 FPS, reads state modified by socket handler
+- Orthogonal state system: each feature (gaze, eyebrows, projection, animations) has independent state variables
+
+**Command handler architecture:**
+- Giant if-elif chain (60+ commands in linear sequence)
+- No routing table or abstraction layer
+- Command parsing embedded directly in socket handler
+- Each handler: parse → validate → call method → send response → log → continue
+
+**Proposed approach:**
+1. **Dual-protocol support:** Run TCP and WebSocket servers in parallel (backward compatible)
+2. **Library choice:** `websockets` (asyncio-based, lightweight, pure Python, Pi-compatible)
+3. **Port allocation:** TCP on 5000 (unchanged), WebSocket on 5001 (new)
+4. **Command abstraction:** Extract command parsing to `CommandRouter` class in new `command_handler.py` module
+5. **Protocol adaptation:** Both TCP and WebSocket call same `router.execute(command_str)` method
+6. **Multi-line handling:** TCP keeps READY/END_UPLOAD handshake, WebSocket uses single JSON message
+
+**Architecture pattern:**
+```python
+class CommandRouter:
+    def __init__(self, pumpkin_face):
+        self.pumpkin = pumpkin_face
+    
+    def execute(self, command_str: str, format='text') -> str:
+        """Parse and execute command, return response.
+        Protocol-agnostic: works for both TCP and WebSocket."""
+        # Extract existing if-elif logic from socket handler
+        # Return "OK ..." or "ERROR ..." strings (text mode)
+        # Or {"status": "ok", "message": "..."} (json mode)
+        pass
+```
+
+**Implementation plan (5 milestones, 21-29 hours total):**
+1. **Command Router Extraction** (5-7h) — Decouple parsing from TCP handler
+2. **WebSocket Server Setup** (3-4h) — Add parallel WebSocket server on port 5001
+3. **JSON Protocol Adapter** (2-3h) — Support `{"command": "blink"}` format for WebSocket
+4. **Multi-line Upload Refactor** (4-5h) — Dual protocol support for `upload_timeline`
+5. **Documentation & Testing** (3-4h) — README, WebSocket API docs, integration tests, browser client example
+
+**Risk assessment:**
+- **Threading + asyncio:** WebSocket uses asyncio in separate thread; may need `asyncio.to_thread()` for CPU-bound operations
+- **GIL contention:** Two socket servers + 60 FPS game loop competing for GIL; profile under load to detect frame drops
+- **Pi compatibility:** Test `websockets` library install on Pi 3/4/5 before release
+- **Command router abstraction:** `upload_timeline` TCP handshake hard to abstract; use protocol-specific handlers
+- **Breaking changes:** Run all 362 tests after each milestone to catch regressions
+- **Port conflicts:** Make WebSocket port configurable via env var, graceful degradation if bind fails
+- **Browser CORS:** Document need for HTTP server to serve HTML client (can't use `file://` protocol)
+
+**Collaboration requirements:**
+- **Mylo (Tester):** Test strategy review, browser compatibility testing, Pi verification
+- **Jinx (Lead):** Approval for port 5001 and websockets dependency, API format decision
+
+**Recommendation:** Proceed with dual-protocol implementation using `websockets` library. Zero breaking changes, browser compatibility unlocked, clean abstraction layer, minimal dependencies, incremental rollout.
+
+**Lessons learned:**
+1. **Protocol agnostic design:** Command router enables testing in isolation, supports multiple transport protocols
+2. **Backward compatibility first:** Dual-protocol approach avoids breaking existing TCP clients during migration
+3. **Stateful protocols need escape hatches:** TCP upload handshake can't be cleanly abstracted; protocol-specific handlers required
+4. **Threading model matters:** asyncio + threading + GIL requires careful testing under load to detect contention
+5. **Incremental milestones reduce risk:** 5 small milestones (each 2-7 hours) easier to test and rollback than monolithic rewrite
+
+---
+
+## Milestone 1 Complete: Command Router Extracted (Issue #43)
+
+**Date:** 2025-01-28
+**Status:** ✅ Complete — 403 tests passing, zero regressions
+
+### Implementation Summary
+Successfully extracted ~660 lines of command parsing logic from TCP socket handler into new `CommandRouter` class. All 60+ commands now route through protocol-agnostic command layer.
+
+**Files modified:**
+- `command_handler.py` (NEW) — 700 lines, CommandRouter class with execute() method
+- `pumpkin_face.py` — Added CommandRouter import and initialization, replaced socket handler command if-elif chain with router delegation
+
+**Command categories extracted:**
+- Expression commands (neutral, happy, sad, angry, surprised, scared, sleeping)
+- Animation commands (blink, wink_left, wink_right, roll_clockwise, roll_counterclockwise)
+- Gaze control (2-arg and 4-arg variants)
+- Eyebrow commands (raise, lower, independent left/right, reset, parametric)
+- Head movement (turn_left/right/up/down, center_head, projection offsets)
+- Nose animation (twitch_nose, scrunch_nose, reset_nose)
+- Timeline playback (play, pause, resume, stop, seek)
+- Recording (record_start, record_stop, record_cancel)
+- File management (list_recordings, delete_recording, rename_recording, upload_timeline, download_timeline)
+- Status queries (timeline_status, recording_status)
+- Reset command
+
+**Special handling preserved:**
+- `upload_timeline` still uses socket-specific multi-step protocol (READY/END_UPLOAD handshake)
+- Animation commands return empty string (no response sent to client)
+- Expression/timeline commands return "OK ..." or "ERROR ..." strings
+- Status queries return JSON
+- Recording capture logic preserved (commands auto-record during active sessions)
+- Playback pause on manual override preserved
+
+**Test results:**
+- 403/403 tests passing (100% success rate)
+- Zero behavioral changes
+- All client integration tests passing
+- Recording, playback, and file management verified
+
+### Learnings
+1. **Extracted command parsing from socket handler into CommandRouter class:** Clean separation enables protocol-agnostic command execution
+2. **Protocol-agnostic command execution enables dual TCP/WebSocket support:** Same command logic works for both transports
+3. **362 tests verify zero behavioral changes after refactoring:** Comprehensive test coverage caught all edge cases during extraction
+
+**Unblocks:** Milestone 2 (WebSocket server setup) ready to begin
