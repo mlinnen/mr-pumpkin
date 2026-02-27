@@ -363,3 +363,45 @@ Chose JSON for human-readability and forward compatibility:
 - FileManager provides complete CRUD operations for remote timeline management
 - Playback status queries enable real-time progress monitoring over TCP
 - Seek enables scrubbing UI controls (progress bar drag, skip forward/back buttons)
+
+### Recording File Upload with Validation (Issue #44)
+
+**What:** Implemented `upload_timeline` socket command to allow clients to upload recording files to the server with automatic validation.
+
+**Key additions:**
+- `pumpkin_face.py`:
+  - Added `FileManager` import for file operations
+  - Added `self.file_manager = FileManager()` initialization in `__init__`
+  - Implemented `upload_timeline` socket command handler with multi-line JSON protocol
+  - Uses READY/END_UPLOAD handshake for reliable multi-line data transfer
+  - Added "upload_timeline" to timeline_command list to prevent playback pause
+
+- `client_example.py`:
+  - Added `upload_timeline(filename, json_file_path)` function for client-side uploads
+  - Reads local JSON file, connects to server, sends filename
+  - Waits for READY signal before transmitting JSON
+  - Sends END_UPLOAD marker to signal completion
+  - Handles errors and provides feedback
+
+**Validation strategy:**
+- JSON syntax validation (invalid JSON immediately rejected)
+- Timeline structure validation (delegated to `FileManager.upload_timeline()`)
+- File collision detection (raises FileExistsError if file exists)
+- Path separator validation (prevents directory traversal attacks)
+- Clear error messages returned to client on any validation failure
+
+**Protocol design:**
+1. Client sends: `upload_timeline <filename>\n`
+2. Server responds: `READY\n`
+3. Client sends: JSON content (multiple lines allowed)
+4. Client sends: `END_UPLOAD\n`
+5. Server responds: `OK Uploaded <filename>.json\n` or error message
+
+**Error handling:**
+- Missing filename → "ERROR Missing filename"
+- Invalid filename (contains path separators) → "ERROR Invalid filename: path separators not allowed"
+- File exists → "ERROR File already exists: <filename>"
+- Invalid JSON → "ERROR Invalid timeline: <error details>"
+- Connection lost → "ERROR Connection lost while reading JSON"
+
+**Testing:** All 362 existing tests pass with no regressions. Feature integrates cleanly with existing recording/playback infrastructure.
