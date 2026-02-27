@@ -154,6 +154,74 @@ $stream.Write($bytes, 0, $bytes.Length)
 $stream.Close()
 ```
 
+### WebSocket Interface (Browser Clients)
+
+The pumpkin face server also provides a WebSocket interface on **port 5001** for browser-based control panels and real-time communication.
+
+**Via JavaScript:**
+```javascript
+const ws = new WebSocket('ws://localhost:5001');
+
+ws.onopen = () => {
+  ws.send('happy');
+  ws.send('blink');
+  ws.send('timeline_status');
+};
+
+ws.onmessage = (event) => {
+  console.log('Response:', event.data);
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+```
+
+**WebSocket protocol:**
+- Each command is sent as a plain text message (same format as TCP)
+- Responses are sent back immediately as text messages
+- Empty responses (for animations) are not sent
+- Connection can be reused for multiple commands
+- Server handles concurrent WebSocket clients simultaneously
+
+**Simple HTML test client:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mr. Pumpkin WebSocket Client</title>
+</head>
+<body>
+  <h1>Mr. Pumpkin Control</h1>
+  <input type="text" id="command" placeholder="Enter command">
+  <button onclick="send()">Send</button>
+  <div id="response"></div>
+  
+  <script>
+    const ws = new WebSocket('ws://localhost:5001');
+    const responseDiv = document.getElementById('response');
+    
+    function send() {
+      const cmd = document.getElementById('command').value;
+      if (cmd) {
+        ws.send(cmd);
+      }
+    }
+    
+    ws.onmessage = (event) => {
+      responseDiv.innerHTML = '<p>' + event.data + '</p>';
+    };
+  </script>
+</body>
+</html>
+```
+
+**Port allocation:**
+- **TCP (port 5000):** Text-based commands, command-line clients, legacy support
+- **WebSocket (port 5001):** Browser clients, real-time dashboards, concurrent connections
+
+Both protocols support the same commands and are always available when the server runs.
+
 ## Supported Commands
 
 ### Expressions
