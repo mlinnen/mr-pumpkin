@@ -3,8 +3,12 @@ import math
 import socket
 import threading
 import sys
+import time
+import json
 from enum import Enum
 from typing import Tuple
+from timeline import Playback, RecordingSession, FileManager
+from command_handler import CommandRouter
 
 class Expression(Enum):
     NEUTRAL = "neutral"
@@ -104,6 +108,16 @@ class PumpkinFace:
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
+        
+        # Timeline playback and recording state
+        self.timeline_playback = Playback()
+        self.recording_session = RecordingSession()
+        self.file_manager = FileManager()
+        self.timeline_playback.set_command_callback(self._execute_timeline_command)
+        
+        # Initialize command router
+        self.command_router = CommandRouter(self)
+        self.last_update_time = time.time()  # For delta time calculation
     
     @property
     def left_eye_gaze_x(self):
@@ -857,7 +871,128 @@ class PumpkinFace:
         """Reset nose to neutral position."""
         self._reset_nose()
     
+    def _execute_timeline_command(self, command: str, args: dict):
+        """Execute a command from timeline playback.
+        
+        Args:
+            command: Command name (e.g., "set_expression", "blink")
+            args: Dictionary of command arguments
+        """
+        # Expression commands
+        if command == "set_expression":
+            expression_str = args.get("expression", "neutral")
+            try:
+                expression = Expression(expression_str)
+                self.set_expression(expression)
+            except ValueError:
+                raise ValueError(f"Invalid expression: {expression_str}")
+        
+        # Animation commands
+        elif command == "blink":
+            self.blink()
+        elif command == "wink_left":
+            self.wink_left()
+        elif command == "wink_right":
+            self.wink_right()
+        elif command == "roll_clockwise":
+            self.roll_clockwise()
+        elif command == "roll_counterclockwise":
+            self.roll_counterclockwise()
+        
+        # Gaze commands
+        elif command == "gaze":
+            x = args.get("x", 0)
+            y = args.get("y", 0)
+            lx = args.get("lx")
+            ly = args.get("ly")
+            rx = args.get("rx")
+            ry = args.get("ry")
+            
+            if lx is not None and ly is not None and rx is not None and ry is not None:
+                self.set_gaze(lx, ly, rx, ry)
+            else:
+                self.set_gaze(x, y)
+        
+        # Eyebrow commands
+        elif command == "eyebrow_raise":
+            self.raise_eyebrows()
+        elif command == "eyebrow_lower":
+            self.lower_eyebrows()
+        elif command == "eyebrow_raise_left":
+            self.raise_eyebrow_left()
+        elif command == "eyebrow_lower_left":
+            self.lower_eyebrow_left()
+        elif command == "eyebrow_raise_right":
+            self.raise_eyebrow_right()
+        elif command == "eyebrow_lower_right":
+            self.lower_eyebrow_right()
+        elif command == "eyebrow_reset":
+            self.reset_eyebrows()
+        elif command == "eyebrow":
+            val = args.get("value", 0)
+            left = args.get("left")
+            right = args.get("right")
+            
+            if left is not None and right is not None:
+                self.set_eyebrow(left, right)
+            else:
+                self.set_eyebrow(val)
+        
+        # Projection offset commands
+        elif command == "projection_reset":
+            self.reset_projection_offset()
+        elif command == "jog_offset":
+            dx = args.get("dx", 0)
+            dy = args.get("dy", 0)
+            self.jog_projection(dx, dy)
+        elif command == "set_offset":
+            x = args.get("x", 0)
+            y = args.get("y", 0)
+            self.set_projection_offset(x, y)
+        
+        # Head movement commands
+        elif command == "turn_left":
+            amount = args.get("amount", 50)
+            self.turn_head_left(amount)
+        elif command == "turn_right":
+            amount = args.get("amount", 50)
+            self.turn_head_right(amount)
+        elif command == "turn_up":
+            amount = args.get("amount", 50)
+            self.turn_head_up(amount)
+        elif command == "turn_down":
+            amount = args.get("amount", 50)
+            self.turn_head_down(amount)
+        elif command == "center_head":
+            self.center_head()
+        
+        # Nose animation commands
+        elif command == "twitch_nose":
+            magnitude = args.get("magnitude", 50.0)
+            self._start_nose_twitch(magnitude)
+        elif command == "scrunch_nose":
+            magnitude = args.get("magnitude", 50.0)
+            self._start_nose_scrunch(magnitude)
+        elif command == "reset_nose":
+            self._reset_nose()
+        
+        else:
+            raise ValueError(f"Unknown timeline command: {command}")
+    
     def update(self):
+        # Calculate delta time for timeline playback
+        current_time = time.time()
+        dt_seconds = current_time - self.last_update_time
+        self.last_update_time = current_time
+        dt_ms = dt_seconds * 1000  # Convert to milliseconds
+        
+        # Update timeline playback
+        if self.timeline_playback.state.value == "playing":
+            errors = self.timeline_playback.update(dt_ms)
+            if errors:
+                for error in errors:
+                    print(f"Timeline error: {error}")
+        
         # Handle blink animation
         if self.is_blinking:
             self.blink_progress += self.blink_speed
@@ -947,64 +1082,210 @@ class PumpkinFace:
                 self.current_expression = self.target_expression
                 self.transition_progress = 1.0
     
+    def _capture_command_for_recording(self, data: str):
+        """Capture a command for the active recording session.
+        
+        Args:
+            data: Raw command string from TCP socket
+        """
+        # Parse command and convert to timeline format (command + args dict)
+        parts = data.split()
+        cmd = parts[0]
+        
+        # Expression commands (single word)
+        if cmd in ["neutral", "happy", "sad", "angry", "surprised", "scared", "sleeping"]:
+            self.recording_session.record_command("set_expression", {"expression": cmd})
+        
+        # Animation commands (no args)
+        elif cmd in ["blink", "wink_left", "wink_right", "roll_clockwise", "roll_counterclockwise"]:
+            self.recording_session.record_command(cmd)
+        
+        # Gaze command
+        elif cmd == "gaze" and len(parts) >= 3:
+            try:
+                if len(parts) == 3:
+                    # Two args: same for both eyes
+                    x, y = float(parts[1]), float(parts[2])
+                    self.recording_session.record_command("gaze", {"x": x, "y": y})
+                elif len(parts) == 5:
+                    # Four args: independent eyes
+                    lx, ly, rx, ry = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
+                    self.recording_session.record_command("gaze", {"lx": lx, "ly": ly, "rx": rx, "ry": ry})
+            except ValueError:
+                pass  # Ignore parse errors during recording
+        
+        # Eyebrow commands
+        elif cmd == "eyebrow_raise":
+            self.recording_session.record_command(cmd)
+        elif cmd == "eyebrow_lower":
+            self.recording_session.record_command(cmd)
+        elif cmd == "eyebrow_raise_left":
+            self.recording_session.record_command(cmd)
+        elif cmd == "eyebrow_lower_left":
+            self.recording_session.record_command(cmd)
+        elif cmd == "eyebrow_raise_right":
+            self.recording_session.record_command(cmd)
+        elif cmd == "eyebrow_lower_right":
+            self.recording_session.record_command(cmd)
+        elif cmd == "eyebrow_reset":
+            self.recording_session.record_command(cmd)
+        elif cmd == "eyebrow" and len(parts) >= 2:
+            try:
+                val = float(parts[1])
+                self.recording_session.record_command("eyebrow", {"value": val})
+            except ValueError:
+                pass
+        elif cmd == "eyebrow_left" and len(parts) >= 2:
+            try:
+                left = float(parts[1])
+                self.recording_session.record_command("eyebrow", {"left": left, "right": self.eyebrow_right_offset})
+            except ValueError:
+                pass
+        elif cmd == "eyebrow_right" and len(parts) >= 2:
+            try:
+                right = float(parts[1])
+                self.recording_session.record_command("eyebrow", {"left": self.eyebrow_left_offset, "right": right})
+            except ValueError:
+                pass
+        
+        # Projection offset commands
+        elif cmd == "projection_reset":
+            self.recording_session.record_command(cmd)
+        elif cmd == "jog_offset" and len(parts) >= 3:
+            try:
+                dx, dy = int(parts[1]), int(parts[2])
+                self.recording_session.record_command(cmd, {"dx": dx, "dy": dy})
+            except ValueError:
+                pass
+        elif cmd == "set_offset" and len(parts) >= 3:
+            try:
+                x, y = int(parts[1]), int(parts[2])
+                self.recording_session.record_command(cmd, {"x": x, "y": y})
+            except ValueError:
+                pass
+        
+        # Head movement commands
+        elif cmd == "turn_left":
+            amount = 50
+            if len(parts) >= 2:
+                try:
+                    amount = int(parts[1])
+                except ValueError:
+                    pass
+            self.recording_session.record_command(cmd, {"amount": amount})
+        elif cmd == "turn_right":
+            amount = 50
+            if len(parts) >= 2:
+                try:
+                    amount = int(parts[1])
+                except ValueError:
+                    pass
+            self.recording_session.record_command(cmd, {"amount": amount})
+        elif cmd == "turn_up":
+            amount = 50
+            if len(parts) >= 2:
+                try:
+                    amount = int(parts[1])
+                except ValueError:
+                    pass
+            self.recording_session.record_command(cmd, {"amount": amount})
+        elif cmd == "turn_down":
+            amount = 50
+            if len(parts) >= 2:
+                try:
+                    amount = int(parts[1])
+                except ValueError:
+                    pass
+            self.recording_session.record_command(cmd, {"amount": amount})
+        elif cmd == "center_head":
+            self.recording_session.record_command(cmd)
+        
+        # Nose animation commands
+        elif cmd == "twitch_nose":
+            magnitude = 50.0
+            if len(parts) >= 2:
+                try:
+                    magnitude = float(parts[1])
+                except ValueError:
+                    pass
+            self.recording_session.record_command(cmd, {"magnitude": magnitude})
+        elif cmd == "scrunch_nose":
+            magnitude = 50.0
+            if len(parts) >= 2:
+                try:
+                    magnitude = float(parts[1])
+                except ValueError:
+                    pass
+            self.recording_session.record_command(cmd, {"magnitude": magnitude})
+        elif cmd == "reset_nose":
+            self.recording_session.record_command(cmd)
+    
     def run(self):
         pygame.init()
         
-        # Get monitor information
-        monitors = pygame.display.get_desktop_sizes()
-        print(f"Available monitors: {len(monitors)}")
-        for i, monitor_size in enumerate(monitors):
-            print(f"  Monitor {i}: {monitor_size[0]}x{monitor_size[1]}")
-        
-        if self.monitor >= len(monitors):
-            print(f"Error: Monitor {self.monitor} not found. Using monitor 0.")
-            self.monitor = 0
-        
-        # Get monitor info and position
-        monitor_size = monitors[self.monitor]
-        
-        if self.fullscreen:
-            self.width, self.height = monitor_size
-            
-            # Calculate monitor position based on index
-            monitor_x = 0
-            for i in range(self.monitor):
-                monitor_x += monitors[i][0]
-            
-            # Set position for fullscreen
-            import os
-            os.environ['SDL_VIDEO_WINDOW_POS'] = f'{monitor_x},0'
-            
-            # Create fullscreen window
-            screen = pygame.display.set_mode(monitor_size, pygame.FULLSCREEN)
-            print(f"Running FULLSCREEN on monitor {self.monitor} - {self.width}x{self.height}")
-        else:
-            # Windowed mode - use default size or smaller if monitor is smaller
-            self.width = min(self.width, monitor_size[0])
-            self.height = min(self.height, monitor_size[1])
-            
-            # Calculate position to center window on selected monitor
-            monitor_x = 0
-            for i in range(self.monitor):
-                monitor_x += monitors[i][0]
-            
-            window_x = monitor_x + (monitor_size[0] - self.width) // 2
-            window_y = (monitor_size[1] - self.height) // 2
-            
-            import os
-            os.environ['SDL_VIDEO_WINDOW_POS'] = f'{window_x},{window_y}'
-            
-            # Create windowed window
-            screen = pygame.display.set_mode((self.width, self.height))
-            print(f"Running WINDOWED on monitor {self.monitor} - {self.width}x{self.height}")
-        
-        pygame.display.set_caption("Mr. Pumpkin")
-        
-        # Start network server
+        # Start network server FIRST (before display initialization)
+        # This ensures socket server is ready even if display fails
         server_thread = threading.Thread(target=self._run_socket_server, daemon=True)
         server_thread.start()
+        print("Socket server listening on port 5000")
         
-        print("Press ESC to exit or send socket commands to port 5000")
+        # Try to create display, but continue if it fails (headless mode)
+        screen = None
+        try:
+            # Get monitor information
+            monitors = pygame.display.get_desktop_sizes()
+            print(f"Available monitors: {len(monitors)}")
+            for i, monitor_size in enumerate(monitors):
+                print(f"  Monitor {i}: {monitor_size[0]}x{monitor_size[1]}")
+            
+            if self.monitor >= len(monitors):
+                print(f"Error: Monitor {self.monitor} not found. Using monitor 0.")
+                self.monitor = 0
+            
+            # Get monitor info and position
+            monitor_size = monitors[self.monitor]
+            
+            if self.fullscreen:
+                self.width, self.height = monitor_size
+                
+                # Calculate monitor position based on index
+                monitor_x = 0
+                for i in range(self.monitor):
+                    monitor_x += monitors[i][0]
+                
+                # Set position for fullscreen
+                import os
+                os.environ['SDL_VIDEO_WINDOW_POS'] = f'{monitor_x},0'
+                
+                # Create fullscreen window
+                screen = pygame.display.set_mode(monitor_size, pygame.FULLSCREEN)
+                print(f"Running FULLSCREEN on monitor {self.monitor} - {self.width}x{self.height}")
+            else:
+                # Windowed mode - use default size or smaller if monitor is smaller
+                self.width = min(self.width, monitor_size[0])
+                self.height = min(self.height, monitor_size[1])
+                
+                # Calculate position to center window on selected monitor
+                monitor_x = 0
+                for i in range(self.monitor):
+                    monitor_x += monitors[i][0]
+                
+                window_x = monitor_x + (monitor_size[0] - self.width) // 2
+                window_y = (monitor_size[1] - self.height) // 2
+                
+                import os
+                os.environ['SDL_VIDEO_WINDOW_POS'] = f'{window_x},{window_y}'
+                
+                # Create windowed window
+                screen = pygame.display.set_mode((self.width, self.height))
+                print(f"Running WINDOWED on monitor {self.monitor} - {self.width}x{self.height}")
+            
+            pygame.display.set_caption("Mr. Pumpkin")
+            print("Press ESC to exit or send socket commands to port 5000")
+        except Exception as e:
+            print(f"Warning: Could not initialize display: {e}")
+            print("Running in headless mode - socket server only")
+            # Continue without display (for CI/headless environments)
         
         while self.running:
             for event in pygame.event.get():
@@ -1016,8 +1297,9 @@ class PumpkinFace:
                     self._handle_keyboard_input(event.key)
             
             self.update()
-            self.draw(screen)
-            pygame.display.flip()
+            if screen is not None:
+                self.draw(screen)
+                pygame.display.flip()
             self.clock.tick(60)
         
         pygame.quit()
@@ -1085,227 +1367,75 @@ class PumpkinFace:
                     print(f"Connected by {addr}")
                     
                     while True:
-                        data = client_socket.recv(1024).decode('utf-8').strip().lower()
+                        data = client_socket.recv(1024).decode('utf-8').strip()
                         if not data:
                             break
                         
-                        # Handle blink command
-                        if data == "blink":
-                            self.blink()
-                            print("Blink animation triggered")
+                        # Route commands through CommandRouter (except upload_timeline)
+                        if not data.lower().startswith("upload_timeline "):
+                            response = self.command_router.execute(data)
+                            if response:  # Only send response if non-empty
+                                client_socket.sendall((response + '\n').encode('utf-8'))
                             continue
                         
-                        # Handle wink commands
-                        if data == "wink_left":
-                            self.wink_left()
-                            print("Left wink animation triggered")
-                            continue
-                        elif data == "wink_right":
-                            self.wink_right()
-                            print("Right wink animation triggered")
-                            continue
-                        
-                        # Handle rolling eyes commands
-                        if data == "roll_clockwise":
-                            self.roll_clockwise()
-                            print("Rolling eyes clockwise")
-                            continue
-                        
-                        if data == "roll_counterclockwise":
-                            self.roll_counterclockwise()
-                            print("Rolling eyes counter-clockwise")
-                            continue
-                        
-                        # Handle gaze command
-                        if data.startswith("gaze "):
+                        if data.startswith("upload_timeline "):
                             try:
-                                parts = data.split()
-                                args = [float(x) for x in parts[1:]]
+                                parts = data.split(maxsplit=1)
+                                if len(parts) < 2:
+                                    response = "ERROR Missing filename"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    print(response)
+                                    continue
                                 
-                                if len(args) == 2:
-                                    # Two args: apply same angles to both eyes
-                                    self.set_gaze(args[0], args[1])
-                                    print(f"Gaze set to: both eyes ({args[0]}°, {args[1]}°)")
-                                elif len(args) == 4:
-                                    # Four args: independent eye control
-                                    self.set_gaze(args[0], args[1], args[2], args[3])
-                                    print(f"Gaze set to: left ({args[0]}°, {args[1]}°), right ({args[2]}°, {args[3]}°)")
-                                else:
-                                    print(f"Error: gaze command requires 2 or 4 numeric arguments, got {len(args)}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing gaze command: {e}")
+                                filename = parts[1]
+                                
+                                # Validate filename (no path separators)
+                                if '/' in filename or '\\' in filename:
+                                    response = "ERROR Invalid filename: path separators not allowed"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    print(response)
+                                    continue
+                                
+                                # Signal ready for JSON data
+                                client_socket.sendall(b"READY\n")
+                                
+                                # Read JSON content until END_UPLOAD marker
+                                json_lines = []
+                                while True:
+                                    json_line = client_socket.recv(4096).decode('utf-8').strip()
+                                    if not json_line:
+                                        response = "ERROR Connection lost while reading JSON"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        print(response)
+                                        break
+                                    
+                                    if json_line == "END_UPLOAD":
+                                        # Upload the timeline
+                                        json_content = '\n'.join(json_lines)
+                                        self.file_manager.upload_timeline(filename, json_content)
+                                        if not filename.endswith('.json'):
+                                            filename = f"{filename}.json"
+                                        response = f"OK Uploaded {filename}"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        print(response)
+                                        break
+                                    
+                                    json_lines.append(json_line)
+                            except FileExistsError:
+                                response = f"ERROR File already exists: {filename}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except ValueError as e:
+                                response = f"ERROR Invalid timeline: {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except Exception as e:
+                                response = f"ERROR {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
                             continue
                         
-                        # Handle eyebrow commands
-                        if data == "eyebrow_raise":
-                            self.raise_eyebrows()
-                            print("Eyebrows raised")
-                            continue
-                        
-                        if data == "eyebrow_lower":
-                            self.lower_eyebrows()
-                            print("Eyebrows lowered")
-                            continue
-                        
-                        if data == "eyebrow_raise_left":
-                            self.raise_eyebrow_left()
-                            print("Left eyebrow raised")
-                            continue
-                        
-                        if data == "eyebrow_lower_left":
-                            self.lower_eyebrow_left()
-                            print("Left eyebrow lowered")
-                            continue
-                        
-                        if data == "eyebrow_raise_right":
-                            self.raise_eyebrow_right()
-                            print("Right eyebrow raised")
-                            continue
-                        
-                        if data == "eyebrow_lower_right":
-                            self.lower_eyebrow_right()
-                            print("Right eyebrow lowered")
-                            continue
-                        
-                        if data == "eyebrow_reset":
-                            self.reset_eyebrows()
-                            print("Eyebrows reset to neutral")
-                            continue
-                        
-                        if data.startswith("eyebrow "):
-                            try:
-                                parts = data.split()
-                                val = float(parts[1])
-                                self.set_eyebrow(val)
-                                print(f"Both eyebrows set to: {val}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing eyebrow command: {e}")
-                            continue
-                        
-                        if data.startswith("eyebrow_left "):
-                            try:
-                                parts = data.split()
-                                val = float(parts[1])
-                                self.set_eyebrow(val, self.eyebrow_right_offset)
-                                print(f"Left eyebrow set to: {val}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing eyebrow_left command: {e}")
-                            continue
-                        
-                        if data.startswith("eyebrow_right "):
-                            try:
-                                parts = data.split()
-                                val = float(parts[1])
-                                self.set_eyebrow(self.eyebrow_left_offset, val)
-                                print(f"Right eyebrow set to: {val}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing eyebrow_right command: {e}")
-                            continue
-                        
-                        # Handle projection offset commands
-                        if data == "projection_reset":
-                            self.reset_projection_offset()
-                            continue
-                        
-                        if data.startswith("jog_offset "):
-                            try:
-                                parts = data.split()
-                                dx = int(parts[1])
-                                dy = int(parts[2])
-                                self.jog_projection(dx, dy)
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing jog_offset command: {e}")
-                            continue
-                        
-                        if data.startswith("set_offset "):
-                            try:
-                                parts = data.split()
-                                x = int(parts[1])
-                                y = int(parts[2])
-                                self.set_projection_offset(x, y)
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing set_offset command: {e}")
-                            continue
-                        
-                        # Handle head movement commands
-                        if data == "turn_left" or data.startswith("turn_left "):
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_left(amount)
-                                print(f"Turning head left by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_left command: {e}")
-                            continue
-                        
-                        if data == "turn_right" or data.startswith("turn_right "):
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_right(amount)
-                                print(f"Turning head right by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_right command: {e}")
-                            continue
-                        
-                        if data == "turn_up" or data.startswith("turn_up "):
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_up(amount)
-                                print(f"Turning head up by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_up command: {e}")
-                            continue
-                        
-                        if data == "turn_down" or data.startswith("turn_down "):
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_down(amount)
-                                print(f"Turning head down by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_down command: {e}")
-                            continue
-                        
-                        if data == "center_head":
-                            self.center_head()
-                            print("Centering head position")
-                            continue
-                        
-                        # Handle nose animation commands
-                        if data == "twitch_nose" or data.startswith("twitch_nose "):
-                            try:
-                                parts = data.split()
-                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
-                                self._start_nose_twitch(magnitude)
-                                print(f"Twitching nose (magnitude={magnitude})")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing twitch_nose command: {e}")
-                            continue
-                        
-                        if data == "scrunch_nose" or data.startswith("scrunch_nose "):
-                            try:
-                                parts = data.split()
-                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
-                                self._start_nose_scrunch(magnitude)
-                                print(f"Scrunching nose (magnitude={magnitude})")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing scrunch_nose command: {e}")
-                            continue
-                        
-                        if data == "reset_nose":
-                            self._reset_nose()
-                            print("Resetting nose to neutral")
-                            continue
-                        
-                        try:
-                            expression = Expression(data)
-                            self.set_expression(expression)
-                            print(f"Expression changed to: {data}")
-                        except ValueError:
-                            print(f"Unknown expression: {data}")
-                    
+                        # ===== END TIMELINE COMMANDS =====
                     client_socket.close()
                 except Exception as e:
                     print(f"Connection error: {e}")

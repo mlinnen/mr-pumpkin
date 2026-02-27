@@ -22,6 +22,7 @@ def create_release_package():
     # Files to include in release
     include_files = [
         "pumpkin_face.py",
+        "timeline.py",
         "client_example.py",
         "requirements.txt",
         "README.md",
