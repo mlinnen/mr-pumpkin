@@ -5,11 +5,18 @@ A standalone Python program that renders an animated pumpkin face on fullscreen 
 ## Features
 
 - **Fullscreen rendering** with 2D vector graphics
-- **6 facial expressions**: neutral, happy, sad, angry, surprised, scared
+- **7 facial expressions**: neutral, happy, sad, angry, surprised, scared, sleeping
 - **Smooth animations** between expression transitions
 - **Network socket server** on port 5000 for receiving commands
-- **Keyboard shortcuts** for quick testing (1-6 keys)
+- **Keyboard shortcuts** for quick testing (1-7 keys for expressions, arrow keys for alignment, B/L/R for animations, U/J for eyebrows, [ ] for individual eyebrows, C/X for eye rolling)
 - **Customizable appearance** (colors, sizes, animation speeds)
+- **Command recording & playback**: Record command sequences and replay them with frame-accurate timing
+  - Record commands into timelines with automatic timestamping
+  - Play, pause, resume, stop, and seek through recorded sequences
+  - List, delete, and rename recorded timelines
+- **Gaze control**: Direct eye positioning with individual eye control
+- **Eye animations**: Blink, wink, and roll eyes
+- **Eyebrow control**: Raise, lower, and control individual eyebrows
 
 ## Installation
 
@@ -95,10 +102,25 @@ The program will list available monitors and run on your selected output. Press 
 
 ### Send commands via network socket:
 
-**Using the example client:**
+**Using the example client (interactive menu):**
 ```bash
 python client_example.py
 ```
+
+This provides an interactive menu with commands for:
+- Changing expressions (neutral, happy, sad, angry, surprised, scared, sleeping)
+- Animation controls (blink, roll eyes, control eyebrows)
+- Gaze control (point eyes at angles)
+- Recording and playback:
+  - `record start` - Begin recording
+  - `record stop <filename>` - Save a recording
+  - `record cancel` - Discard recording
+  - `record status` - Check recording state
+  - `list` - View all recordings
+  - `play <filename>` - Play a recording
+  - `pause` / `resume` / `stop` - Control playback
+  - `seek <position_ms>` - Jump to position
+  - `timeline_status` - Check playback state
 
 **Via Python:**
 ```python
@@ -107,12 +129,17 @@ import socket
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect(('localhost', 5000))
 client.send(b'happy')
+response = client.recv(1024)  # Some commands return responses
 client.close()
 ```
 
 **Via command line (netcat/nc):**
 ```bash
 echo "happy" | nc localhost 5000
+echo "record start" | nc localhost 5000
+echo "record stop my_recording" | nc localhost 5000
+echo "play my_recording" | nc localhost 5000
+echo "timeline_status" | nc localhost 5000
 ```
 
 **Via PowerShell:**
@@ -125,14 +152,52 @@ $stream.Write($bytes, 0, $bytes.Length)
 $stream.Close()
 ```
 
-## Supported Expressions
+## Supported Commands
 
+### Expressions
 - `neutral` - Default expression
 - `happy` - Smiling face
 - `sad` - Frowning face
 - `angry` - Angry eyes and mouth
 - `surprised` - Wide eyes, open mouth
 - `scared` - Frightened expression
+- `sleeping` - Eyes closed (sleeping)
+
+### Recording & Playback
+- `record_start` or `record start` - Begin recording commands
+- `record_stop <filename>` or `record stop <filename>` - Stop recording and save with filename
+- `record_cancel` or `record cancel` - Discard current recording without saving
+- `recording_status` or `record status` - Show recording state (is_recording, command_count, duration_ms)
+- `list_recordings` or `list` - Show all available recordings
+- `delete_recording <filename>` - Remove a saved recording
+- `rename_recording <old_name> <new_name>` - Rename a saved recording
+- `play <filename>` - Start playing a recorded timeline
+- `pause` - Pause current playback
+- `resume` - Resume from paused state
+- `stop` - Stop playback and return to start
+- `seek <position_ms>` - Jump to specific position in recording
+- `timeline_status` - Show current playback state (state, filename, position, duration, is_playing)
+
+### Animation Controls
+- `blink` - Blink both eyes
+- `wink_left` - Wink left eye only
+- `wink_right` - Wink right eye only
+- `roll_clockwise` - Roll eyes clockwise
+- `roll_counterclockwise` - Roll eyes counter-clockwise
+- `raise_eyebrows` - Raise both eyebrows
+- `lower_eyebrows` - Lower both eyebrows
+- `raise_left_eyebrow` - Raise left eyebrow only
+- `lower_left_eyebrow` - Lower left eyebrow only
+- `raise_right_eyebrow` - Raise right eyebrow only
+- `lower_right_eyebrow` - Lower right eyebrow only
+
+### Gaze Control
+- `gaze <x> <y>` - Point both eyes at angle (x, y in degrees, -90 to +90)
+- `gaze <x1> <y1> <x2> <y2>` - Point left and right eyes independently
+
+### Nose Animation
+- `wiggle_nose` - Animate nose wiggle
+- `reset_nose` - Stop nose animation and return to neutral
 
 ## Keyboard Controls
 
@@ -164,10 +229,19 @@ While the application is running:
 ## Customization
 
 Edit `pumpkin_face.py` to customize:
-- Colors: Modify `PUMPKIN_COLOR`, `EYE_COLOR`, etc.
+- Colors: Modify `PUMPKIN_COLOR`, `EYE_COLOR`, `MOUTH_COLOR`, etc.
 - Animation speed: Change `self.transition_speed`
 - Face size: Adjust `pumpkin_radius`
 - Socket port: Change the port in `_run_socket_server()`
+- Recordings storage path: Modify the `recordings_dir` in the FileManager class
+
+### Headless Mode
+
+The application can run in headless mode (without a display) for automation and CI/CD environments. In this mode:
+- The TCP socket server runs fully functional
+- All commands work normally (expressions, animations, recording/playback)
+- The pygame display is optional and gracefully skipped if unavailable
+- Useful for running the pumpkin server on a headless Linux machine that communicates with a remote display
 
 ## Architecture
 
