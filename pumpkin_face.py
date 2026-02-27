@@ -7,7 +7,7 @@ import time
 import json
 from enum import Enum
 from typing import Tuple
-from timeline import Playback, RecordingSession
+from timeline import Playback, RecordingSession, FileManager
 
 class Expression(Enum):
     NEUTRAL = "neutral"
@@ -111,6 +111,7 @@ class PumpkinFace:
         # Timeline playback and recording state
         self.timeline_playback = Playback()
         self.recording_session = RecordingSession()
+        self.file_manager = FileManager()
         self.timeline_playback.set_command_callback(self._execute_timeline_command)
         self.last_update_time = time.time()  # For delta time calculation
     
@@ -1902,6 +1903,63 @@ class PumpkinFace:
                             print(response)
                             continue
                         
+                        if data.startswith("upload_timeline "):
+                            try:
+                                parts = data.split(maxsplit=1)
+                                if len(parts) < 2:
+                                    response = "ERROR Missing filename"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    print(response)
+                                    continue
+                                
+                                filename = parts[1]
+                                
+                                # Validate filename (no path separators)
+                                if '/' in filename or '\\' in filename:
+                                    response = "ERROR Invalid filename: path separators not allowed"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    print(response)
+                                    continue
+                                
+                                # Signal ready for JSON data
+                                client_socket.sendall(b"READY\n")
+                                
+                                # Read JSON content until END_UPLOAD marker
+                                json_lines = []
+                                while True:
+                                    json_line = client_socket.recv(4096).decode('utf-8').strip()
+                                    if not json_line:
+                                        response = "ERROR Connection lost while reading JSON"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        print(response)
+                                        break
+                                    
+                                    if json_line == "END_UPLOAD":
+                                        # Upload the timeline
+                                        json_content = '\n'.join(json_lines)
+                                        self.file_manager.upload_timeline(filename, json_content)
+                                        if not filename.endswith('.json'):
+                                            filename = f"{filename}.json"
+                                        response = f"OK Uploaded {filename}"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        print(response)
+                                        break
+                                    
+                                    json_lines.append(json_line)
+                            except FileExistsError:
+                                response = f"ERROR File already exists: {filename}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except ValueError as e:
+                                response = f"ERROR Invalid timeline: {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except Exception as e:
+                                response = f"ERROR {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            continue
+                        
                         # ===== END TIMELINE COMMANDS =====
                         
                         # Check for manual override during playback
@@ -1910,7 +1968,7 @@ class PumpkinFace:
                                                        "pause", "resume", "stop", "timeline_status", 
                                                        "recording_status", "list_recordings", "list"] or \
                                              data.startswith(("record_stop", "record stop", "play ", "seek ", 
-                                                             "delete_recording ", "rename_recording "))
+                                                             "delete_recording ", "rename_recording ", "upload_timeline "))
                         
                         if not is_timeline_command and self.timeline_playback.state.value == "playing":
                             self.timeline_playback.pause()
