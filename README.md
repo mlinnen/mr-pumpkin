@@ -154,6 +154,83 @@ $stream.Write($bytes, 0, $bytes.Length)
 $stream.Close()
 ```
 
+
+### WebSocket Interface (Browser Clients)
+
+The pumpkin face server also provides a WebSocket interface on **port 5001** for browser-based control panels and real-time communication.
+
+**Via JavaScript:**
+```javascript
+const ws = new WebSocket('ws://localhost:5001');
+
+ws.onopen = () => {
+  ws.send('happy');
+  ws.send('blink');
+  ws.send('timeline_status');
+};
+
+ws.onmessage = (event) => {
+  console.log('Response:', event.data);
+};
+
+ws.onerror = (error) => {
+  console.error('WebSocket error:', error);
+};
+```
+
+**WebSocket protocol:**
+- Each command is sent as a plain text message (same format as TCP)
+- Responses are sent back immediately as text messages
+- Empty responses (for animations) are not sent
+- Connection can be reused for multiple commands
+- Server handles concurrent WebSocket clients simultaneously
+
+**Simple HTML test client:**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mr. Pumpkin WebSocket Client</title>
+</head>
+<body>
+  <h1>Mr. Pumpkin Control</h1>
+  <input type="text" id="command" placeholder="Enter command">
+  <button onclick="send()">Send</button>
+  <div id="response"></div>
+  
+  <script>
+    const ws = new WebSocket('ws://localhost:5001');
+    const responseDiv = document.getElementById('response');
+    
+    function send() {
+      const cmd = document.getElementById('command').value;
+      if (cmd) {
+        ws.send(cmd);
+      }
+    }
+    
+    ws.onmessage = (event) => {
+      responseDiv.innerHTML = '<p>' + event.data + '</p>';
+    };
+  </script>
+</body>
+</html>
+```
+
+**Port allocation:**
+- **TCP (port 5000):** Text-based commands, command-line clients, legacy support
+- **WebSocket (port 5001):** Browser clients, real-time dashboards, concurrent connections
+
+Both protocols support the same commands and are always available when the server runs.
+
+**Full-featured test client:**
+For comprehensive testing and debugging, open `websocket-test-client.html` in your browser. This client includes:
+- Connection status monitoring with automatic fallback
+- Quick test buttons for common commands
+- Timeline upload testing (multi-line JSON)
+- Full event logging with timestamps
+- Error handling and diagnostics
+
 ## Supported Commands
 
 ### Expressions
@@ -314,7 +391,7 @@ Run the test suite to validate projection mapping and other features:
 # Install development dependencies (if not already installed)
 pip install -r requirements-dev.txt
 
-# Run all tests
+# Run all tests (430+ tests)
 pytest
 
 # Run specific test file
@@ -334,6 +411,68 @@ The test suite validates:
 - All expression states render correctly
 - Resolution independence
 - Transition behavior
+
+### Integration Tests
+
+The project includes comprehensive integration tests for dual-protocol operation (TCP + WebSocket):
+
+```bash
+# Run integration tests only
+pytest tests/test_integration_dual_protocol.py -v
+
+# Run TCP integration tests
+pytest tests/test_tcp_integration.py -v
+```
+
+**Dual-Protocol Integration Tests** (`test_integration_dual_protocol.py`) validate:
+
+1. **Identical Responses** (5 tests)
+   - Both TCP and WebSocket return identical responses for the same commands
+   - Status queries (timeline_status, recording_status) return consistent JSON
+   - List operations return matching results
+
+2. **Protocol Switching** (3 tests)
+   - Commands work when alternating between TCP and WebSocket
+   - No state corruption when switching protocols mid-session
+   - 10+ command sequences alternating protocols
+
+3. **Concurrent Commands** (2 tests)
+   - Multiple concurrent commands from both protocols execute correctly
+   - Concurrent status queries from both protocols
+
+4. **Error Handling Consistency** (3 tests)
+   - Invalid commands return errors on both protocols
+   - Malformed commands handled gracefully
+   - Nonexistent file errors consistent across protocols
+
+5. **Timeline Upload/Download** (3 tests)
+   - Upload timeline via TCP, verify via WebSocket
+   - Upload timeline via WebSocket, verify via TCP
+   - Download same timeline via both protocols yields identical results
+
+6. **State Synchronization** (3 tests)
+   - Recording state visible from both protocols
+   - Playback state visible from both protocols
+   - Expression changes propagate across protocols
+
+7. **Connection Resilience** (2 tests)
+   - TCP disconnect doesn't affect WebSocket
+   - WebSocket disconnect doesn't affect TCP
+
+8. **Large Payloads** (2 tests)
+   - Large timelines (>100KB JSON, 200+ commands) work on both protocols
+
+9. **Stress Testing** (1 test)
+   - 50 rapid commands alternating TCP/WebSocket
+
+10. **Playback Integration** (2 tests)
+    - Start playback on one protocol, control via the other
+    - Cross-protocol pause/resume/stop
+
+11. **Clean Shutdown** (1 test)
+    - Graceful disconnect on both protocols without orphaned resources
+
+**Total:** 27 integration tests covering all critical dual-protocol scenarios.
 
 ## License
 

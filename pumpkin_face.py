@@ -5,10 +5,17 @@ import threading
 import sys
 import time
 import json
+import asyncio
 from enum import Enum
 from typing import Tuple
 from timeline import Playback, RecordingSession, FileManager
 from command_handler import CommandRouter
+
+try:
+    import websockets
+except ImportError:
+    websockets = None
+
 
 class Expression(Enum):
     NEUTRAL = "neutral"
@@ -1223,11 +1230,18 @@ class PumpkinFace:
     def run(self):
         pygame.init()
         
-        # Start network server FIRST (before display initialization)
-        # This ensures socket server is ready even if display fails
+        # Start network servers FIRST (before display initialization)
+        # This ensures socket servers are ready even if display fails
         server_thread = threading.Thread(target=self._run_socket_server, daemon=True)
         server_thread.start()
         print("Socket server listening on port 5000")
+        
+        if websockets is not None:
+            ws_thread = threading.Thread(target=self._run_ws_server, daemon=True)
+            ws_thread.start()
+            print("WebSocket server listening on port 5001")
+        else:
+            print("Warning: websockets library not available (WebSocket server disabled)")
         
         # Try to create display, but continue if it fails (headless mode)
         screen = None
@@ -1441,6 +1455,37 @@ class PumpkinFace:
                     print(f"Connection error: {e}")
         finally:
             server_socket.close()
+    
+    def _run_ws_server(self):
+        """Start WebSocket server in asyncio event loop (runs in separate thread)."""
+        try:
+            asyncio.run(self._ws_server_main())
+        except Exception as e:
+            print(f"WebSocket server error: {e}")
+    
+    async def _ws_server_main(self):
+        """Main WebSocket server coroutine."""
+        try:
+            async with websockets.serve(self._ws_handler, 'localhost', 5001):
+                await asyncio.Future()  # Run forever
+        except Exception as e:
+            print(f"Failed to start WebSocket server: {e}")
+    
+    async def _ws_handler(self, websocket, path=None):
+        """Handle WebSocket client connections."""
+        try:
+            async for message in websocket:
+                try:
+                    response = self.command_router.execute(message)
+                    if response:  # Only send response if non-empty
+                        await websocket.send(response)
+                except Exception as e:
+                    error_response = f"ERROR {e}"
+                    await websocket.send(error_response)
+        except websockets.exceptions.ConnectionClosed:
+            pass  # Client disconnected
+        except Exception as e:
+            print(f"WebSocket handler error: {e}")
 
 if __name__ == "__main__":
     monitor = 0
