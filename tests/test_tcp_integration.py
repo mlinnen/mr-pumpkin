@@ -887,6 +887,7 @@ class TestCommandIntegration:
         for expr in expressions:
             tcp_send(expr)
             time.sleep(0.1)
+        time.sleep(0.1)  # Ensure last command is processed before stop
         tcp_send("record_stop test_expressions")
         
         # Verify recording contains all expressions
@@ -901,6 +902,7 @@ class TestCommandIntegration:
         for anim in animations:
             tcp_send(anim)
             time.sleep(0.2)
+        time.sleep(0.1)  # Ensure last command is processed before stop
         tcp_send("record_stop test_animations")
         
         content = verify_file_content(recordings_dir, "test_animations")
@@ -915,6 +917,7 @@ class TestCommandIntegration:
         time.sleep(0.1)
         tcp_send("gaze -90 0 90 45")
         time.sleep(0.1)
+        time.sleep(0.1)  # Ensure last command is processed before stop
         tcp_send("record_stop test_gaze")
         
         content = verify_file_content(recordings_dir, "test_gaze")
@@ -928,6 +931,7 @@ class TestCommandIntegration:
         for cmd in commands:
             tcp_send(cmd)
             time.sleep(0.1)
+        time.sleep(0.1)  # Ensure last command is processed before stop
         tcp_send("record_stop test_eyebrows")
         
         content = verify_file_content(recordings_dir, "test_eyebrows")
