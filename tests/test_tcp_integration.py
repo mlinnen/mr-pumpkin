@@ -237,6 +237,7 @@ class TestRecordingWorkflow:
         time.sleep(0.2)
         
         # Stop recording with explicit filename
+        time.sleep(1.0)  # Ensure last command is processed before stop
         response = tcp_send("record_stop test_simple")
         assert "OK" in response or "saved" in response.lower()
         
@@ -269,6 +270,7 @@ class TestRecordingWorkflow:
         time.sleep(0.1)
         
         # Stop without filename
+        time.sleep(1.0)  # Ensure last command is processed before stop
         response = tcp_send("record_stop")
         
         # Response should contain generated filename
@@ -299,6 +301,7 @@ class TestRecordingWorkflow:
         time.sleep(0.1)
         
         # Try to save with same filename
+        time.sleep(1.0)  # Ensure last command is processed before stop
         response = tcp_send("record_stop test_existing")
         assert "ERROR" in response or "already exists" in response.lower()
         
@@ -307,6 +310,7 @@ class TestRecordingWorkflow:
     
     def test_record_stop_without_active_recording_errors(self, pumpkin_server):
         """Stopping recording when not recording should error."""
+        time.sleep(1.0)  # Ensure last command is processed before stop
         response = tcp_send("record_stop test_invalid")
         assert "ERROR" in response or "no active recording" in response.lower()
     
@@ -321,6 +325,7 @@ class TestRecordingWorkflow:
         time.sleep(0.3)  # 300ms
         tcp_send("sad")
         
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_timestamps")
         
         # Load file and check timestamps
@@ -363,6 +368,7 @@ class TestBasicPlayback:
         time.sleep(0.2)
         tcp_send("happy")
         time.sleep(0.2)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_playback_simple")
         
         # Play back
@@ -385,6 +391,7 @@ class TestBasicPlayback:
         time.sleep(0.3)
         tcp_send("sad")
         time.sleep(0.3)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_state_transitions")
         
         # Initial state: STOPPED
@@ -416,6 +423,7 @@ class TestBasicPlayback:
         tcp_send("happy")
         time.sleep(0.3)
         tcp_send("sad")
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_timing")
         
         # Verify file has correct timing
@@ -444,6 +452,7 @@ class TestPlaybackControl:
         time.sleep(0.5)
         tcp_send("happy")
         time.sleep(0.5)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_control")
         
         # Play
@@ -500,6 +509,7 @@ class TestPlaybackControl:
         for i in range(5):
             tcp_send("neutral")
             time.sleep(0.4)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_seek")
         
         # Start playback
@@ -522,6 +532,7 @@ class TestPlaybackControl:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.5)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_seek_clamp")
         
         # Load timeline
@@ -542,6 +553,7 @@ class TestPlaybackControl:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.5)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_seek_zero")
         
         tcp_send("play test_seek_zero")
@@ -565,11 +577,13 @@ class TestFileManagement:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_file1")
         
         tcp_send("record_start")
         tcp_send("happy")
         time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_file2")
         
         # List recordings
@@ -610,6 +624,7 @@ class TestFileManagement:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_delete")
         
         assert verify_file_exists(recordings_dir, "test_delete")
@@ -632,6 +647,7 @@ class TestFileManagement:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_old_name")
         
         assert verify_file_exists(recordings_dir, "test_old_name")
@@ -653,11 +669,13 @@ class TestFileManagement:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_rename1")
         
         tcp_send("record_start")
         tcp_send("happy")
         time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_rename2")
         
         # Try to rename first to second's name
@@ -685,6 +703,7 @@ class TestStatusQueries:
         time.sleep(0.3)
         tcp_send("happy")
         time.sleep(0.3)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_status_playing")
         
         # Start playback
@@ -710,6 +729,7 @@ class TestStatusQueries:
         time.sleep(0.3)
         tcp_send("happy")
         time.sleep(0.3)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_status_paused")
         
         tcp_send("play test_status_paused")
@@ -760,6 +780,7 @@ class TestManualOverride:
         for i in range(10):
             tcp_send("neutral")
             time.sleep(0.2)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_manual_override")
         
         # Start playback
@@ -782,6 +803,7 @@ class TestManualOverride:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.2)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_playback_session")
         
         # Play it back and send manual override
@@ -794,6 +816,7 @@ class TestManualOverride:
         tcp_send("record_start")
         tcp_send("sad")
         time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_new_recording")
         
         # Verify new recording only has "sad", not "happy"
@@ -822,7 +845,7 @@ class TestEdgeCases:
         tcp_send("record_start")
         # Don't send any commands
         time.sleep(0.1)
-        
+        time.sleep(1.0)  # Ensure last command is processed before stop
         response = tcp_send("record_stop test_empty")
         assert "ERROR" in response or "empty" in response.lower()
         
@@ -858,6 +881,7 @@ class TestEdgeCases:
         tcp_send("record_start")
         tcp_send("neutral")
         time.sleep(0.5)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_rapid")
         
         # Rapid state changes
@@ -887,7 +911,7 @@ class TestCommandIntegration:
         for expr in expressions:
             tcp_send(expr)
             time.sleep(0.1)
-        time.sleep(0.1)  # Ensure last command is processed before stop
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_expressions")
         
         # Verify recording contains all expressions
@@ -902,7 +926,7 @@ class TestCommandIntegration:
         for anim in animations:
             tcp_send(anim)
             time.sleep(0.2)
-        time.sleep(0.1)  # Ensure last command is processed before stop
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_animations")
         
         content = verify_file_content(recordings_dir, "test_animations")
@@ -917,7 +941,7 @@ class TestCommandIntegration:
         time.sleep(0.1)
         tcp_send("gaze -90 0 90 45")
         time.sleep(0.1)
-        time.sleep(0.1)  # Ensure last command is processed before stop
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_gaze")
         
         content = verify_file_content(recordings_dir, "test_gaze")
@@ -931,7 +955,7 @@ class TestCommandIntegration:
         for cmd in commands:
             tcp_send(cmd)
             time.sleep(0.1)
-        time.sleep(0.1)  # Ensure last command is processed before stop
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_eyebrows")
         
         content = verify_file_content(recordings_dir, "test_eyebrows")
@@ -945,6 +969,7 @@ class TestCommandIntegration:
         for cmd in commands:
             tcp_send(cmd)
             time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_head_movement")
         
         content = verify_file_content(recordings_dir, "test_head_movement")
@@ -958,6 +983,7 @@ class TestCommandIntegration:
         for cmd in commands:
             tcp_send(cmd)
             time.sleep(0.2)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_nose")
         
         content = verify_file_content(recordings_dir, "test_nose")
@@ -972,6 +998,7 @@ class TestCommandIntegration:
         for cmd in sequence:
             tcp_send(cmd)
             time.sleep(0.1)
+        time.sleep(1.0)  # Ensure last command is processed before stop
         tcp_send("record_stop test_order")
         
         # Verify order in file
