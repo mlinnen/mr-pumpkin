@@ -199,6 +199,57 @@ $stream.Close()
 - `wiggle_nose` - Animate nose wiggle
 - `reset_nose` - Stop nose animation and return to neutral
 
+## Recording Storage
+
+### Recording File Format
+
+Recordings are stored as JSON files in the user's home directory. Each recording contains:
+
+**File location:** `~/.mr-pumpkin/recordings/{filename}.json`
+
+**File structure:**
+```json
+{
+  "version": "1.0",
+  "duration_ms": 5230,
+  "commands": [
+    {
+      "time_ms": 0,
+      "command": "happy"
+    },
+    {
+      "time_ms": 500,
+      "command": "blink"
+    },
+    {
+      "time_ms": 2000,
+      "command": "roll_clockwise"
+    }
+  ]
+}
+```
+
+**Field descriptions:**
+- `version` - Format version for future compatibility (currently "1.0")
+- `duration_ms` - Total duration of the recording in milliseconds
+- `commands` - Array of commands, each with:
+  - `time_ms` - Timestamp in milliseconds from the start of the recording
+  - `command` - The pumpkin command to execute at this time (e.g., "happy", "blink", "gaze")
+  - `args` (optional) - Additional command arguments for commands that need them (e.g., gaze angles)
+
+### Recording Directory
+
+All recordings are stored in `~/.mr-pumpkin/recordings/`. The directory is created automatically when you save your first recording.
+
+- **On Windows:** `C:\Users\{username}\.mr-pumpkin\recordings\`
+- **On macOS/Linux:** `/Users/{username}/.mr-pumpkin/recordings/` or `~/.mr-pumpkin/recordings/`
+
+You can browse recordings in this directory to:
+- Back up important sequences
+- Edit timeline files directly (JSON format is human-readable)
+- Share recordings with others
+- Delete old recordings manually if desired
+
 ## Keyboard Controls
 
 While the application is running:
