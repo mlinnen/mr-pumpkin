@@ -117,6 +117,7 @@ This provides an interactive menu with commands for:
   - `record cancel` - Discard recording
   - `record status` - Check recording state
   - `list` - View all recordings
+  - `download_timeline <filename>` - Download a recording file as JSON
   - `play <filename>` - Play a recording
   - `upload_timeline <filename> <json_file>` - Upload a recording file from disk
   - `pause` / `resume` / `stop` - Control playback
@@ -173,6 +174,7 @@ $stream.Close()
 - `delete_recording <filename>` - Remove a saved recording
 - `rename_recording <old_name> <new_name>` - Rename a saved recording
 - `upload_timeline <filename> <json_file>` - Upload a recording file from disk (filename: name to store as, json_file: local path to JSON file)
+- `download_timeline <filename>` - Download a recording file as JSON string (filename: name of recording to download)
 - `play <filename>` - Start playing a recorded timeline
 - `pause` - Pause current playback
 - `resume` - Resume from paused state
