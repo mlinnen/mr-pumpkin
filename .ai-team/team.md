@@ -5,7 +5,7 @@
 **Project:** Animated 2D Graphics Pumpkin Face  
 **Language/Stack:** Python with 2D graphics & animation  
 **What it does:** Animated pumpkin face that switches expressions based on commands  
-**Owner:** Mike Linnen (mike@protosystem.net)  
+**Owner:** Mike Linnen  
 **Created:** 2026-02-16  
 
 ## Team Roster
