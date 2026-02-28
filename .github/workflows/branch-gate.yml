@@ -1,0 +1,20 @@
+name: Branch Gate
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify source branch
+        run: |
+          SRC_BRANCH=${{ github.head_ref }}
+          if [[ $SRC_BRANCH == release/* ]]; then
+            echo "Valid source branch: $SRC_BRANCH"
+            exit 0
+          else
+            echo "Error: Only 'release/*' branches can target 'main'. You tried: $SRC_BRANCH"
+            exit 1
+          fi
