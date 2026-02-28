@@ -1964,3 +1964,665 @@ This protocol design:
 - 2026-02-21: Gaze Control API Mismatch — Test vs Implementation
 - 2026-02-21: Rolling Eyes Gaze Integration Fix
 - 2026-02-21: Rolling Eyes Gaze Sequencing Fix
+
+---
+
+
+---
+
+
+---
+
+### 2026-02-27: Issue triage — Round 1
+**By:** Jinx
+**What:** Triaged issues #43, #39, #33, #20 and set routing/priority
+**Why:** Ralph activated for continuous backlog management
+
+---
+
+## Issue #43: Convert to websockets instead of straight sockets
+- **Route to:** Vi (Backend Dev)
+- **Priority:** P1 (should have)
+- **Type:** Backend / Infrastructure
+- **Blocker?** No — straightforward protocol upgrade
+- **Dependencies:** None
+- **Next step:** Vi to evaluate websocket library options (websockets, aiohttp) and propose minimal migration path. Current TCP socket server works fine; this is about enabling browser-based UIs.
+- **Complexity estimate:** 6-8 hours (library integration, protocol adaptation, backward compatibility testing)
+- **Notes:** Enables future web-based control panels. Consider maintaining TCP socket backward compatibility or documenting breaking change. Vi should evaluate whether to run both protocols simultaneously or phase out TCP.
+
+---
+
+## Issue #39: Create a mr-pumpkin skill for LLM-driven recording generation
+- **Route to:** Vi (Backend Dev) + Mylo (Tester)
+- **Priority:** P2 (nice to have)
+- **Type:** Feature / Integration / DevOps
+- **Blocker?** No — but requires architectural review first
+- **Dependencies:** None, but synergizes with #44 (upload timeline) which is complete
+- **Next step:** Jinx to define skill interface contract (input: natural language prompt, output: valid timeline JSON). Then Vi builds skill script that generates timeline JSON from LLM response, Mylo validates against existing timeline schema.
+- **Complexity estimate:** 12-16 hours (LLM integration, prompt engineering, JSON schema generation, validation)
+- **Notes:** This is a **tooling/automation feature**, not a core pumpkin_face.py feature. Deliverable is a CLI script (e.g., `scripts/generate_recording.py --prompt "happy dance"`) that writes JSON files compatible with `upload_timeline` command. Requires:
+  1. LLM API integration (OpenAI/Anthropic/local model)
+  2. Prompt template that teaches LLM the timeline JSON schema
+  3. Validation against existing recording schema (version 1.0)
+  4. Upload capability via existing socket command
+- **Architectural decision needed:** Which LLM provider? Local vs. cloud? How to handle API keys? Mike's preference required.
+
+---
+
+## Issue #33: Automatic updates
+- **Route to:** Vi (Backend Dev)
+- **Priority:** P1 (should have)
+- **Type:** DevOps / Infrastructure
+- **Blocker?** Yes — architectural decision required on update strategy
+- **Dependencies:** None
+- **Next step:** Jinx to decide: (1) External script that polls GitHub API and manages process lifecycle, OR (2) Built-in update mechanism in pumpkin_face.py. Then Vi implements chosen approach.
+- **Complexity estimate:** 16-20 hours (GitHub API integration, version comparison, download/extraction, process management, cross-platform compatibility, rollback strategy)
+- **Notes:** This is critical for deployment stability but has architectural implications:
+  - **External script approach:** Separate updater.py that runs independently (cron/Task Scheduler), polls GitHub Releases API, downloads ZIP, stops pumpkin_face.py via PID, extracts new version, restarts. Pros: clean separation, no runtime overhead. Cons: extra process to manage.
+  - **Built-in approach:** pumpkin_face.py checks for updates on startup or periodic interval, downloads in background, restarts itself. Pros: single binary. Cons: complicates core application, cross-platform process replacement is tricky.
+  - **Recommendation:** External script for cleaner separation of concerns. Vi to implement Python script that uses GitHub API, handles version comparison (parse VERSION file from release), manages download/extract/restart lifecycle, logs to ~/.mr-pumpkin/update.log.
+  - **Platform concerns:** Windows (taskkill + Task Scheduler), Linux/macOS (kill + cron), Raspberry Pi (systemd service restart). Cross-platform process management is non-trivial.
+  - **Rollback:** Backup current installation before extraction, restore on failure.
+
+---
+
+## Issue #20: Lip-Syncing
+- **Route to:** Ekko (Graphics Dev) + Vi (Backend Dev)
+- **Priority:** P2 (nice to have)
+- **Type:** Feature / Graphics / Backend
+- **Blocker?** Yes — major architectural review required
+- **Dependencies:** None, but may require external audio analysis library (aubio, librosa, phoneme recognition)
+- **Next step:** Jinx to architect lip-sync system: (1) Audio input mechanism, (2) Phoneme/viseme mapping, (3) Mouth shape vocabulary, (4) Real-time vs. pre-computed approach. Then Ekko designs mouth shapes, Vi implements audio analysis pipeline.
+- **Complexity estimate:** 40-60 hours (audio analysis, phoneme detection, mouth shape design, timing synchronization, projection-safe rendering)
+- **Notes:** This is a **major feature** with significant scope:
+  - **Audio input:** Real-time microphone vs. pre-recorded file? Socket command to start/stop lip-sync mode?
+  - **Phoneme detection:** Audio analysis to detect vowel/consonant shapes (A, E, I, O, U, M, B, F, V, etc.). Requires phoneme recognition library or pre-computed viseme timing.
+  - **Mouth shapes:** Current mouth is expression-based (happy curve, sad frown, etc.). Lip-sync requires 8-12 distinct mouth shapes (visemes) for phonemes. Ekko must design projection-safe white outlines for each.
+  - **Synchronization:** Frame-accurate timing between audio playback and mouth shape changes. 60fps rendering means 16ms windows.
+  - **Projection constraints:** All mouth shapes must be pure white outlines on black background (no fills, no anti-aliasing).
+  - **Integration:** New animation mode orthogonal to expressions (like blink/wink). Lip-sync overrides expression mouth, preserves expression eyes/eyebrows.
+  - **Recording compatibility:** Should lip-sync timings be recordable in timeline JSON? Requires schema extension.
+- **Recommendation:** This is a P2 feature because it's complex, requires external dependencies (audio analysis), and significantly expands the rendering pipeline. Should be tackled after P0/P1 features are stable. Consider phased approach: (1) Manual viseme control via socket commands first (no audio analysis), (2) Pre-computed viseme timing from file, (3) Real-time audio analysis last.
+
+---
+
+## Summary
+
+**Routing breakdown:**
+- Vi (Backend Dev): #43, #39 (with Mylo), #33, #20 (with Ekko)
+- Ekko (Graphics Dev): #20 (with Vi)
+- Mylo (Tester): #39 (with Vi)
+- Jinx (Lead): Architectural decisions for #39, #33, #20 before team starts work
+
+**Priority distribution:**
+- P0 (blocking release): None
+- P1 (should have): #43 (websockets), #33 (auto-updates)
+- P2 (nice to have): #39 (LLM skill), #20 (lip-sync)
+
+**Blockers:**
+- #39: Needs LLM provider decision from Mike
+- #33: Needs update strategy decision (external vs. built-in)
+- #20: Needs full architectural design (audio input, phoneme mapping, mouth shape vocabulary)
+
+**Recommended execution order:**
+1. #43 (websockets) — clean backend work, enables browser UIs
+2. #33 (auto-updates) — after architectural decision, critical for deployment
+3. #39 (LLM skill) — after Mike clarifies LLM provider preference
+4. #20 (lip-sync) — last, most complex, requires phased approach
+
+**Next actions for Jinx:**
+- Schedule architectural design session for #33 (update strategy)
+- Schedule architectural design session for #20 (lip-sync system)
+- Clarify with Mike: LLM provider preference for #39 (OpenAI? Anthropic? Local model?)
+- Unblock Vi to start #43 immediately (no architectural decisions needed)
+
+---
+
+# Recording File Upload Implementation
+
+**Date:** 2026-02-25  
+**Decision Owner:** Vi (Backend Dev)  
+**Issue:** #44 - Allow users to upload recording files with validation
+
+## What
+
+Implemented `upload_timeline` socket command that allows clients to upload JSON recording files to the server with full validation.
+
+## Why
+
+Users need a way to programmatically upload pre-recorded or externally-generated timeline files. The implementation leverages the existing `FileManager` validation infrastructure to ensure only valid timeline files are accepted.
+
+## Design Decisions
+
+### 1. Multi-line JSON Protocol (READY/END_UPLOAD Handshake)
+
+**Decision:** Use explicit READY and END_UPLOAD markers rather than expecting JSON on a single line.
+
+**Rationale:**
+- Timeline JSON files can be multi-line for readability
+- Socket protocol is line-based, but JSON may contain newlines
+- Handshake approach is explicit and prevents accidental data truncation
+- Easy for clients to implement: read READY, send JSON, send END_UPLOAD marker
+
+**Pattern:**
+```
+Client: upload_timeline <filename>
+Server: READY
+Client: <json content (multiple lines)>
+Client: END_UPLOAD
+Server: OK Uploaded <filename>.json
+```
+
+### 2. Leverage Existing FileManager Validation
+
+**Decision:** Use `FileManager.upload_timeline()` which already validates JSON structure.
+
+**Rationale:**
+- DRY principle - validation logic already exists and is tested
+- Consistent error messages across all upload paths
+- Simplifies socket handler to focus on protocol, not validation logic
+- FileManager already handles file system operations and collision detection
+
+### 3. Add FileManager to PumpkinFace Initialization
+
+**Decision:** Create `self.file_manager = FileManager()` in `__init__`.
+
+**Rationale:**
+- Consistent with existing patterns (timeline_playback, recording_session)
+- Single instance reused across all socket commands
+- Centralized file management state (if needed for future features)
+
+### 4. Include upload_timeline in Timeline Commands List
+
+**Decision:** Add "upload_timeline" to the list of commands that don't pause playback.
+
+**Rationale:**
+- Uploading a file is a file management operation, not an expression/animation command
+- User might want to prepare a recording while playback is active
+- Consistent with other timeline management commands (list, rename, delete)
+
+## Implementation Details
+
+### Error Handling
+
+All errors return explicit messages to help clients debug:
+- Missing filename: `ERROR Missing filename`
+- Path traversal attempt: `ERROR Invalid filename: path separators not allowed`
+- File collision: `ERROR File already exists: <filename>`
+- Invalid JSON: `ERROR Invalid timeline: <error details>`
+- Connection loss: `ERROR Connection lost while reading JSON`
+
+### Client-Side Implementation
+
+Added `upload_timeline(filename, json_file_path)` to client_example.py:
+1. Validates local file exists
+2. Reads file contents
+3. Connects to server
+4. Sends command, waits for READY
+5. Transmits JSON content
+6. Sends END_UPLOAD marker
+7. Displays server response
+
+### Security Considerations
+
+- Path separator validation prevents directory traversal (e.g., `../../etc/passwd`)
+- No shell commands or file operations beyond .json reading
+- FileManager ensures only valid timeline structure is saved
+- File permissions handled by OS filesystem
+
+## Testing
+
+- All 362 existing tests pass (no regressions)
+- Protocol validated with client_example.py example
+- Error paths covered (invalid JSON, file exists, missing args)
+- Integration with existing recording/playback/file management infrastructure verified
+
+## Future Extensions
+
+- Support for gzip compression (large timeline files)
+- Batch upload (multiple files in one connection)
+- Streaming large files (don't read entire file into memory)
+- Download/export timeline with validation
+
+
+### 2026-02-25: Issue #43 analysis — WebSocket upgrade proposal
+**By:** Vi
+**What:** Analyzed TCP socket implementation and proposed WebSocket migration strategy
+**Why:** P1 feature enabling browser-based UIs
+
+## Current State Assessment
+
+### Socket Code Footprint
+**Location:** `pumpkin_face.py` lines 1352-2035 (~680 lines)
+**Core server:** Lines 1352-1357 (server setup), 1360-2031 (client handler loop), 2035 (cleanup)
+**Protocol characteristics:**
+- Single-threaded blocking server (`socket.socket`, `bind`, `listen(1)`)
+- Runs in daemon thread (spawned at line 1224)
+- Port: 5000 (localhost only)
+- Connection: One client at a time (`listen(1)`)
+- Protocol: Text-based, newline-delimited (`\n` terminated)
+- Encoding: UTF-8
+
+### Command Protocol Format
+**Request structure:** Simple string commands, case-insensitive (`.lower()` at line 1366)
+- **Simple commands:** `"blink"`, `"happy"`, `"pause"`, etc.
+- **Parameterized commands:** `"gaze 45 -30"`, `"seek 1500"`, `"play recording1"`
+- **Multi-line upload:** Special handshake protocol for `upload_timeline`:
+  1. Client sends `"upload_timeline <filename>"`
+  2. Server responds `"READY\n"`
+  3. Client sends JSON content (multiple 4096-byte chunks)
+  4. Client sends `"END_UPLOAD"` marker
+  5. Server responds `"OK Uploaded <filename>.json\n"` or error
+
+**Response structure:** Text messages prefixed with status codes
+- **Success:** `"OK <message>\n"` (e.g., `"OK Expression changed to happy"`)
+- **Error:** `"ERROR <message>\n"` (e.g., `"ERROR Unknown expression: invalid"`)
+- **Data responses:** Raw JSON strings with `\n` terminator (for `recording_status`, `list_recordings`, `timeline_status`, `download_timeline`)
+- **Special responses:** `"READY\n"` for upload handshake
+
+### State Shared Between Socket Handler and Game Loop
+**Orthogonal state management pattern:** Socket handler directly modifies PumpkinFace instance state variables:
+- Expression state: `self.set_expression(expression)`
+- Animation triggers: `self.blink()`, `self.wink_left()`, `self.roll_clockwise()`
+- Gaze control: `self.set_gaze(x, y)` or `self.set_gaze_independent(x1, y1, x2, y2)`
+- Eyebrow positioning: `self.raise_eyebrows()`, `self.set_eyebrow(value)`
+- Projection offset: `self.jog_projection(dx, dy)`, `self.set_projection_offset(x, y)`
+- Nose animation: `self._start_nose_twitch()`, `self._start_nose_scrunch()`
+- Head movement: `self._move_head_to(x, y)`
+- Timeline playback: `self.timeline_playback.play(filename)`, `self.timeline_playback.pause()`
+- Recording session: `self.recording_session.start()`, `self.recording_session.stop(filename)`
+
+**No mutex/lock protection:** Game loop runs in main thread at 60 FPS, socket handler runs in daemon thread. State modifications are atomic method calls on shared PumpkinFace instance. Python's GIL provides thread safety for individual assignments, but no explicit locking used.
+
+**Threading model:**
+- Main thread: pygame event loop + rendering (`pumpkin.run()` at line 2062)
+- Daemon thread: TCP socket server (spawned at line 1224-1225)
+- Thread lifecycle: Socket thread terminates when `self.running = False` (main thread exit)
+
+### Command Handler Architecture
+**Pattern:** Giant if-elif chain (lines 1370-2029) — no routing table
+- 60+ command handlers in linear sequence
+- Each handler:
+  1. Parses command string (`data.split()` or `data.startswith()`)
+  2. Validates parameters (try-except blocks for ValueError/IndexError)
+  3. Calls PumpkinFace methods
+  4. Constructs response string
+  5. Sends via `client_socket.sendall((response + '\n').encode('utf-8'))`
+  6. Prints to console for logging
+  7. `continue` to next loop iteration
+
+**Command categories:**
+1. **Expressions** (7): neutral, happy, sad, angry, surprised, scared, sleeping
+2. **Animations** (10): blink, wink_left, wink_right, roll_clockwise, roll_counterclockwise, raise_eyebrows, etc.
+3. **Gaze control** (1): `gaze <x> <y>` or `gaze <x1> <y1> <x2> <y2>`
+4. **Nose control** (3): twitch_nose, scrunch_nose, reset_nose
+5. **Projection offset** (3): jog_offset, set_offset, projection_reset
+6. **Head movement** (3): move_head, reset_head, head_status
+7. **Timeline playback** (6): play, pause, resume, stop, seek, timeline_status
+8. **Recording** (5): record_start, record_stop, record_cancel, recording_status, list_recordings
+9. **File management** (4): delete_recording, rename_recording, upload_timeline, download_timeline
+
+**Reusability potential:** Command parsing logic is embedded in socket handler. No command registry or abstraction layer exists.
+
+---
+
+## Proposed Architecture
+
+### Recommendation: Dual-Protocol Support (TCP + WebSocket)
+
+**Rationale:**
+1. **Backward compatibility:** Existing Python/shell clients use raw TCP sockets (`client_example.py`, nc/netcat scripts)
+2. **Browser enablement:** WebSocket required for browser-based control panels (JavaScript WebSocket API)
+3. **Migration safety:** Run both protocols in parallel, deprecate TCP later if adoption justifies
+4. **Zero breaking changes:** Existing users unaffected
+
+### Recommended Library: `websockets` (asyncio-based)
+
+**Why `websockets`:**
+- **Minimal dependencies:** Pure Python, no C extensions (important for Raspberry Pi compatibility)
+- **Async native:** Integrates cleanly with modern Python patterns
+- **Production-ready:** Battle-tested, used by major projects
+- **Lightweight:** ~150 KB installed size vs. FastAPI's 5+ MB
+- **Protocol focus:** WebSocket-only (no HTTP bloat like aiohttp/FastAPI)
+
+**Why NOT alternatives:**
+- **FastAPI:** Overkill — adds HTTP routing, dependency injection, OpenAPI docs we don't need. Dependencies include pydantic, starlette, uvicorn (heavy install).
+- **aiohttp:** Adds full HTTP client/server framework. We only need WebSocket, not web server.
+- **socket + handshake:** Reinventing the wheel. RFC 6455 WebSocket handshake is complex (HTTP upgrade, SHA-1 hashing, base64 encoding).
+
+### Architecture: Command Abstraction Layer
+
+**New module:** `command_handler.py`
+```python
+class CommandRouter:
+    def __init__(self, pumpkin_face):
+        self.pumpkin = pumpkin_face
+        self.handlers = self._register_handlers()
+    
+    def execute(self, command_str: str) -> str:
+        """Parse and execute command, return response string."""
+        # Extract existing if-elif logic from socket handler
+        # Return "OK ..." or "ERROR ..." strings
+        pass
+    
+    def _register_handlers(self) -> dict:
+        """Map command prefixes to handler functions."""
+        # Future: convert to routing table
+        pass
+```
+
+**Benefits:**
+1. **Protocol agnostic:** Both TCP and WebSocket call `router.execute(command_str)`
+2. **Testable in isolation:** Unit test commands without socket/websocket setup
+3. **Single source of truth:** Command parsing logic lives in one place
+4. **Incremental refactoring:** Start by extracting current if-elif chain, refactor to routing table later
+
+### Dual Server Architecture
+
+**Pattern:** Run two servers in separate threads
+```python
+# In PumpkinFace.__init__()
+self.command_router = CommandRouter(self)
+
+# In run() method
+tcp_thread = threading.Thread(target=self._run_tcp_server, daemon=True)
+ws_thread = threading.Thread(target=self._run_ws_server, daemon=True)
+tcp_thread.start()
+ws_thread.start()
+```
+
+**TCP Server (unchanged):**
+```python
+def _run_tcp_server(self):
+    # Existing implementation (lines 1352-2035)
+    # Replace command handling with: response = self.command_router.execute(data)
+    pass
+```
+
+**WebSocket Server (new):**
+```python
+import asyncio
+import websockets
+
+def _run_ws_server(self):
+    """Run WebSocket server in asyncio event loop (separate thread)."""
+    asyncio.run(self._ws_server_main())
+
+async def _ws_server_main(self):
+    async with websockets.serve(self._ws_handler, 'localhost', 5001):
+        await asyncio.Future()  # Run forever
+
+async def _ws_handler(self, websocket):
+    """Handle WebSocket client connection."""
+    async for message in websocket:
+        response = self.command_router.execute(message)
+        await websocket.send(response)
+```
+
+**Port allocation:**
+- TCP: Port 5000 (unchanged, backward compatible)
+- WebSocket: Port 5001 (new, browser clients)
+- Both on localhost only (security isolation)
+
+### Multi-line Protocol Adaptation (upload_timeline)
+
+**Challenge:** Current `upload_timeline` uses stateful handshake (READY/END_UPLOAD markers)
+**WebSocket solution:** Send JSON object in single message
+```javascript
+// Browser client:
+ws.send(JSON.stringify({
+    command: "upload_timeline",
+    filename: "test.json",
+    content: {...}  // Timeline JSON as nested object
+}));
+```
+
+**Backend handling:**
+```python
+# In command_router.execute():
+if command_str.startswith('{'):
+    # WebSocket JSON format
+    data = json.loads(command_str)
+    if data['command'] == 'upload_timeline':
+        return self._handle_upload_json(data['filename'], data['content'])
+else:
+    # TCP text format (existing)
+    if command_str.startswith('upload_timeline'):
+        return self._handle_upload_tcp(client_socket, filename)
+```
+
+**Backward compatibility preserved:** TCP clients continue using READY/END_UPLOAD, WebSocket clients use single JSON message.
+
+---
+
+## Implementation Plan
+
+### Milestone 1: Command Router Extraction (5-7 hours)
+**Goal:** Decouple command parsing from TCP socket handler
+
+**Tasks:**
+1. Create `command_handler.py` module
+2. Define `CommandRouter` class with `execute(command_str) -> response_str` method
+3. Extract existing if-elif chain from `_run_socket_server()` (lines 1370-2029)
+4. Update TCP handler to call `self.command_router.execute(data)`
+5. Verify all 362 existing tests still pass (no behavioral changes)
+
+**Files modified:** `pumpkin_face.py`, `command_handler.py` (new)
+**Lines of code:** ~700 lines moved to new module, ~20 lines TCP handler cleanup
+**Blocking dependencies:** None
+**Risk:** Medium — large code movement, potential for copy-paste errors
+
+### Milestone 2: WebSocket Server Setup (3-4 hours)
+**Goal:** Add WebSocket server running in parallel with TCP
+
+**Tasks:**
+1. Add `websockets>=11.0,<12.0` to `requirements.txt`
+2. Implement `_run_ws_server()` and `_ws_handler()` methods in `pumpkin_face.py`
+3. Spawn WebSocket thread in `run()` method (line ~1226)
+4. Test with browser JavaScript client (simple HTML test page)
+5. Verify both protocols work simultaneously
+
+**Files modified:** `pumpkin_face.py`, `requirements.txt`
+**Lines of code:** ~30 lines WebSocket server, ~10 lines thread spawn
+**Blocking dependencies:** Milestone 1 (command router must exist)
+**Risk:** Low — additive change, no modifications to existing TCP path
+
+### Milestone 3: JSON Protocol Adapter (2-3 hours)
+**Goal:** Support JSON-formatted commands for WebSocket clients
+
+**Tasks:**
+1. Add JSON detection to `CommandRouter.execute()` (check if `command_str.startswith('{')`)
+2. Implement JSON parsing: `{"command": "blink"}` → `"blink"`
+3. Implement JSON response formatting: `"OK Blink"` → `{"status": "ok", "message": "Blink"}`
+4. Add optional parameter: `execute(command_str, format='text')` where format can be 'text' or 'json'
+5. Update WebSocket handler to use `format='json'`
+
+**Files modified:** `command_handler.py`, `pumpkin_face.py` (WebSocket handler)
+**Lines of code:** ~50 lines JSON parsing/formatting
+**Blocking dependencies:** Milestone 2
+**Risk:** Low — TCP clients unaffected (still use text format)
+
+### Milestone 4: Multi-line Upload Refactor (4-5 hours)
+**Goal:** Support `upload_timeline` in both TCP (stateful) and WebSocket (stateless) modes
+
+**Tasks:**
+1. Extract TCP upload logic to `_handle_upload_tcp(client_socket, filename)` method
+2. Implement WebSocket upload handler: `_handle_upload_json(filename, content_dict)`
+3. Update `CommandRouter` to delegate based on protocol detection
+4. Test both paths: TCP with READY/END_UPLOAD, WebSocket with single JSON message
+5. Update `client_example.py` with WebSocket upload example
+
+**Files modified:** `command_handler.py`, `pumpkin_face.py`, `client_example.py`
+**Lines of code:** ~60 lines refactoring, ~40 lines WebSocket upload
+**Blocking dependencies:** Milestone 3
+**Risk:** Medium — stateful TCP protocol requires careful handling in abstraction layer
+
+### Milestone 5: Documentation & Testing (3-4 hours)
+**Goal:** Document WebSocket API and add integration tests
+
+**Tasks:**
+1. Update `README.md` with WebSocket section:
+   - Connection endpoint: `ws://localhost:5001`
+   - JSON command format examples
+   - Browser JavaScript client example
+   - Migration guide for TCP users
+2. Create `docs/websocket-api.md` with full protocol spec
+3. Create `tests/test_websocket_integration.py` — integration tests using `websockets` library
+4. Add browser client example: `client_example.html` (simple test page)
+5. Test on Raspberry Pi (verify `websockets` library installs cleanly)
+
+**Files modified:** `README.md`, `docs/websocket-api.md` (new), `tests/test_websocket_integration.py` (new), `client_example.html` (new)
+**Lines of code:** ~200 lines documentation, ~150 lines tests, ~80 lines HTML example
+**Blocking dependencies:** Milestone 4
+**Risk:** Low — documentation and testing only
+
+### Total Effort Estimate
+**Development time:** 17-23 hours (3-4 days of focused work)
+**Testing time:** 4-6 hours (included in milestone 5)
+**Total:** ~21-29 hours
+
+---
+
+## Risk Assessment
+
+### Technical Risks
+
+**1. Threading + asyncio interaction**
+- **Risk:** WebSocket server runs asyncio event loop in separate thread. Calling synchronous PumpkinFace methods from async handler may cause issues.
+- **Likelihood:** Medium
+- **Impact:** Medium (WebSocket functionality degraded)
+- **Mitigation:** 
+  - Use `asyncio.to_thread(self.command_router.execute, command)` for CPU-bound operations
+  - Test with high message volume (100+ commands/sec) to detect race conditions
+  - Monitor for deadlocks during integration testing
+
+**2. GIL contention with game loop**
+- **Risk:** Two socket servers + 60 FPS game loop all competing for GIL. Rendering frame rate may drop.
+- **Likelihood:** Low (command volume typically <10/sec)
+- **Impact:** High (visible animation stutter)
+- **Mitigation:**
+  - Profile with `cProfile` under load (10 concurrent WebSocket clients)
+  - If contention detected, batch commands and process in game loop instead of handler threads
+  - Worst case: make command handling async-only (requires refactoring game loop to asyncio — major change)
+
+**3. WebSocket library compatibility on Raspberry Pi**
+- **Risk:** `websockets` library may not install cleanly on older Pi models (32-bit ARM).
+- **Likelihood:** Low (pure Python library)
+- **Impact:** Medium (blocks Pi users from upgrading)
+- **Mitigation:**
+  - Test install on Pi 3B, 4, and 5 before release
+  - Add fallback to `requirements.txt`: if websockets fails, only TCP available (graceful degradation)
+  - Document manual install steps for edge cases
+
+**4. Command router abstraction leaks protocol details**
+- **Risk:** TCP's stateful `upload_timeline` handshake hard to abstract cleanly. Router may need socket handle passed in.
+- **Likelihood:** High (already identified in multi-line upload analysis)
+- **Impact:** Low (localized to one command)
+- **Mitigation:**
+  - Create separate handler methods: `_handle_upload_tcp(socket)` vs `_handle_upload_json(data)`
+  - Router delegates based on protocol detection, not one-size-fits-all abstraction
+  - Accept that some commands have protocol-specific implementations
+
+### Compatibility Risks
+
+**5. Breaking existing TCP clients**
+- **Risk:** Refactoring TCP handler introduces subtle behavior changes (response timing, error messages).
+- **Likelihood:** Low (careful extraction + comprehensive tests)
+- **Impact:** High (user scripts break)
+- **Mitigation:**
+  - Run full test suite after each milestone (362 tests)
+  - Test `client_example.py` and shell scripts (`echo "happy" | nc localhost 5000`) manually
+  - Add regression test: capture all TCP responses before/after refactor, diff outputs
+
+**6. Port conflicts**
+- **Risk:** Port 5001 already in use on user's machine (another service).
+- **Likelihood:** Low (5001 not commonly used)
+- **Impact:** Medium (WebSocket server fails to start)
+- **Mitigation:**
+  - Make WebSocket port configurable via environment variable: `WS_PORT=5002 python pumpkin_face.py`
+  - Graceful degradation: if WebSocket bind fails, log warning and continue with TCP-only mode
+  - Document port requirements in README
+
+**7. Browser CORS restrictions**
+- **Risk:** Browsers block WebSocket connections from `file://` HTML pages (CORS policy).
+- **Likelihood:** High (standard browser security)
+- **Impact:** Low (users need simple HTTP server)
+- **Mitigation:**
+  - Document workaround in README: `python -m http.server 8000` to serve HTML client
+  - Or: add minimal HTTP server for serving `client_example.html` (adds complexity)
+
+### Testing Risks
+
+**8. Parallel protocol testing complexity**
+- **Risk:** Tests need to verify both TCP and WebSocket paths for every command (doubles test surface area).
+- **Likelihood:** High
+- **Impact:** Medium (longer test development time)
+- **Mitigation:**
+  - Parameterize tests: `@pytest.mark.parametrize('protocol', ['tcp', 'websocket'])`
+  - Reuse command router tests (protocol-agnostic layer)
+  - Focus integration tests on critical commands (expressions, recording, playback)
+
+**9. Async test infrastructure**
+- **Risk:** Existing tests are synchronous (pytest). WebSocket tests require `pytest-asyncio` plugin.
+- **Likelihood:** High
+- **Impact:** Low (add dependency)
+- **Mitigation:**
+  - Add `pytest-asyncio>=0.21.0` to `requirements-dev.txt`
+  - Isolate async tests in separate file (`test_websocket_integration.py`)
+  - Use `@pytest.mark.asyncio` decorator for WebSocket-specific tests
+
+---
+
+## Collaboration Points
+
+### Ekko (Graphics Dev) Collaboration
+**Scope:** None required
+**Rationale:** WebSocket implementation is pure backend infrastructure. Graphics layer untouched.
+
+### Mylo (Tester) Collaboration
+**Required:**
+1. **Test strategy review** (Milestone 5) — Validate integration test coverage
+2. **Browser client testing** (Milestone 5) — Manual testing of `client_example.html` on different browsers
+3. **Raspberry Pi verification** (Milestone 5) — Test WebSocket install and functionality on Pi hardware
+
+**Artifacts to provide:**
+- Test plan for dual-protocol scenarios (concurrent TCP + WebSocket clients)
+- Browser compatibility matrix (Chrome, Firefox, Safari, Edge)
+- Pi installation report (Pi 3, Pi 4, Pi 5)
+
+### Jinx (Team Lead) Collaboration
+**Decision points:**
+1. **Port allocation approval** — Confirm port 5001 for WebSocket (or suggest alternative)
+2. **Dependency approval** — Add `websockets` library to production dependencies (affects release package size)
+3. **Migration timeline** — When (if ever) to deprecate TCP protocol
+4. **API format decision** — JSON-only for WebSocket, or support both text and JSON?
+
+---
+
+## Open Questions
+
+1. **WebSocket subprotocol:** Should we define custom subprotocol (`ws://localhost:5001/?protocol=pumpkin-v1`) for versioning?
+2. **Authentication:** Both TCP and WebSocket are localhost-only. Future: add token-based auth for remote access?
+3. **Binary protocol:** Timeline JSON can be large (100s of commands). Use binary encoding (MessagePack) for efficiency?
+4. **Broadcast mode:** Should WebSocket support pub/sub (multiple clients receive state updates)? Or stay request-response like TCP?
+5. **Error handling:** Should WebSocket send structured errors (`{"status": "error", "code": 404, "message": "..."}`) or match TCP text format?
+
+---
+
+## Recommendation Summary
+
+**Proceed with dual-protocol implementation using `websockets` library.**
+
+**Key advantages:**
+- Zero breaking changes (TCP remains fully functional)
+- Browser compatibility unlocked (JavaScript WebSocket API)
+- Clean abstraction layer (command router testable in isolation)
+- Minimal dependencies (websockets is lightweight, pure Python)
+- Incremental rollout (5 milestones, each independently testable)
+
+**Next steps:**
+1. **Approval from Jinx** on port 5001 and websockets dependency
+2. **Start Milestone 1** (command router extraction) — foundation for both protocols
+3. **Consult Mylo** on test strategy before Milestone 5
+
+**Timeline:** 3-4 weeks for full implementation (working in parallel with other P1 issues)

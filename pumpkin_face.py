@@ -5,9 +5,17 @@ import threading
 import sys
 import time
 import json
+import asyncio
 from enum import Enum
 from typing import Tuple
-from timeline import Playback, RecordingSession
+from timeline import Playback, RecordingSession, FileManager
+from command_handler import CommandRouter
+
+try:
+    import websockets
+except ImportError:
+    websockets = None
+
 
 class Expression(Enum):
     NEUTRAL = "neutral"
@@ -111,7 +119,11 @@ class PumpkinFace:
         # Timeline playback and recording state
         self.timeline_playback = Playback()
         self.recording_session = RecordingSession()
+        self.file_manager = FileManager()
         self.timeline_playback.set_command_callback(self._execute_timeline_command)
+        
+        # Initialize command router
+        self.command_router = CommandRouter(self)
         self.last_update_time = time.time()  # For delta time calculation
     
     @property
@@ -1218,11 +1230,18 @@ class PumpkinFace:
     def run(self):
         pygame.init()
         
-        # Start network server FIRST (before display initialization)
-        # This ensures socket server is ready even if display fails
+        # Start network servers FIRST (before display initialization)
+        # This ensures socket servers are ready even if display fails
         server_thread = threading.Thread(target=self._run_socket_server, daemon=True)
         server_thread.start()
         print("Socket server listening on port 5000")
+        
+        if websockets is not None:
+            ws_thread = threading.Thread(target=self._run_ws_server, daemon=True)
+            ws_thread.start()
+            print("WebSocket server listening on port 5001")
+        else:
+            print("Warning: websockets library not available (WebSocket server disabled)")
         
         # Try to create display, but continue if it fails (headless mode)
         screen = None
@@ -1362,346 +1381,18 @@ class PumpkinFace:
                     print(f"Connected by {addr}")
                     
                     while True:
-                        data = client_socket.recv(1024).decode('utf-8').strip().lower()
+                        data = client_socket.recv(1024).decode('utf-8').strip()
                         if not data:
                             break
                         
-                        # Handle blink command
-                        if data == "blink":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.blink()
-                            print("Blink animation triggered")
+                        # Route commands through CommandRouter (except upload_timeline)
+                        if not data.lower().startswith("upload_timeline "):
+                            response = self.command_router.execute(data)
+                            if response:  # Only send response if non-empty
+                                client_socket.sendall((response + '\n').encode('utf-8'))
                             continue
                         
-                        # Handle wink commands
-                        if data == "wink_left":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.wink_left()
-                            print("Left wink animation triggered")
-                            continue
-                        elif data == "wink_right":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.wink_right()
-                            print("Right wink animation triggered")
-                            continue
-                        
-                        # Handle rolling eyes commands
-                        if data == "roll_clockwise":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.roll_clockwise()
-                            print("Rolling eyes clockwise")
-                            continue
-                        
-                        if data == "roll_counterclockwise":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.roll_counterclockwise()
-                            print("Rolling eyes counter-clockwise")
-                            continue
-                        
-                        # Handle gaze command
-                        if data.startswith("gaze "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                args = [float(x) for x in parts[1:]]
-                                
-                                if len(args) == 2:
-                                    # Two args: apply same angles to both eyes
-                                    self.set_gaze(args[0], args[1])
-                                    print(f"Gaze set to: both eyes ({args[0]}°, {args[1]}°)")
-                                elif len(args) == 4:
-                                    # Four args: independent eye control
-                                    self.set_gaze(args[0], args[1], args[2], args[3])
-                                    print(f"Gaze set to: left ({args[0]}°, {args[1]}°), right ({args[2]}°, {args[3]}°)")
-                                else:
-                                    print(f"Error: gaze command requires 2 or 4 numeric arguments, got {len(args)}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing gaze command: {e}")
-                            continue
-                        
-                        # Handle eyebrow commands
-                        if data == "eyebrow_raise":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.raise_eyebrows()
-                            print("Eyebrows raised")
-                            continue
-                        
-                        if data == "eyebrow_lower":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.lower_eyebrows()
-                            print("Eyebrows lowered")
-                            continue
-                        
-                        if data == "eyebrow_raise_left":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.raise_eyebrow_left()
-                            print("Left eyebrow raised")
-                            continue
-                        
-                        if data == "eyebrow_lower_left":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.lower_eyebrow_left()
-                            print("Left eyebrow lowered")
-                            continue
-                        
-                        if data == "eyebrow_raise_right":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.raise_eyebrow_right()
-                            print("Right eyebrow raised")
-                            continue
-                        
-                        if data == "eyebrow_lower_right":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.lower_eyebrow_right()
-                            print("Right eyebrow lowered")
-                            continue
-                        
-                        if data == "eyebrow_reset":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.reset_eyebrows()
-                            print("Eyebrows reset to neutral")
-                            continue
-                        
-                        if data.startswith("eyebrow "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                val = float(parts[1])
-                                self.set_eyebrow(val)
-                                print(f"Both eyebrows set to: {val}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing eyebrow command: {e}")
-                            continue
-                        
-                        if data.startswith("eyebrow_left "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                val = float(parts[1])
-                                self.set_eyebrow(val, self.eyebrow_right_offset)
-                                print(f"Left eyebrow set to: {val}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing eyebrow_left command: {e}")
-                            continue
-                        
-                        if data.startswith("eyebrow_right "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                val = float(parts[1])
-                                self.set_eyebrow(self.eyebrow_left_offset, val)
-                                print(f"Right eyebrow set to: {val}")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing eyebrow_right command: {e}")
-                            continue
-                        
-                        # Handle projection offset commands
-                        if data == "projection_reset":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.reset_projection_offset()
-                            continue
-                        
-                        if data.startswith("jog_offset "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                dx = int(parts[1])
-                                dy = int(parts[2])
-                                self.jog_projection(dx, dy)
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing jog_offset command: {e}")
-                            continue
-                        
-                        if data.startswith("set_offset "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                x = int(parts[1])
-                                y = int(parts[2])
-                                self.set_projection_offset(x, y)
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing set_offset command: {e}")
-                            continue
-                        
-                        # Handle head movement commands
-                        if data == "turn_left" or data.startswith("turn_left "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_left(amount)
-                                print(f"Turning head left by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_left command: {e}")
-                            continue
-                        
-                        if data == "turn_right" or data.startswith("turn_right "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_right(amount)
-                                print(f"Turning head right by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_right command: {e}")
-                            continue
-                        
-                        if data == "turn_up" or data.startswith("turn_up "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_up(amount)
-                                print(f"Turning head up by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_up command: {e}")
-                            continue
-                        
-                        if data == "turn_down" or data.startswith("turn_down "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                amount = int(parts[1]) if len(parts) > 1 else 50
-                                self.turn_head_down(amount)
-                                print(f"Turning head down by {amount}px")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing turn_down command: {e}")
-                            continue
-                        
-                        if data == "center_head":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self.center_head()
-                            print("Centering head position")
-                            continue
-                        
-                        # Handle nose animation commands
-                        if data == "twitch_nose" or data.startswith("twitch_nose "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
-                                self._start_nose_twitch(magnitude)
-                                print(f"Twitching nose (magnitude={magnitude})")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing twitch_nose command: {e}")
-                            continue
-                        
-                        if data == "scrunch_nose" or data.startswith("scrunch_nose "):
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            try:
-                                parts = data.split()
-                                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
-                                self._start_nose_scrunch(magnitude)
-                                print(f"Scrunching nose (magnitude={magnitude})")
-                            except (ValueError, IndexError) as e:
-                                print(f"Error parsing scrunch_nose command: {e}")
-                            continue
-                        
-                        if data == "reset_nose":
-                            if self.recording_session.is_recording:
-                                self._capture_command_for_recording(data)
-                            self._reset_nose()
-                            print("Resetting nose to neutral")
-                            continue
-                        
-                        # ===== TIMELINE COMMANDS =====
-                        
-                        # Reset command (clears recording and playback state)
-                        if data == "reset":
-                            self.recording_session.cancel()
-                            self.timeline_playback.stop()
-                            self.timeline_playback.filename = None  # Clear loaded filename
-                            self.timeline_playback.timeline = None  # Clear loaded timeline
-                            response = "OK Reset complete"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        # Recording commands
-                        if data == "record_start" or data == "record start":
-                            if self.recording_session.is_recording:
-                                response = "ERROR Recording already in progress"
-                            elif self.timeline_playback.state.value == "playing":
-                                response = "ERROR Cannot start recording while playback active"
-                            else:
-                                self.recording_session.start()
-                                response = "OK Recording started"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        if data.startswith("record_stop") or data.startswith("record stop"):
-                            try:
-                                # Handle both "record_stop filename" and "record stop filename"
-                                if data.startswith("record_stop"):
-                                    parts = data.split(maxsplit=1)
-                                    filename = parts[1] if len(parts) > 1 else None
-                                else:  # "record stop filename"
-                                    parts = data.split(maxsplit=2)
-                                    filename = parts[2] if len(parts) > 2 else None
-                                
-                                # Validate filename (no path separators)
-                                if filename and ('/' in filename or '\\' in filename):
-                                    response = "ERROR Invalid filename: path separators not allowed"
-                                    client_socket.sendall((response + '\n').encode('utf-8'))
-                                    print(response)
-                                    continue
-                                
-                                # Check if recording is active
-                                if not self.recording_session.is_recording:
-                                    response = "ERROR No active recording"
-                                else:
-                                    saved_filename = self.recording_session.stop(filename)
-                                    response = f"OK Saved to {saved_filename}"
-                            except ValueError as e:
-                                response = f"ERROR {e}"
-                            except FileExistsError as e:
-                                response = f"ERROR {e}"
-                            except Exception as e:
-                                response = f"ERROR {e}"
-                            
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        if data == "record_cancel" or data == "record cancel":
-                            if not self.recording_session.is_recording:
-                                response = "ERROR No active recording"
-                            else:
-                                self.recording_session.cancel()
-                                response = "OK Recording cancelled"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        # Playback commands
-                        if data.startswith("play "):
+                        if data.startswith("upload_timeline "):
                             try:
                                 parts = data.split(maxsplit=1)
                                 if len(parts) < 2:
@@ -1719,223 +1410,82 @@ class PumpkinFace:
                                     print(response)
                                     continue
                                 
-                                if self.timeline_playback.state.value == "playing":
-                                    response = f"ERROR Playback already active: {self.timeline_playback.filename}"
-                                elif self.recording_session.is_recording:
-                                    response = "ERROR Cannot control playback while recording"
-                                else:
-                                    self.timeline_playback.play(filename)
-                                    duration = self.timeline_playback.timeline.duration_ms
-                                    response = f"OK Playing {self.timeline_playback.filename} ({duration}ms)"
-                            except FileNotFoundError as e:
-                                response = f"ERROR File not found: {filename}"
-                            except ValueError as e:
-                                response = f"ERROR Invalid timeline file: {filename}"
-                            except Exception as e:
-                                response = f"ERROR {e}"
-                            
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        if data == "pause":
-                            if self.timeline_playback.state.value != "playing":
-                                response = "ERROR No active playback"
-                            else:
-                                self.timeline_playback.pause()
-                                position = int(self.timeline_playback.current_position_ms)
-                                response = f"OK Paused at {position}ms"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        if data == "resume":
-                            if self.timeline_playback.state.value != "paused":
-                                response = "ERROR Playback not paused"
-                            else:
-                                self.timeline_playback.resume()
-                                position = int(self.timeline_playback.current_position_ms)
-                                response = f"OK Resumed from {position}ms"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        if data == "stop":
-                            if self.timeline_playback.state.value == "stopped":
-                                response = "ERROR No active playback"
-                            else:
-                                self.timeline_playback.stop()
-                                response = "OK Playback stopped"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        if data.startswith("seek "):
-                            try:
-                                parts = data.split()
-                                if len(parts) < 2:
-                                    response = "ERROR Missing position argument"
-                                    client_socket.sendall((response + '\n').encode('utf-8'))
-                                    print(response)
-                                    continue
+                                # Signal ready for JSON data
+                                client_socket.sendall(b"READY\n")
                                 
-                                position_ms = int(parts[1])
-                                
-                                if self.timeline_playback.timeline is None:
-                                    response = "ERROR No timeline loaded"
-                                else:
-                                    duration = self.timeline_playback.timeline.duration_ms
-                                    if position_ms < 0 or position_ms > duration:
-                                        response = f"ERROR Seek position out of range (0-{duration}ms)"
-                                    else:
-                                        self.timeline_playback.seek(position_ms)
-                                        response = f"OK Seeked to {position_ms}ms"
-                            except ValueError:
-                                response = "ERROR Invalid position (must be integer milliseconds)"
-                            except Exception as e:
-                                response = f"ERROR {e}"
-                            
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        # Status query commands
-                        if data == "timeline_status":
-                            status = self.timeline_playback.get_status()
-                            status["recording"] = self.recording_session.is_recording
-                            response = json.dumps(status)
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            continue
-                        
-                        if data == "recording_status":
-                            status = {
-                                "is_recording": self.recording_session.is_recording,
-                                "command_count": len(self.recording_session.commands),
-                                "duration_ms": 0
-                            }
-                            if self.recording_session.is_recording and self.recording_session.start_time:
-                                current_time_ms = time.time() * 1000
-                                status["duration_ms"] = int(current_time_ms - self.recording_session.start_time)
-                            response = json.dumps(status)
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            continue
-                        
-                        # File management commands
-                        if data == "list_recordings" or data == "list":
-                            recordings = self.timeline_playback.list_recordings()
-                            response = json.dumps(recordings)
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            continue
-                        
-                        if data.startswith("delete_recording "):
-                            try:
-                                parts = data.split(maxsplit=1)
-                                if len(parts) < 2:
-                                    response = "ERROR Missing filename"
-                                    client_socket.sendall((response + '\n').encode('utf-8'))
-                                    print(response)
-                                    continue
-                                
-                                filename = parts[1]
-                                
-                                # Validate filename (no path separators)
-                                if '/' in filename or '\\' in filename:
-                                    response = "ERROR Invalid filename: path separators not allowed"
-                                    client_socket.sendall((response + '\n').encode('utf-8'))
-                                    print(response)
-                                    continue
-                                
-                                # Check if currently playing
-                                if self.timeline_playback.filename == filename or \
-                                   self.timeline_playback.filename == f"{filename}.json":
-                                    response = "ERROR Cannot delete file currently in playback"
-                                else:
-                                    self.timeline_playback.delete_recording(filename)
-                                    if not filename.endswith('.json'):
-                                        filename = f"{filename}.json"
-                                    response = f"OK Deleted {filename}"
-                            except FileNotFoundError:
-                                response = f"ERROR File not found: {filename}"
-                            except Exception as e:
-                                response = f"ERROR {e}"
-                            
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
-                            continue
-                        
-                        if data.startswith("rename_recording "):
-                            try:
-                                parts = data.split()
-                                if len(parts) < 3:
-                                    response = "ERROR Missing filename arguments (old_name new_name)"
-                                    client_socket.sendall((response + '\n').encode('utf-8'))
-                                    print(response)
-                                    continue
-                                
-                                old_name = parts[1]
-                                new_name = parts[2]
-                                
-                                # Validate filenames (no path separators)
-                                if '/' in old_name or '\\' in old_name or '/' in new_name or '\\' in new_name:
-                                    response = "ERROR Invalid filename: path separators not allowed"
-                                    client_socket.sendall((response + '\n').encode('utf-8'))
-                                    print(response)
-                                    continue
-                                
-                                # Check if currently playing old file
-                                if self.timeline_playback.filename == old_name or \
-                                   self.timeline_playback.filename == f"{old_name}.json":
-                                    response = "ERROR Cannot rename file currently in playback"
-                                else:
-                                    self.timeline_playback.rename_recording(old_name, new_name)
-                                    old_json = old_name if old_name.endswith('.json') else f"{old_name}.json"
-                                    new_json = new_name if new_name.endswith('.json') else f"{new_name}.json"
-                                    response = f"OK Renamed {old_json} to {new_json}"
-                            except FileNotFoundError:
-                                response = f"ERROR File not found: {old_name}"
+                                # Read JSON content until END_UPLOAD marker
+                                json_lines = []
+                                while True:
+                                    json_line = client_socket.recv(4096).decode('utf-8').strip()
+                                    if not json_line:
+                                        response = "ERROR Connection lost while reading JSON"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        print(response)
+                                        break
+                                    
+                                    if json_line == "END_UPLOAD":
+                                        # Upload the timeline
+                                        json_content = '\n'.join(json_lines)
+                                        self.file_manager.upload_timeline(filename, json_content)
+                                        if not filename.endswith('.json'):
+                                            filename = f"{filename}.json"
+                                        response = f"OK Uploaded {filename}"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        print(response)
+                                        break
+                                    
+                                    json_lines.append(json_line)
                             except FileExistsError:
-                                response = f"ERROR File already exists: {new_name}"
+                                response = f"ERROR File already exists: {filename}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except ValueError as e:
+                                response = f"ERROR Invalid timeline: {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
                             except Exception as e:
                                 response = f"ERROR {e}"
-                            
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(response)
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
                             continue
                         
                         # ===== END TIMELINE COMMANDS =====
-                        
-                        # Check for manual override during playback
-                        # Timeline commands don't trigger pause, but animation/expression commands do
-                        is_timeline_command = data in ["record_start", "record start", "record_cancel", "record cancel", 
-                                                       "pause", "resume", "stop", "timeline_status", 
-                                                       "recording_status", "list_recordings", "list"] or \
-                                             data.startswith(("record_stop", "record stop", "play ", "seek ", 
-                                                             "delete_recording ", "rename_recording "))
-                        
-                        if not is_timeline_command and self.timeline_playback.state.value == "playing":
-                            self.timeline_playback.pause()
-                            print("Playback paused for manual override")
-                        
-                        # Capture command if recording (for expression commands that reach this point)
-                        if self.recording_session.is_recording and not is_timeline_command:
-                            self._capture_command_for_recording(data)
-                        
-                        try:
-                            expression = Expression(data)
-                            self.set_expression(expression)
-                            response = f"OK Expression changed to {data}"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(f"Expression changed to: {data}")
-                        except ValueError:
-                            response = f"ERROR Unknown expression: {data}"
-                            client_socket.sendall((response + '\n').encode('utf-8'))
-                            print(f"Unknown expression: {data}")
-                    
                     client_socket.close()
                 except Exception as e:
                     print(f"Connection error: {e}")
         finally:
             server_socket.close()
+    
+    def _run_ws_server(self):
+        """Start WebSocket server in asyncio event loop (runs in separate thread)."""
+        try:
+            asyncio.run(self._ws_server_main())
+        except Exception as e:
+            print(f"WebSocket server error: {e}")
+    
+    async def _ws_server_main(self):
+        """Main WebSocket server coroutine."""
+        try:
+            async with websockets.serve(self._ws_handler, 'localhost', 5001):
+                await asyncio.Future()  # Run forever
+        except Exception as e:
+            print(f"Failed to start WebSocket server: {e}")
+    
+    async def _ws_handler(self, websocket, path=None):
+        """Handle WebSocket client connections."""
+        try:
+            async for message in websocket:
+                try:
+                    response = self.command_router.execute(message)
+                    if response:  # Only send response if non-empty
+                        await websocket.send(response)
+                except Exception as e:
+                    error_response = f"ERROR {e}"
+                    await websocket.send(error_response)
+        except websockets.exceptions.ConnectionClosed:
+            pass  # Client disconnected
+        except Exception as e:
+            print(f"WebSocket handler error: {e}")
 
 if __name__ == "__main__":
     monitor = 0

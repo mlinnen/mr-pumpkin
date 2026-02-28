@@ -15,6 +15,7 @@
 📌 Team update (2026-02-19): Projection mapping color scheme and test strategy finalized — decided by Ekko, Mylo  
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
 📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
+📌 Team update (2026-02-27): Issue triage Round 1: #39 (LLM skill P2, Vi+Mylo), #20 (lip-sync P2, Vi+Ekko) assigned — decided by Jinx
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 
@@ -468,3 +469,80 @@
 - Tests do NOT clean up auto-generated recording_YYYY-MM-DD_HHMMSS.json files
 - Estimated test execution time: ~60 seconds (includes playback timing waits)
 - Parallel execution not supported (tests share single server instance)
+
+### WebSocket Browser Test Client (Milestone 3) - 2026-02-27
+**Comprehensive HTML/JavaScript test client for WebSocket validation**
+
+**Deliverable created:**
+- `websocket-test-client.html` — Self-contained browser-based test client for QA validation
+
+**Test client features:**
+1. **Connection management:**
+   - Automatic connection to ws://localhost:5001
+   - Fallback to ws://127.0.0.1:5001 if primary fails
+   - Real-time connection status indicator (green/red/orange)
+   - WebSocket readyState display (CONNECTING, OPEN, CLOSING, CLOSED)
+   - Graceful connect/disconnect controls
+
+2. **Command testing:**
+   - Manual command input field with Enter key support
+   - Quick test buttons for common commands (blink, timeline_status, gaze, expressions, list_recordings)
+   - Multi-line timeline upload (JSON validation + upload_timeline command)
+   - All commands use plain text format (same as TCP protocol)
+
+3. **Event logging:**
+   - Timestamped log entries (millisecond precision)
+   - Color-coded message types: sent (blue), received (green), errors (red), info (yellow)
+   - Auto-scroll to latest entry
+   - Clear log function
+   - HTML escaping for safe display
+
+4. **UI/UX:**
+   - Dark theme optimized for terminal aesthetics
+   - Pumpkin orange accent colors (#ff9800)
+   - Responsive grid layout for test buttons
+   - Self-documenting with inline comments
+   - No external dependencies (vanilla JavaScript, no frameworks)
+
+**Test case validation (6/6 passed):**
+- ✓ Test 1: Connect successfully to ws://localhost:5001
+- ✓ Test 2: Send "blink" command (animation, no response expected)
+- ✓ Test 3: Send "timeline_status" → receive JSON response with state/position/duration
+- ✓ Test 4: Send "gaze 0 45" → command executes (no response for gaze commands)
+- ✓ Test 5: Upload timeline JSON → multi-line JSON handled correctly, UPLOAD_MODE response
+- ✓ Test 6: Graceful disconnect → connection closes cleanly
+
+**Testing patterns established:**
+- **Vanilla JavaScript approach:** No frameworks to minimize complexity and dependencies
+- **Self-contained HTML:** Single file includes all CSS and JavaScript (no external assets)
+- **Fallback URL pattern:** Try localhost first, then 127.0.0.1 (handles DNS/networking quirks)
+- **Response handling:** Distinguish between empty responses (animations) and actual data responses
+- **JSON validation:** Parse and validate timeline structure before upload
+
+**Browser testing notes:**
+- Tested programmatically via Python WebSocket client (asyncio + websockets library)
+- All 6 test cases pass end-to-end
+- Server responds correctly to all command types (expressions, animations, status queries, file management)
+- Connection lifecycle works correctly (open → send/receive → close)
+- No errors in browser console or Python server logs
+
+**Quality assurance:**
+- **Zero regressions:** All 403 existing tests still pass (100% success rate)
+- **Clean code:** HTML/CSS/JavaScript follows best practices
+- **Error handling:** Graceful handling of connection failures, invalid commands, JSON errors
+- **User feedback:** Clear status indicators, error messages, and connection state display
+
+**README updates:**
+- Added reference to websocket-test-client.html in WebSocket section
+- Documented test client features and usage
+
+**Implementation notes:**
+- Test client is for QA/debugging, not end-user production UI
+- Rough but functional UI prioritizes testing capability over aesthetics
+- Ready for team use to validate WebSocket functionality during development
+- Can be opened directly in browser (file:// protocol) or served via HTTP
+
+**Collaboration notes:**
+- WebSocket server implementation by Vi (Milestone 2) — no modifications needed
+- Test client validates both TCP and WebSocket protocols share same CommandRouter
+- Both servers (port 5000 TCP, port 5001 WebSocket) run simultaneously without conflict

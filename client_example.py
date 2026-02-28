@@ -22,10 +22,13 @@ Usage:
       - stop: Stop playback
       - seek <position_ms>: Jump to position in recording
       - timeline_status: Show playback state (state, filename, position, duration)
+    Or file upload:
+      - upload_timeline <filename> <json_file>: Upload a recording file
 """
 
 import socket
 import json
+import os
 
 def send_command(command: str):
     """Send command and handle response (for recording/status/playback commands)"""
@@ -81,6 +84,52 @@ def send_expression(expression: str):
     """Legacy wrapper for backward compatibility"""
     send_command(expression)
 
+def upload_timeline(filename: str, json_file_path: str):
+    """Upload a recording file to the server.
+    
+    Args:
+        filename: Name to save the recording as on the server
+        json_file_path: Local path to JSON file to upload
+    """
+    if not os.path.exists(json_file_path):
+        print(f"Error: File not found: {json_file_path}")
+        return
+    
+    try:
+        # Read the JSON file
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            json_content = f.read()
+        
+        # Connect to server
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect(('localhost', 5000))
+        
+        # Send upload request
+        upload_cmd = f"upload_timeline {filename}\n"
+        client.send(upload_cmd.encode('utf-8'))
+        
+        # Wait for READY signal
+        response = client.recv(1024).decode('utf-8').strip()
+        if response != "READY":
+            print(f"Error: Server did not send READY signal. Got: {response}")
+            client.close()
+            return
+        
+        # Send JSON content
+        client.send(json_content.encode('utf-8'))
+        client.send(b"\n")
+        
+        # Send end marker
+        client.send(b"END_UPLOAD\n")
+        
+        # Get response
+        response = client.recv(1024).decode('utf-8').strip()
+        client.close()
+        
+        print(f"Response: {response}")
+    except Exception as e:
+        print(f"Error uploading timeline: {e}")
+
 if __name__ == "__main__":
     print("Pumpkin Face Client")
     print("Valid expressions: neutral, happy, sad, angry, surprised, scared, sleeping")
@@ -100,6 +149,8 @@ if __name__ == "__main__":
     print("  stop - Stop playback")
     print("  seek <position_ms> - Jump to position in recording")
     print("  timeline_status - Show playback state")
+    print("File upload:")
+    print("  upload_timeline <server_filename> <local_json_file> - Upload a recording file")
     print("Type 'quit' to exit\n")
     
     while True:
@@ -110,5 +161,12 @@ if __name__ == "__main__":
             # Handle special case: 'record status' → 'recording_status'
             if user_input == "record status":
                 send_command("recording_status")
+            # Handle upload_timeline with two arguments
+            elif user_input.startswith("upload_timeline "):
+                parts = user_input.split(maxsplit=2)
+                if len(parts) < 3:
+                    print("Error: upload_timeline requires two arguments: server_filename local_json_file")
+                else:
+                    upload_timeline(parts[1], parts[2])
             else:
                 send_command(user_input)

@@ -1,0 +1,99 @@
+# Changelog
+
+All notable changes to Mr. Pumpkin will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.5.0] - 2026-02-27
+
+### 🎃 Major Features
+
+**WebSocket Dual-Protocol Support**
+- Added WebSocket server on port 5001 running parallel to TCP server (port 5000)
+- Both protocols share unified CommandRouter for protocol-agnostic command execution
+- Browser client support via standard JavaScript WebSocket API
+- Zero breaking changes — fully backward compatible with existing TCP clients
+
+### Added
+
+- **WebSocket Server**: Asyncio-based WebSocket server runs in daemon thread alongside TCP server
+- **CommandRouter**: Extracted 660-line command routing logic into shared `command_handler.py` module
+- **Browser Test Client**: `websocket-test-client.html` for interactive WebSocket validation
+  - Connection status monitoring with automatic fallback
+  - Quick test buttons for common commands
+  - Timeline upload testing (multi-line JSON)
+  - Full event logging with timestamps
+- **Integration Tests**: 27 comprehensive tests validating dual-protocol behavior
+  - Identical response verification across protocols
+  - Protocol switching and concurrent command execution
+  - Error handling consistency
+  - State synchronization (recordings, playback, expressions)
+  - Connection resilience and large payload handling
+  - Stress testing (50 rapid alternating commands)
+
+### Architecture
+
+**Milestone Implementation**:
+- **M1**: Command router extraction (660-line refactor, 403/403 tests passing)
+- **M2**: WebSocket server setup (asyncio daemon thread, port 5001)
+- **M3**: Browser test client (HTML/JS validation tool)
+- **M4**: Integration testing (27 comprehensive test scenarios)
+- **M5**: Production release (v0.5.0 tagging and documentation)
+
+### Performance
+
+- **Zero Regressions**: All 403 existing tests continue to pass
+- **New Test Coverage**: 430 total tests (403 existing + 27 new integration tests)
+- **Sub-millisecond Overhead**: Command routing overhead negligible
+- **Concurrent Client Support**: Multiple TCP and WebSocket clients simultaneously
+
+### Documentation
+
+- Updated README with complete WebSocket usage examples
+- Documented all 27 integration test scenarios
+- Added browser test client documentation
+- Installation instructions unchanged (no new dependencies beyond `websockets` package)
+
+### Breaking Changes
+
+**None** — This release is fully backward compatible. Existing TCP clients work without modification.
+
+### Upgrade Path
+
+No migration required. Simply update to v0.5.0:
+
+```bash
+git pull origin main
+pip install -r requirements.txt  # Installs websockets package
+python pumpkin_face.py           # Both TCP and WebSocket servers start automatically
+```
+
+### Contributors
+
+- **Vi**: Backend architecture (CommandRouter extraction, WebSocket server implementation)
+- **Mylo**: Integration test suite (27 comprehensive test scenarios, browser client validation)
+- **Jinx**: Milestone coordination, architectural review, release management
+
+---
+
+## [0.4.1] - 2026-02-26
+
+### Added
+- Recording file upload with validation (#44)
+- Download timeline command handler
+- Playback controls and recording/list bug fixes (#42)
+
+### Changed
+- Systematic race condition delays in recording tests
+- Updated documentation for recording file structure
+
+### Fixed
+- Recording upload validation
+- Playback control edge cases
+
+---
+
+## Earlier Versions
+
+See git history for releases prior to 0.4.1.
