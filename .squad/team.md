@@ -12,11 +12,11 @@
 
 | Name | Role | Charter | Status |
 |------|------|---------|--------|
-| Jinx | Lead | `.ai-team/agents/jinx/charter.md` | ✅ Active |
-| Ekko | Graphics Dev | `.ai-team/agents/ekko/charter.md` | ✅ Active |
-| Vi | Backend Dev | `.ai-team/agents/vi/charter.md` | ✅ Active |
-| Mylo | Tester | `.ai-team/agents/mylo/charter.md` | ✅ Active |
-| Scribe | Memory & Logging | `.ai-team/agents/scribe/charter.md` | ✅ Silent |
+| Jinx | Lead | `.squad/agents/jinx/charter.md` | ✅ Active |
+| Ekko | Graphics Dev | `.squad/agents/ekko/charter.md` | ✅ Active |
+| Vi | Backend Dev | `.squad/agents/vi/charter.md` | ✅ Active |
+| Mylo | Tester | `.squad/agents/mylo/charter.md` | ✅ Active |
+| Scribe | Memory & Logging | `.squad/agents/scribe/charter.md` | ✅ Silent |
 | Ralph | Work Monitor | — | 🔄 Monitor |
 
 **Universe:** Arcane (capacity 10, all characters from animated series)

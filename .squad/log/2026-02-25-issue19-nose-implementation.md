@@ -67,8 +67,8 @@
 - **`pumpkin_face.py`** — State variables, backend methods, socket commands, update loop integration (~100 lines added/modified)
 - **`test_nose_movement.py`** — New test suite with 45 test cases
 - **`test_nose_commands.py`** — Socket command validation tests
-- **`.ai-team/agents/*/history.md`** — Updated agent learnings (Jinx, Ekko, Vi, Mylo)
-- **`.ai-team/decisions/inbox/*`** — Decision documents from team members
+- **`.squad/agents/*/history.md`** — Updated agent learnings (Jinx, Ekko, Vi, Mylo)
+- **`.squad/decisions/inbox/*`** — Decision documents from team members
 
 ---
 

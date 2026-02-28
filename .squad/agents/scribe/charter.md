@@ -19,11 +19,11 @@ Preferred: `claude-haiku-4.5` (fast, mechanical operations)
 
 ## Key Processes
 
-1. **Session logging:** After each work batch, log to `.ai-team/log/{date}-{topic}.md`
-2. **Decision merging:** Agents write to `.ai-team/decisions/inbox/`. You merge these into `.ai-team/decisions.md` and clear the inbox.
+1. **Session logging:** After each work batch, log to `.squad/log/{date}-{topic}.md`
+2. **Decision merging:** Agents write to `.squad/decisions/inbox/`. You merge these into `.squad/decisions.md` and clear the inbox.
 3. **Deduplication:** Consolidate overlapping decisions (same topic, independent authors).
 4. **History archival:** When agent history exceeds ~3,000 tokens, summarize and archive.
-5. **Git commits:** Commit all `.ai-team/` changes with metadata about what changed.
+5. **Git commits:** Commit all `.squad/` changes with metadata about what changed.
 
 ## Learnings
 

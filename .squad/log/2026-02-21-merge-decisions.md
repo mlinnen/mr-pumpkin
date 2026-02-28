@@ -4,7 +4,7 @@
 
 ## Summary
 
-Scribe processed 8 pending decision files from the `.ai-team/decisions/inbox/` directory, merged them into the canonical `decisions.md` file, consolidated overlapping decisions into unified blocks, and deleted the inbox files after merge.
+Scribe processed 8 pending decision files from the `.squad/decisions/inbox/` directory, merged them into the canonical `decisions.md` file, consolidated overlapping decisions into unified blocks, and deleted the inbox files after merge.
 
 ## Work Performed
 
@@ -48,8 +48,8 @@ Scribe processed 8 pending decision files from the `.ai-team/decisions/inbox/` d
 
 ## Files Changed
 
-- `.ai-team/decisions.md` — Added 8 merged/consolidated decision blocks
-- `.ai-team/decisions/inbox/` — Deleted all 8 files after merge
+- `.squad/decisions.md` — Added 8 merged/consolidated decision blocks
+- `.squad/decisions/inbox/` — Deleted all 8 files after merge
 
 ## Statistics
 

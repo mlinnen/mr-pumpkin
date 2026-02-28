@@ -25,13 +25,13 @@ Ralph activated. Jinx triaged issues #3, #4, #5. Ekko implemented sleeping expre
 
 ## Artifacts Created
 
-- `.ai-team/decisions/inbox/ekko-sleeping-expression.md` — Sleeping expression design decision
-- `.ai-team/decisions/inbox/jinx-triage-sleeping-blink.md` — Issues #4 and #5 triage analysis
-- `.ai-team/decisions/inbox/jinx-triage-summary.md` — Quick reference for all triage work
-- `.ai-team/decisions/inbox/jinx-github-comments.md` — Ready-to-post GitHub comments
-- `.ai-team/decisions/inbox/jinx-release-package-plan.md` — Detailed release package analysis
-- `.ai-team/decisions/inbox/jinx-python-workflows.md` — GitHub Actions Python migration decision
-- `.ai-team/decisions/inbox/jinx-projection-first-architecture.md` — Projection-first rendering constraint
+- `.squad/decisions/inbox/ekko-sleeping-expression.md` — Sleeping expression design decision
+- `.squad/decisions/inbox/jinx-triage-sleeping-blink.md` — Issues #4 and #5 triage analysis
+- `.squad/decisions/inbox/jinx-triage-summary.md` — Quick reference for all triage work
+- `.squad/decisions/inbox/jinx-github-comments.md` — Ready-to-post GitHub comments
+- `.squad/decisions/inbox/jinx-release-package-plan.md` — Detailed release package analysis
+- `.squad/decisions/inbox/jinx-python-workflows.md` — GitHub Actions Python migration decision
+- `.squad/decisions/inbox/jinx-projection-first-architecture.md` — Projection-first rendering constraint
 
 ---
 

@@ -37,7 +37,7 @@
 5. **Global pip installs:** No virtual environments (per owner request, simplifies Pi deployment)
 6. **Dependency pinning:** Use range constraints (`pygame>=2.0.0,<3.0.0`) to allow patch updates while preventing breaking changes
 
-**Architecture decision:** Exclude `.ai-team/`, `.github/`, `.git/`, `__pycache__/`, `.copilot/` from release package. Include `docs/` folder (owner override of earlier decision).
+**Architecture decision:** Exclude `.squad/`, `.github/`, `.git/`, `__pycache__/`, `.copilot/` from release package. Include `docs/` folder (owner override of earlier decision).
 
 **CI/CD pattern:** GitHub Actions workflow runs `python scripts/package_release.py` after tests pass, then attaches ZIP to release via `gh release create ... {zipfile}`.
 

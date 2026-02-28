@@ -16,9 +16,9 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
-### .ai-team/ Git Tracking Evolution
-- **Original policy (2026-02-20)**: `.ai-team/` blocked from `preview` and `main` branches via `.gitignore` entries, `squad-main-guard.yml` workflow (rejected PRs containing `.ai-team/` files), and validation check in `squad-preview.yml`. Rationale was to keep squad coordination state off release branches.
-- **Policy reversal (Issue #40, 2026-02-26)**: All guards removed. `.ai-team/` now tracked on all branches like any other project directory. Squad state (decisions, histories, routing rules, agent charters) flows through normal git workflow. This allows team evolution history to be preserved and shared across branches.
+### .squad/ Git Tracking Evolution
+- **Original policy (2026-02-20)**: `.squad/` blocked from `preview` and `main` branches via `.gitignore` entries, `squad-main-guard.yml` workflow (rejected PRs containing `.squad/` files), and validation check in `squad-preview.yml`. Rationale was to keep squad coordination state off release branches.
+- **Policy reversal (Issue #40, 2026-02-26)**: All guards removed. `.squad/` now tracked on all branches like any other project directory. Squad state (decisions, histories, routing rules, agent charters) flows through normal git workflow. This allows team evolution history to be preserved and shared across branches.
 
 ### Projection Mapping Architecture
 - **Pure contrast design principle**: Projection mapping on 3D surfaces demands binary color schemes (black/white) rather than gradients or intermediate tones. Falloff at oblique angles eliminates gray values entirely.
@@ -38,7 +38,7 @@
 - **Workflows were Node.js scaffolded**: All three GitHub Actions workflows (`squad-ci.yml`, `squad-preview.yml`, `squad-release.yml`) used `actions/setup-node`, `node --test`, and read version from `package.json`. None of these apply to a Python project.
 - **VERSION file as single source of truth**: Chose a flat `VERSION` file (content: `0.1.0`) over embedding version in `setup.py`, `pyproject.toml`, or elsewhere — simpler to read in shell scripts (`cat VERSION`) and consistent across all three workflows.
 - **pytest is already in requirements.txt**: No need to install pytest separately or fall back to `python test_projection_mapping.py`. `pip install -r requirements.txt` handles it, then `python -m pytest` picks up all tests automatically.
-- **Minimal surgical changes**: Preserved all release logic (tag creation, GitHub Release, `.ai-team/` file check) — only replaced the Node.js tooling surface.
+- **Minimal surgical changes**: Preserved all release logic (tag creation, GitHub Release, `.squad/` file check) — only replaced the Node.js tooling surface.
 
 ### File References
 - **pumpkin_face.py**: Core rendering with projection-safe colors (BACKGROUND_COLOR, FEATURE_COLOR) baked into base class
@@ -64,7 +64,7 @@
 - **Distribution model:** ZIP archive with install scripts (not pip package) — this is a standalone application, not a library
 - **Platform support:** Cross-platform by default, Raspberry Pi as first-class target (requires SDL2 system dependencies on Linux)
 - **Dependency pinning:** Semi-pinned (major version constraints) — `pygame>=2.0.0,<3.0.0` allows security patches, blocks breaking changes
-- **Exclusions:** `.ai-team/`, `.github/`, `.git/`, `__pycache__/`, `.copilot/` — end users don't need squad coordination files or CI/CD workflows
+- **Exclusions:** `.squad/`, `.github/`, `.git/`, `__pycache__/`, `.copilot/` — end users don't need squad coordination files or CI/CD workflows
 - **Inclusions:** Core scripts (pumpkin_face.py, client_example.py), README, requirements.txt, VERSION, test suite (useful for users to validate setup)
 - **Automation strategy:** Modify `squad-release.yml` to create ZIP archive and attach to GitHub Release as asset
 

@@ -118,7 +118,7 @@
 
 **Scope:**
 - **Include:** pumpkin_face.py, client_example.py, README.md, requirements.txt, VERSION, test_projection_mapping.py
-- **Exclude:** `.ai-team/`, `.github/`, `.git/`, `__pycache__/`, `.copilot/`, `docs/`
+- **Exclude:** `.squad/`, `.github/`, `.git/`, `__pycache__/`, `.copilot/`, `docs/`
 - **Cross-platform:** All code is platform-agnostic, pygame handles SDL2 abstraction
 - **Raspberry Pi:** Requires SDL2 system libraries (`apt-get install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev`)
 
@@ -255,13 +255,13 @@ These tests were written BEFORE implementation landed (parallel to Ekko's work o
 
 ---
 
-### 2026-02-20: .ai-team/ tracking policy
+### 2026-02-20: .squad/ tracking policy
 
 **By:** Jinx
 
-**What:** .ai-team/ and .ai-team-templates/ are tracked on dev but NOT on preview or main. These directories are in .gitignore on preview and main. When merging dev→preview, untrack them with `git rm -r --cached .ai-team/ .ai-team-templates/` before committing the merge.
+**What:** .squad/ and .squad-templates/ are tracked on dev but NOT on preview or main. These directories are in .gitignore on preview and main. When merging dev→preview, untrack them with `git rm -r --cached .squad/ .squad-templates/` before committing the merge.
 
-**Why:** .ai-team/ is squad internal state — it should not ship with the product.
+**Why:** .squad/ is squad internal state — it should not ship with the product.
 
 ---
 
@@ -280,7 +280,7 @@ These tests were written BEFORE implementation landed (parallel to Ekko's work o
    - Reads VERSION file dynamically
    - Creates `mr-pumpkin-v{VERSION}.zip` with nested folder structure
    - Includes: source files, docs/, LICENSE, requirements.txt, install scripts
-   - Excludes: .ai-team/, .github/, .git/, __pycache__/, .copilot/
+   - Excludes: .squad/, .github/, .git/, __pycache__/, .copilot/
 
 2. **Install Scripts**:
    - `install.sh` (Linux/macOS/Raspberry Pi):
@@ -1380,7 +1380,7 @@ include_files = [
 
 Current decision (from team history) suggests **tests are valuable for deployment validation**, so I recommend including `tests/`.
 
-### 3. Consider excluding `.ai-team/` and `.github/` (Already correctly excluded)
+### 3. Consider excluding `.squad/` and `.github/` (Already correctly excluded)
 
 **Current behavior:** Script correctly skips these.  
 **Assessment:** ✓ Correct. End users do not need squad coordination files or CI/CD workflows.
@@ -1434,12 +1434,12 @@ Before merging the fix:
 
 **Recommendation:** Add `timeline.py` to the script's `include_files` list and merge. The fix is a one-line addition. This will resolve the critical blocking issue and make the package distribution-ready.
 
-### 2026-02-26: Remove .ai-team/ guard workflow and gitignore restrictions
+### 2026-02-26: Remove .squad/ guard workflow and gitignore restrictions
 **By:** Jinx  
 **Issue:** #40  
-**What:** Removed all mechanisms preventing `.ai-team/` from being committed to `preview` and `main` branches: deleted `squad-main-guard.yml` workflow, removed `.gitignore` entries, removed validation check from `squad-preview.yml`.  
+**What:** Removed all mechanisms preventing `.squad/` from being committed to `preview` and `main` branches: deleted `squad-main-guard.yml` workflow, removed `.gitignore` entries, removed validation check from `squad-preview.yml`.  
 **Why:** Squad team state (decisions, histories, routing rules, agent charters) should flow through normal git workflow like any other project directory. This preserves team evolution history and shares it across branches. The original guard design kept squad coordination files off release branches, but this prevented team knowledge from being versioned and distributed with the codebase.  
-**Impact:** `.ai-team/` is now fully git-tracked. Future merges to `preview` and `main` will include squad state files. Release artifacts may need explicit exclusion patterns if `.ai-team/` should not ship to end users.
+**Impact:** `.squad/` is now fully git-tracked. Future merges to `preview` and `main` will include squad state files. Release artifacts may need explicit exclusion patterns if `.squad/` should not ship to end users.
 
 # TCP Protocol Specification — Timeline Recording & Playback
 ## Issue #34 Timeline Feature
