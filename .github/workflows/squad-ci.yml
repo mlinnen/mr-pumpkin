@@ -17,12 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build and test
-        run: |
-          # TODO: Add your python build/test commands here
-          # Go:            go test ./...
-          # Python:        pip install -r requirements.txt && pytest
-          # .NET:          dotnet test
-          # Java (Maven):  mvn test
-          # Java (Gradle): ./gradlew test
-          echo "No build commands configured — update squad-ci.yml"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install SDL system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest
