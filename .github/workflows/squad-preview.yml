@@ -1,4 +1,5 @@
 name: Squad Preview Validation
+# python project — configure build, test, and validation commands below
 
 on:
   push:
@@ -34,3 +35,4 @@ jobs:
             exit 1
           fi
           echo "✅ VERSION: $VERSION"
+          
