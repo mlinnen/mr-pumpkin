@@ -529,5 +529,6 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 1. **Extracted command parsing from socket handler into CommandRouter class:** Clean separation enables protocol-agnostic command execution
 2. **Protocol-agnostic command execution enables dual TCP/WebSocket support:** Same command logic works for both transports
 3. **362 tests verify zero behavioral changes after refactoring:** Comprehensive test coverage caught all edge cases during extraction
+4. **TCP recv() deadlock pattern — no-response commands:** When a server conditionally sends a response (only `if response:`), a client that always calls `recv()` will deadlock if the server sends nothing. Both sides block waiting on the other. Fix: call `socket.shutdown(SHUT_WR)` after `send()` to signal EOF. The server's `recv()` returns `b""`, breaking its loop and closing the connection — which unblocks the client's `recv()` with empty data. This is the correct pattern for single-exchange TCP command protocols.
 
 **Unblocks:** Milestone 2 (WebSocket server setup) ready to begin

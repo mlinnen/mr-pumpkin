@@ -7,9 +7,10 @@ class CommandRouter:
     Accepts text commands, executes against PumpkinFace state, returns text responses.
     """
     
-    def __init__(self, pumpkin_face):
+    def __init__(self, pumpkin_face, expression_class):
         """Initialize router with PumpkinFace instance."""
         self.pumpkin = pumpkin_face
+        self.Expression = expression_class
     
     def execute(self, command_str: str) -> str:
         """
@@ -594,9 +595,8 @@ class CommandRouter:
             self.pumpkin._capture_command_for_recording(data)
         
         # Handle expression changes
-        from pumpkin_face import Expression
         try:
-            expression = Expression(data)
+            expression = self.Expression(data)
             self.pumpkin.set_expression(expression)
             response = f"OK Expression changed to {data}"
             print(f"Expression changed to: {data}")

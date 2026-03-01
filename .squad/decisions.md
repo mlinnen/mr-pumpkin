@@ -2626,3 +2626,46 @@ else:
 3. **Consult Mylo** on test strategy before Milestone 5
 
 **Timeline:** 3-4 weeks for full implementation (working in parallel with other P1 issues)
+
+
+---
+
+# Decision: Add socket.shutdown(SHUT_WR) in send_command() to fix recv deadlock
+
+**Date:** 2025-07-21  
+**Author:** Vi (Backend Dev)  
+**File changed:** `client_example.py`
+
+## Problem
+
+`send_command()` always called `client.recv()` after sending, but certain commands (`blink`, `roll_clockwise`, `roll_counterclockwise`, `gaze`, and all eyebrow/head/nose commands) return `""` from `execute()` in `command_handler.py`. The server only sends a response `if response:`, so for these commands it sends nothing and loops back to its own `recv()`.
+
+Result: client blocks on `recv()`, server blocks on `recv()` — **deadlock**. The server can no longer accept new connections, breaking all subsequent commands including expression changes.
+
+## Decision
+
+Add `client.shutdown(socket.SHUT_WR)` immediately after `client.send(command.encode('utf-8'))` in `send_command()`.
+
+\\\python
+client.send(command.encode('utf-8'))
+client.shutdown(socket.SHUT_WR)  # Signal EOF so server breaks its recv loop
+\\\
+
+## Why This Works
+
+`SHUT_WR` sends a TCP FIN, signaling EOF to the server. The server's `recv()` returns `b""` after it finishes processing, which breaks its inner `while` loop and causes it to close the socket. This unblocks the client's `recv()` in all cases:
+
+- **Commands with a response:** server sends response → server loops → server gets EOF → closes socket → client recv() gets data then empty
+- **Commands without a response:** server processes → sends nothing → server loops → server gets EOF → closes socket → client recv() gets empty → prints "Sent: {command}"
+
+## Scope
+
+- **Changed:** `send_command()` in `client_example.py` — one line added
+- **Not changed:** `upload_timeline()` — multi-step protocol requires keeping the connection open across multiple sends/recvs
+- **Not changed:** Server code (`pumpkin_face.py`, `command_handler.py`)
+
+## Alternatives Considered
+
+- **Timeout on recv():** Fragile, adds latency, masks the real issue
+- **Sending a sentinel/ack from server for all commands:** Would require server changes and change the protocol contract
+- **Separate connection per command (already the case):** The pattern is correct; only the EOF signal was missing
