@@ -1,7 +1,7 @@
-# Squad: .ai-team/ append-only files use union merge to enable conflict-free merging.
+# Squad: .squad/ append-only files use union merge to enable conflict-free merging.
 # Decisions, histories, and logs are append-only — both sides of a merge only add content.
 # Using merge=union combines all lines from both branches automatically.
-.ai-team/decisions.md merge=union
-.ai-team/agents/*/history.md merge=union
-.ai-team/log/** merge=union
-.ai-team/orchestration-log/** merge=union
+.squad/decisions.md merge=union
+.squad/agents/*/history.md merge=union
+.squad/log/** merge=union
+.squad/orchestration-log/** merge=union
