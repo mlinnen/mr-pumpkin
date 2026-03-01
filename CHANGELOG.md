@@ -5,6 +5,15 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-03-01
+
+### Added
+- `wiggle_nose` command: alias for nose twitch animation, callable from TCP client
+- `wiggle_nose` added to timeline recording capture whitelist
+- 21 test cases covering `wiggle_nose` command routing, alias equivalence, and recording integration
+
+---
+
 ## [0.5.2] - 2026-03-01
 
 ### Fixed
@@ -18,17 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.5.2] - 2026-03-01
-
-### Fixed
-- **Expression commands not working via client**: command_handler.py imported Expression via a local rom pumpkin_face import Expression inside xecute(). Because pumpkin_face.py runs as __main__, Python loaded a second module copy, creating two distinct Expression enum classes — equality checks always failed silently. Fixed by passing the Expression class into CommandRouter at construction.
-- **TCP recv deadlock**: send_command() in client_example.py always called ecv() after sending, but commands like link return no response. Client blocked on ecv(), server blocked on next ecv(). Fixed with socket.shutdown(SHUT_WR) after send.
-- **Happy/sad expressions swapped**: Mouth curve signs were inverted in _get_mouth_points(). In pygame (Y increases downward), a smile needs mouth_y + sin and a frown needs mouth_y - sin. They were backwards.
-
-### Housekeeping
-- Moved squad planning artifacts from repo root to .squad/log/
-
----
 ## [0.5.1] - 2026-03-01
 
 ### Added
