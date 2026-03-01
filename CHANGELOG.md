@@ -5,6 +5,30 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-03-01
+
+### Fixed
+- Expression commands now work correctly from TCP client — resolved Python `__main__` vs module
+  name circular import issue where `command_handler.py` imported `Expression` as a second class
+  instance, causing enum equality checks to silently fail
+- Happy and sad mouth curves were visually swapped — corrected sine curve sign in `_get_mouth_points`
+  (pygame Y increases downward; smile needs `+`, frown needs `-`)
+- TCP recv deadlock in `client_example.py` — added `socket.shutdown(SHUT_WR)` after send so the
+  server's blocking `recv()` unblocks for no-response commands (blink, roll, gaze, etc.)
+
+---
+
+## [0.5.2] - 2026-03-01
+
+### Fixed
+- **Expression commands not working via client**: command_handler.py imported Expression via a local rom pumpkin_face import Expression inside xecute(). Because pumpkin_face.py runs as __main__, Python loaded a second module copy, creating two distinct Expression enum classes — equality checks always failed silently. Fixed by passing the Expression class into CommandRouter at construction.
+- **TCP recv deadlock**: send_command() in client_example.py always called ecv() after sending, but commands like link return no response. Client blocked on ecv(), server blocked on next ecv(). Fixed with socket.shutdown(SHUT_WR) after send.
+- **Happy/sad expressions swapped**: Mouth curve signs were inverted in _get_mouth_points(). In pygame (Y increases downward), a smile needs mouth_y + sin and a frown needs mouth_y - sin. They were backwards.
+
+### Housekeeping
+- Moved squad planning artifacts from repo root to .squad/log/
+
+---
 ## [0.5.1] - 2026-03-01
 
 ### Added

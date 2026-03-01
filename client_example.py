@@ -36,6 +36,7 @@ def send_command(command: str):
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect(('localhost', 5000))
         client.send(command.encode('utf-8'))
+        client.shutdown(socket.SHUT_WR)  # Signal EOF so server breaks its recv loop
         
         # For commands that return JSON responses, read the response
         if command in ["recording_status", "list_recordings", "timeline_status"] or command == "list":
