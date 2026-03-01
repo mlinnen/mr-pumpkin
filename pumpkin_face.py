@@ -1216,6 +1216,14 @@ class PumpkinFace:
                 except ValueError:
                     pass
             self.recording_session.record_command(cmd, {"magnitude": magnitude})
+        elif cmd == "wiggle_nose":
+            magnitude = 50.0
+            if len(parts) >= 2:
+                try:
+                    magnitude = float(parts[1])
+                except ValueError:
+                    pass
+            self.recording_session.record_command(cmd, {"magnitude": magnitude})
         elif cmd == "scrunch_nose":
             magnitude = 50.0
             if len(parts) >= 2:

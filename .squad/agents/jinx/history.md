@@ -123,3 +123,33 @@
 **Routing pattern:** Backend-heavy backlog routes primarily to Vi, with Ekko on graphics for lip-sync and Mylo on validation for LLM skill. All three P2 features (auto-updates, LLM skill, lip-sync) require architectural review before implementation.
 
 **Priority insight:** P1 features (#43 websockets, #33 auto-updates) are infrastructure improvements that don't expand expression vocabulary or animation system. P2 features (#39 LLM skill, #20 lip-sync) add user-facing capabilities but have higher complexity and external dependencies.
+
+### Issue #50 — Nose Wiggle Command Handler (2026-02-27)
+
+**Problem:** README.md documented `wiggle_nose` command but it was not implemented in command_handler.py.
+
+**Investigation findings:**
+- `wiggle_nose` only existed in README.md documentation (line 280)
+- Actual implementation had `twitch_nose` and `scrunch_nose` commands
+- Both `twitch_nose` and `reset_nose` were already wired in command_handler.py
+- Public API methods (`twitch_nose()`, `reset_nose()`) don't accept parameters
+- Command handler correctly calls private methods (`_start_nose_twitch(magnitude)`, `_reset_nose()`) to support optional magnitude parameter
+
+**Solution:** Added `wiggle_nose` as an alias command that calls the same `_start_nose_twitch()` method as `twitch_nose`, maintaining consistency with existing pattern.
+
+**Key architectural insight:** Command handler uses private methods (not public API) when parameter passing is required. Public methods are zero-parameter convenience wrappers. This is consistent across blink/wink (no params), gaze (params via private), and nose animations (params via private).
+
+### Issue #50 — Wiggle Nose Recording Capture Bug (2026-02-27)
+
+**Problem:** The `wiggle_nose` command alias was added to `command_handler.py` but was missing from the recording capture whitelist in `pumpkin_face.py`, causing timeline recording to skip this command.
+
+**Investigation findings:**
+- Recording capture logic in `pumpkin_face.py` (lines 1211-1228) had handlers for `twitch_nose`, `scrunch_nose`, and `reset_nose`
+- The `wiggle_nose` alias was recognized and executed by the command router but not captured during recording sessions
+- Test suite had 2 xfail tests (`test_wiggle_nose_captured_during_recording`, `test_wiggle_nose_with_magnitude_captured_with_params`) documenting the expected behavior
+
+**Solution:** Added `wiggle_nose` elif branch to recording capture logic with identical structure to `twitch_nose` (default magnitude 50.0, parse float parameter, record command with magnitude args).
+
+**Test fixes:** Removed `@pytest.mark.xfail` decorators from the 2 recording tests and updated test assertions to match TimelineEntry object structure (`.command` attribute, `.args["magnitude"]` for parameters, proper `.start()` initialization).
+
+**Key architectural insight:** Recording capture is a separate concern from command execution - command aliases must be explicitly whitelisted in BOTH the command router AND the recording capture logic to achieve full integration. All 21 wiggle_nose tests now pass.
