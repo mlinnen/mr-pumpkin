@@ -257,6 +257,18 @@ class CommandRouter:
             return ""
         
         # Handle nose animation commands
+        if data == "wiggle_nose" or data.startswith("wiggle_nose "):
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            try:
+                parts = data.split()
+                magnitude = float(parts[1]) if len(parts) > 1 else 50.0
+                self.pumpkin._start_nose_twitch(magnitude)
+                print(f"Wiggling nose (magnitude={magnitude})")
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing wiggle_nose command: {e}")
+            return ""
+        
         if data == "twitch_nose" or data.startswith("twitch_nose "):
             if self.pumpkin.recording_session.is_recording:
                 self.pumpkin._capture_command_for_recording(data)
