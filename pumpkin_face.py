@@ -195,7 +195,7 @@ class PumpkinFace:
             points = []
             for i in range(0, 101):
                 x = cx - mouth_width + (i / 100) * (mouth_width * 2)
-                y = mouth_y - math.sin(i / 100 * math.pi) * 60
+                y = mouth_y + math.sin(i / 100 * math.pi) * 60
                 points.append((int(x), int(y)))
             return points
         elif self.current_expression == Expression.SAD:
@@ -203,7 +203,7 @@ class PumpkinFace:
             points = []
             for i in range(0, 101):
                 x = cx - mouth_width + (i / 100) * (mouth_width * 2)
-                y = mouth_y + math.sin(i / 100 * math.pi) * 40
+                y = mouth_y - math.sin(i / 100 * math.pi) * 40
                 points.append((int(x), int(y)))
             return points
         elif self.current_expression == Expression.ANGRY:
