@@ -269,33 +269,30 @@ class TestWiggleNoseRecordingIntegration:
         """Create a CommandRouter for testing command execution."""
         return CommandRouter(pumpkin, Expression)
     
-    @pytest.mark.xfail(reason="wiggle_nose not yet added to recording capture logic - needs implementation fix")
     def test_wiggle_nose_captured_during_recording(self, router, pumpkin):
         """wiggle_nose should be captured when recording is active."""
         # Start recording session
-        pumpkin.recording_session.is_recording = True
-        pumpkin.recording_session.commands = []
+        pumpkin.recording_session.start()
         
         # Execute wiggle_nose
         router.execute("wiggle_nose")
         
         # Verify command was captured
         assert len(pumpkin.recording_session.commands) == 1
-        assert pumpkin.recording_session.commands[0]["command"] == "wiggle_nose"
+        assert pumpkin.recording_session.commands[0].command == "wiggle_nose"
     
-    @pytest.mark.xfail(reason="wiggle_nose not yet added to recording capture logic - needs implementation fix")
     def test_wiggle_nose_with_magnitude_captured_with_params(self, router, pumpkin):
         """wiggle_nose with magnitude should be captured with full command string."""
         # Start recording
-        pumpkin.recording_session.is_recording = True
-        pumpkin.recording_session.commands = []
+        pumpkin.recording_session.start()
         
         # Execute wiggle_nose with magnitude
         router.execute("wiggle_nose 75")
         
         # Verify full command captured (preserves magnitude for playback)
         assert len(pumpkin.recording_session.commands) == 1
-        assert pumpkin.recording_session.commands[0]["command"] == "wiggle_nose 75"
+        assert pumpkin.recording_session.commands[0].command == "wiggle_nose"
+        assert pumpkin.recording_session.commands[0].args["magnitude"] == 75.0
     
     def test_wiggle_nose_not_captured_when_not_recording(self, router, pumpkin):
         """wiggle_nose should not be captured when recording is inactive."""
