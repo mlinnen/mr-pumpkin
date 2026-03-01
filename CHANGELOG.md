@@ -5,6 +5,19 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-03-01
+
+### Fixed
+- Expression commands now work correctly from TCP client — resolved Python `__main__` vs module
+  name circular import issue where `command_handler.py` imported `Expression` as a second class
+  instance, causing enum equality checks to silently fail
+- Happy and sad mouth curves were visually swapped — corrected sine curve sign in `_get_mouth_points`
+  (pygame Y increases downward; smile needs `+`, frown needs `-`)
+- TCP recv deadlock in `client_example.py` — added `socket.shutdown(SHUT_WR)` after send so the
+  server's blocking `recv()` unblocks for no-response commands (blink, roll, gaze, etc.)
+
+---
+
 ## [0.5.1] - 2026-03-01
 
 ### Added
