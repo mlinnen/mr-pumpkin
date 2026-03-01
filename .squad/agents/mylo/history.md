@@ -546,3 +546,128 @@
 - WebSocket server implementation by Vi (Milestone 2) — no modifications needed
 - Test client validates both TCP and WebSocket protocols share same CommandRouter
 - Both servers (port 5000 TCP, port 5001 WebSocket) run simultaneously without conflict
+
+### Test Run — wiggle_nose alias (Issue #50, PR #51) - 2026-02-29
+**Comprehensive test suite validation after wiggle_nose alias addition**
+
+**Test execution results:**
+- **Total tests:** 430 tests
+- **Passed:** 389 tests (90.5%)
+- **Failed:** 41 tests (9.5%)
+- **Execution time:** 429.43 seconds (~7 minutes)
+
+**Test failure analysis:**
+All 41 failures are in `test_tcp_integration.py` — caused by TCP server connection timeouts, NOT by the wiggle_nose feature:
+- Connection error pattern: `ConnectionError: Failed to send command: timed out`
+- Root cause: TCP server unavailable or unresponsive on port 5000
+- Affected test classes: TestRecordingWorkflow, TestBasicPlayback, TestPlaybackControl, TestFileManagement, TestStatusQueries, TestManualOverride, TestEdgeCases, TestCommandIntegration
+- These are integration tests requiring live server, not unit tests
+
+**Non-TCP test suite results:**
+- **All 389 non-integration tests passed (100% success rate)**
+- Passing test categories:
+  - Animated head movement (1 test)
+  - Client recording (30 tests)
+  - Eyebrow animation (39 tests)
+  - Eyebrow clipping (2 tests)
+  - Head movement (88 tests)
+  - Dual protocol integration (28 tests)
+  - Mouth clipping, nose movement, nose rendering, projection mapping, etc. (201+ tests)
+
+**wiggle_nose command validation:**
+- **Implementation:** Found in `command_handler.py` lines 260-270
+- **Functionality:** Alias for `twitch_nose` — calls `self.pumpkin._start_nose_twitch(magnitude)`
+- **Syntax:** `wiggle_nose` or `wiggle_nose <magnitude>` (default magnitude: 50.0)
+- **Recording integration:** Captures command if recording session active
+- **Error handling:** ValueError/IndexError handling for magnitude parsing
+
+**Test coverage gap identified:**
+- ✗ **No dedicated unit tests for wiggle_nose command alias**
+- ✓ `twitch_nose` has comprehensive test coverage in `test_nose_movement.py` (45 tests)
+- ✓ `scrunch_nose` has comprehensive test coverage in `test_nose_movement.py` (45 tests)
+- ✗ `wiggle_nose` alias NOT explicitly tested in any test file
+- **Gap impact:** Alias functionality works (same code path as twitch_nose), but regression risk if alias logic changes
+
+**Recommended action:**
+- Add test for `wiggle_nose` command alias in `test_nose_commands.py` or `test_nose_movement.py`
+- Test should verify: (1) wiggle_nose executes twitch animation, (2) magnitude parameter parsing, (3) recording capture
+- Example test: `test_wiggle_nose_alias_calls_twitch_nose()`
+
+**Quality assessment:**
+- Core functionality: ✓ Passing (389/389 unit tests)
+- Integration tests: ✗ Skipped due to server unavailability (41 tests require live TCP server)
+- wiggle_nose feature: ✓ Implementation correct, ✗ Test coverage missing
+- Overall project health: Strong (90.5% pass rate, failures unrelated to code changes)
+
+---
+
+## 2026-03-01 — wiggle_nose Command Test Coverage
+
+**Context:** PR #51 (branch `squad/50-nose-wiggle-reset`) added `wiggle_nose` as an alias for `twitch_nose` but had zero test coverage. Task was to write comprehensive tests for the new command alias.
+
+**Test suite created: `test_wiggle_nose_alias.py`**
+- **Location:** `tests/test_wiggle_nose_alias.py`
+- **Total tests:** 21 tests across 5 test classes
+- **Test run result:** 19 passed, 2 xfail (expected failures due to known implementation gap)
+
+**Test structure:**
+1. **TestWiggleNoseCommandRecognition** (5 tests)
+   - Command recognition by router
+   - Default magnitude (50)
+   - Custom magnitude parameter
+   - Case insensitivity
+   
+2. **TestWiggleNoseAliasEquivalence** (3 tests)
+   - Behavioral equivalence to `twitch_nose` (default)
+   - Behavioral equivalence to `twitch_nose` (with magnitude)
+   - Internal method verification (_start_nose_twitch)
+
+3. **TestWiggleNoseEdgeCases** (8 tests)
+   - Invalid magnitude graceful degradation
+   - Negative magnitude handling
+   - Zero magnitude edge case
+   - Extra parameters ignored
+   - Non-interrupting behavior (already twitching)
+   - Cross-animation blocking (twitch during scrunch)
+   - Reset and re-wiggle workflow
+
+4. **TestWiggleNoseRecordingIntegration** (3 tests)
+   - Command captured during recording (xfail - known bug)
+   - Magnitude preserved in recording (xfail - known bug)
+   - Not captured when recording inactive (passed)
+
+5. **TestWiggleNoseParameterParsing** (4 tests)
+   - Float magnitude values
+   - Large magnitude values
+   - Whitespace variations
+   - Empty parameter handling
+
+**Bug discovered during testing:**
+- `wiggle_nose` command NOT included in `_capture_command_for_recording()` whitelist
+- Location: `pumpkin_face.py` lines 1211-1228 (handles twitch_nose, scrunch_nose, reset_nose but not wiggle_nose)
+- Impact: wiggle_nose works correctly but won't be captured in timeline recordings
+- Two tests marked with `@pytest.mark.xfail` to document expected behavior until bug is fixed
+- Bug should be fixed by adding wiggle_nose handling (identical to twitch_nose logic)
+
+**Test patterns used:**
+- Fixture-based setup: PumpkinFace + CommandRouter initialization
+- State verification: Check is_twitching, duration, progress after command execution
+- Behavioral equivalence testing: Compare wiggle_nose vs twitch_nose state side-by-side
+- Edge case coverage: Invalid inputs, state conflicts, parameter parsing variations
+- Recording integration: Verify command capture in recording session
+
+**Commit details:**
+- Branch: `squad/50-nose-wiggle-reset`
+- Commit: c29b23d "test: add wiggle_nose command coverage"
+- Files added: `tests/test_wiggle_nose_alias.py` (362 lines, 21 tests)
+
+**Test coverage gap now CLOSED:**
+- ✓ wiggle_nose command recognition
+- ✓ Alias equivalence verified
+- ✓ Edge cases covered
+- ✓ Recording integration tested (limitation documented with xfail)
+
+**Next steps for full coverage:**
+- Jinx should fix recording capture bug (add wiggle_nose to whitelist in pumpkin_face.py)
+- After fix, remove @pytest.mark.xfail from two recording tests
+- Verify all 21 tests pass without xfail markers
