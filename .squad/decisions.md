@@ -1967,6 +1967,19 @@ This protocol design:
 
 ---
 
+### 2025-07-14: WebSocket upload_timeline uses inline JSON format
+
+**By:** Vi (Backend Dev)  
+**Task:** Fix upload_timeline in the WebSocket handler
+
+**What:** WebSocket clients send `upload_timeline` as a single inline message: `upload_timeline <filename> <json_string>`. The WebSocket handler (`_ws_handler` in `pumpkin_face.py`) intercepts this command **before** routing to `command_router`, parses filename and JSON content from the message, and calls `file_manager.upload_timeline(filename, json_content)` directly.
+
+**Why:** TCP uses a multi-step handshake protocol (send filename → recv READY → send JSON → send END_UPLOAD). This stateful protocol cannot be replicated over WebSocket's single-message model. The `command_router` returns the string `"UPLOAD_MODE"` as a placeholder when it sees `upload_timeline` — this is meaningless to a WS client. The WebSocket handler therefore short-circuits `upload_timeline` and handles it inline, keeping both protocols functional with their respective designs.
+
+**Security:** Path separators (`/`, `\`) are rejected in the filename to prevent directory traversal. Invalid JSON is caught by `file_manager.upload_timeline` and returned as an `ERROR` response.
+
+---
+
 
 ---
 
