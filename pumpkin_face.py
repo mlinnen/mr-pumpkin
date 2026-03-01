@@ -123,7 +123,7 @@ class PumpkinFace:
         self.timeline_playback.set_command_callback(self._execute_timeline_command)
         
         # Initialize command router
-        self.command_router = CommandRouter(self)
+        self.command_router = CommandRouter(self, Expression)
         self.last_update_time = time.time()  # For delta time calculation
     
     @property
