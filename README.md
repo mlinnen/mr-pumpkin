@@ -71,6 +71,82 @@ pip install -r requirements-dev.txt
 
 This installs all production dependencies plus pytest for running the test suite.
 
+## Auto-Update
+
+Mr. Pumpkin includes automated update scripts that check for new releases on GitHub and deploy them automatically.
+
+### Usage
+
+**Linux/macOS/Raspberry Pi:**
+```bash
+./update.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+.\update.ps1
+```
+
+The update script will:
+1. Check the current installed version against the latest GitHub release
+2. Download the new release if available
+3. Stop the running pumpkin_face.py process (if running)
+4. Deploy the updated files
+5. Restart pumpkin_face.py with the same arguments
+
+### Scheduling Automatic Updates
+
+**Linux/macOS/Raspberry Pi (crontab):**
+
+Run daily at 3 AM:
+```bash
+crontab -e
+```
+
+Add this line:
+```cron
+0 3 * * * /absolute/path/to/mr-pumpkin/update.sh
+```
+
+**Windows (Task Scheduler):**
+
+Create a scheduled task using PowerShell:
+```powershell
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File C:\path\to\mr-pumpkin\update.ps1"
+$trigger = New-ScheduledTaskTrigger -Daily -At 3am
+Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "MrPumpkinAutoUpdate" -Description "Daily check for Mr. Pumpkin updates"
+```
+
+Or use Task Scheduler GUI:
+1. Open Task Scheduler → Create Basic Task
+2. Name: "Mr Pumpkin Auto Update"
+3. Trigger: Daily at 3:00 AM
+4. Action: Start a program
+5. Program: `powershell.exe`
+6. Arguments: `-ExecutionPolicy Bypass -File C:\path\to\mr-pumpkin\update.ps1`
+
+### Configuration
+
+**Custom Installation Directory:**
+
+Set the `INSTALL_DIR` environment variable to specify where Mr. Pumpkin is installed:
+
+```bash
+export INSTALL_DIR=/custom/path/to/mr-pumpkin
+./update.sh
+```
+
+```powershell
+$env:INSTALL_DIR = "C:\custom\path\to\mr-pumpkin"
+.\update.ps1
+```
+
+### Log File
+
+All update operations are logged to `mr-pumpkin-update.log` in the installation directory with timestamps.
+
+For detailed setup and troubleshooting, see [docs/auto-update.md](docs/auto-update.md).
+
 ## Usage
 
 ### Run the pumpkin face application:
