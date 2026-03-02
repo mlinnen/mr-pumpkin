@@ -153,3 +153,36 @@
 **Test fixes:** Removed `@pytest.mark.xfail` decorators from the 2 recording tests and updated test assertions to match TimelineEntry object structure (`.command` attribute, `.args["magnitude"]` for parameters, proper `.start()` initialization).
 
 **Key architectural insight:** Recording capture is a separate concern from command execution - command aliases must be explicitly whitelisted in BOTH the command router AND the recording capture logic to achieve full integration. All 21 wiggle_nose tests now pass.
+
+### Issue #33 — Auto-Update Architecture Design (2026-03-02)
+
+**Problem:** Users need automated update checking and deployment without manual intervention. Must work as cron job (Linux/macOS/Raspberry Pi) or scheduled task (Windows).
+
+**Architectural decision:** External script approach (separate update scripts `update.sh` and `update.ps1`, not embedded in pumpkin_face.py core).
+
+**Rationale:** Cleaner separation of concerns. Mr. Pumpkin is a graphics application, not a system updater. External scripts can be scheduled via cron/Task Scheduler without modifying core code. Keeps pumpkin_face.py simple, focused, and stable.
+
+**5-Phase Update Workflow:**
+1. **Check** — Compare local VERSION file against latest GitHub release tag via API
+2. **Download** — Fetch new release ZIP if version is newer (gh CLI preferred, direct URL fallback)
+3. **Stop** — Gracefully stop pumpkin_face.py if running (SIGTERM/taskkill, capture PID + args for restart)
+4. **Deploy** — Extract ZIP to temp, validate structure, copy files to install directory, run pip install
+5. **Restart** — Launch pumpkin_face.py with original args if it was running before update
+
+**Key design choices:**
+- **Process detection:** Match full command line pattern (`pumpkin_face.py`), not process name (`python`)
+- **Version comparison:** Semantic versioning (major.minor.patch), skip update if local >= remote
+- **Graceful stop:** SIGTERM (Linux/macOS) or Stop-Process (Windows), wait 5 seconds, force kill if stuck
+- **Deployment validation:** Check for required files (pumpkin_face.py, VERSION, requirements.txt) before overwriting
+- **Restart logic:** Capture original command arguments (monitor number, --window flag), launch as background process
+- **Logging:** Append-only log file (`mr-pumpkin-update.log`) with timestamps for cron job visibility
+- **Idempotent:** Running script multiple times safe, logs "Already up-to-date" if no update needed
+- **Exit codes:** 0 = success, 1 = failure (for scheduled task monitoring)
+
+**Implementation scope:**
+- Vi creates `update.sh` (Linux/macOS/Pi) and `update.ps1` (Windows) with identical functionality
+- Mylo validates version comparison logic, process detection, and error handling
+- Vi adds documentation (README section + docs/auto-update.md)
+- Platform testing on Ubuntu, macOS, Windows, Raspberry Pi
+
+**Architectural insight:** Update mechanism as external script (not built-in feature) enables cron/scheduler integration without coupling system administration logic to graphics rendering code. This pattern keeps the core application focused on its primary responsibility (animated face rendering) while providing automated update capability through standard OS scheduling tools.

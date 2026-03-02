@@ -722,3 +722,67 @@ All 41 failures are in `test_tcp_integration.py` — caused by TCP server connec
 - ✅ All edge cases covered per Jinx architecture spec
 - ✅ Zero new dependencies
 - ✅ Tests ready for Vi to include in PR
+
+## Cross-Agent Collaboration — Issue #33 (2026-03-02)
+
+**Coordination with Jinx (Lead):**
+- Jinx provided comprehensive architecture specification with test scenarios (documented in spec)
+- Specification listed 32 required tests covering version comparison, GitHub API parsing, ZIP validation, file operations, edge cases
+- Jinx's implementation notes included error handling requirements and platform-specific concerns for testing
+
+**Coordination with Vi (Backend Dev):**
+- Vi implemented update.sh and update.ps1 based on specification
+- Vi's shell script implementation required translating Mylo's Python test logic to bash/PowerShell patterns
+- Vi validated that ZIP extraction handles subdirectory structure (required files checked by basename)
+- Mylo's test for user data preservation aligned with Vi's deployment logic (timeline_*.json pattern matching)
+
+**Test Suite Design (32 tests, all passing):**
+
+1. **TestVersionComparison (11 tests)**
+   - Validates semantic version comparison (0.5.9 < 0.5.10)
+   - Tests 'v' prefix handling (v0.5.4 vs 0.5.4)
+   - Tests multi-digit components (not string comparison)
+   - Serves as reference for bash/PowerShell version logic
+
+2. **TestGitHubApiParsing (6 tests)**
+   - Validates JSON parsing of GitHub releases API response
+   - Tests tag_name extraction and 'v' prefix stripping
+   - Serves as reference for curl/Invoke-WebRequest JSON handling
+
+3. **TestZipValidation (8 tests)**
+   - Validates ZIP integrity (BadZipFile detection)
+   - Checks for required files (pumpkin_face.py, VERSION, requirements.txt)
+   - Tests subdirectory structure handling (basename matching)
+   - Serves as reference for zipinfo/Expand-Archive validation
+
+4. **TestFileOperations (4 tests)**
+   - Validates temp directory creation with unique names
+   - Tests file deployment (copy from extracted ZIP to install dir)
+   - **Critical:** Validates user data preservation (timeline_*.json NOT overwritten)
+   - Serves as reference for deployment logic implementation
+
+5. **TestEdgeCases (3 tests)**
+   - Pre-release versions (v0.6.0-beta.1) — documented v1 limitation
+   - Large version numbers (99.99.99)
+   - Non-existent deployment directory
+
+**Learnings:**
+1. **Python as executable documentation:** Test functions serve as reference implementation for shell script translation. Test names describe expected behavior clearly.
+2. **Semantic versioning requires careful implementation:** String comparison fails (0.5.9 vs 0.5.10). Integer tuple comparison necessary.
+3. **ZIP file validation must check integrity AND content:** BadZipFile exception catches corrupted files; namelist() validates required files present.
+4. **User data preservation is critical:** Test explicitly validates timeline_*.json files skipped during deployment (non-negotiable requirement).
+5. **File operations testing:** Helper functions validate temp directory uniqueness, proper file copying, and cleanup.
+6. **Test coverage gaps are intentional:** Pre-release versions not supported in v1. Process detection/restart tested manually (shell-specific). Rollback not implemented.
+
+**Integration with Scripts:**
+- Shell scripts implement logic matching test behavior (version comparison, ZIP validation, file operations)
+- Python helpers serve as reference — bash/PowerShell should produce identical results
+- All test logic translatable to shell without loss of fidelity
+
+**Next Steps:**
+- Manual platform testing on Ubuntu 22.04, macOS 13+, Raspberry Pi OS, Windows 10/11
+- Verify cron job and Task Scheduler execution
+- Test gh CLI path and direct URL fallback
+- Validate version comparison on all platforms
+- Test ZIP validation with real release ZIPs
+

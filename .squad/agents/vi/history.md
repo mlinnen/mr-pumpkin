@@ -538,3 +538,165 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 - TCP uses a multi-step handshake (READY/END_UPLOAD); the command_router returns `UPLOAD_MODE` as a placeholder — not suitable for WS  
 - Fix: intercept `upload_timeline` in `_ws_handler` before routing to command_router; call `file_manager.upload_timeline(filename, json_content)` directly  
 - Test update: send JSON content inline (not a file path), assert `OK Uploaded <filename>.json`
+
+## Issue #33 Auto-Update — Install Infrastructure Exploration
+
+**Date:** 2025-03-01
+
+### Findings
+- **Install scripts:** Both install.ps1 (Windows) and install.sh (Linux/macOS/RPi) use pip/pip3 fallback pattern, install from requirements.txt
+- **Release format:** GitHub releases tagged as {VERSION}, ZIP named mr-pumpkin-v{VERSION}.zip, contains versioned folder with all runtime files + installers + docs
+- **Version storage:** Plain text in VERSION file (e.g., "0.5.4"), semantic versioning format
+- **Platform differences:** Windows has no system deps (Python only), Linux requires SDL2 libs via apt-get; process detection and file locking differ significantly
+- **Update opportunities:** GitHub API can check latest release tag, download ZIP via browser_download_url; version comparison is simple string comparison for semver
+- **Safe update pattern:** Two-script approach (download/verify in Python, apply/restart in shell script) minimizes risk of corrupting running process
+
+### Learnings
+1. **Release ZIP structure is self-contained:** Every release includes installers, docs, and VERSION file — update script can extract and verify version before applying
+2. **Cross-platform process handling is critical:** Windows locks files when process runs; Linux allows file replacement via inode swap — need different strategies
+3. **GitHub REST API for release checking:** /repos/{owner}/{repo}/releases/latest returns tag_name and asset URLs — simple, no auth needed for public repos
+4. **Backup-before-replace is essential:** Keep previous version in .backup/ folder; if update fails mid-apply, can restore and retry
+
+**Ready for:** Jinx's architecture spec to design update state machine and command interface
+
+**Document created:** .squad/decisions/inbox/vi-issue33-install-findings.md with detailed analysis and recommendations
+
+
+## Issue #33 Auto-Update Scripts Implementation
+
+**Date:** 2026-03-01
+
+### What
+
+Implemented external auto-update scripts (update.sh for Linux/macOS/Pi, update.ps1 for Windows) following Jinx's architecture specification for automated version checking and deployment.
+
+### Key Implementation Patterns
+
+1. **5-Phase Workflow:** Check version → Download release → Stop process → Deploy files → Restart process
+2. **Version Comparison:** Semantic version comparison (major.minor.patch) with pre-release suffix handling
+3. **Download Strategy:** Prefer gh CLI (authenticated, higher rate limits), fallback to direct URL via curl/wget or Invoke-WebRequest
+4. **Process Detection:**
+   - Linux/macOS: pgrep -f "[p]umpkin_face.py" with bracket trick to avoid matching grep itself
+   - Windows: Get-WmiObject Win32_Process filtering by CommandLine
+5. **Graceful Stop:** SIGTERM with 5-second timeout, force kill with SIGKILL/-9 or Stop-Process -Force
+6. **Command Line Preservation:** Capture original args (monitor number, --window) before stopping, restore on restart
+7. **Validation Before Deploy:** Check ZIP integrity, validate required files (pumpkin_face.py, VERSION, requirements.txt)
+8. **Dependency Update:** Always run pip install -r requirements.txt after file deployment
+9. **Background Restart:** nohup with output redirection (Linux/macOS) or Start-Process -WindowStyle Hidden (Windows)
+10. **Comprehensive Logging:** Timestamped log file (mr-pumpkin-update.log) with phase markers
+
+### Files Created
+
+- **update.sh** (339 lines): Bash script for Linux/macOS/Raspberry Pi
+  - Sets PATH for cron job compatibility: export PATH="/usr/local/bin:/usr/bin:/bin:"
+  - Uses mktemp -d for secure temp directory creation
+  - Process args extraction: ps -p 14828 -o args= piped to sed
+  - Cleanup trap on EXIT
+  - Exit codes: 0 = success/up-to-date, 1 = failure
+
+- **update.ps1** (401 lines): PowerShell script for Windows
+  - Continue = "Stop" for fail-fast behavior
+  - WMI query fallback for process detection (PowerShell 5.1 compatibility)
+  - Expand-Archive for ZIP extraction
+  - Structured error handling with try/catch blocks
+  - Same exit code convention as bash version
+
+- **docs/auto-update.md** (400+ lines): Comprehensive setup guide
+  - Platform-specific instructions (cron jobs, Task Scheduler)
+  - Environment variable configuration (INSTALL_DIR override)
+  - Log file format and examples
+  - Troubleshooting section (rate limits, network errors, permissions)
+  - Manual rollback procedure
+  - Security considerations (HTTPS enforcement, gh CLI auth, least privilege)
+
+- **README.md**: Added "## Auto-Update" section after Development Setup
+  - Usage instructions for both platforms
+  - Crontab and Task Scheduler examples
+  - INSTALL_DIR environment variable docs
+  - Link to detailed guide in docs/auto-update.md
+
+### Technical Decisions
+
+**Why external scripts (not embedded in pumpkin_face.py):**
+- Separation of concerns: Pumpkin face is a graphics application, not a system updater
+- Reliability: Update logic runs independently, can update the main application while it's stopped
+- Simplicity: Scheduled via standard OS tools (cron, Task Scheduler)
+
+**Why dual scripts (not single cross-platform Python script):**
+- Platform idioms: Bash and PowerShell are native to their platforms (no additional dependencies)
+- Process handling: Fundamentally different on Windows (file locking) vs Linux (inode-based)
+- Existing patterns: Follows install.sh/install.ps1 pattern already established in project
+
+**Why gh CLI preferred over direct download:**
+- Authentication: gh CLI handles GitHub auth, avoids API rate limits (60/hour → 5000/hour)
+- Reliability: Built-in retry logic and error handling
+- Fallback ensures: Works even without gh installed
+
+**Why validate before deploy:**
+- Safety: Corrupted download or incomplete release could break installation
+- Atomicity: Either fully deploy or abort (no partial state)
+- User trust: Never overwrite working files with broken ones
+
+### Shell Script Patterns Learned
+
+**Bash:**
+- Bracket trick for process grep: grep [p]umpkin_face.py avoids matching grep itself
+- Command substitution safety: $(command) with quotes prevents word splitting
+- mktemp for secure temp dirs: Avoids race conditions in /tmp
+- Trap for cleanup: Ensures temp files deleted even on error/Ctrl+C
+- Process args extraction: ps -p 14828 -o args= gets full command line
+
+**PowerShell:**
+- WMI for command line access: Get-WmiObject Win32_Process includes CommandLine property (Get-Process doesn't in PS 5.1)
+- -split for version parsing: Create arrays from semantic version strings
+- Join-Path for cross-platform paths: Handles backslash vs forward slash
+- -ErrorAction SilentlyContinue: Graceful command availability checks
+- Try/finally for cleanup: PowerShell's trap + function pattern
+
+### Git Workflow
+
+- Branch: squad/33-auto-update (created from dev)
+- Commit: "feat: add auto-update scripts for issue #33" with full description
+- Files changed: update.sh (+339), update.ps1 (+401), README.md (+68), docs/auto-update.md (+400)
+- Pushed to origin with upstream tracking
+
+### Integration Points
+
+- **Existing install scripts:** Follows same pip/pip3 fallback pattern as install.sh and install.ps1
+- **VERSION file:** Single source of truth for version comparison (0.5.4 format)
+- **GitHub Releases:** Relies on existing release workflow (scripts/package_release.py, .github/workflows/squad-release.yml)
+- **Directory structure:** Works with current layout (no .mr-pumpkin config dir needed)
+
+### Learnings
+
+1. **Cron job PATH requirements:** Cron runs with minimal environment; scripts must set PATH explicitly for Python/pip availability
+2. **Process detection patterns differ by platform:** Linux uses command line grep, Windows needs WMI query or ps-based heuristics
+3. **Graceful stop critical for state preservation:** SIGTERM allows cleanup, immediate SIGKILL can corrupt recordings/timelines
+4. **Version comparison edge cases:** Pre-release suffixes (v0.6.0-beta.1) need regex extraction of numeric parts
+5. **Idempotent script design:** Running multiple times safely (already up-to-date exits 0 without changes)
+6. **Log files essential for cron monitoring:** Silent cron jobs need persistent logs for debugging failures
+7. **ZIP validation prevents corruption:** Always check file exists, non-zero size, and contains required files before deployment
+
+**Unblocks:** Issue #33 ready for testing and merge to dev
+
+
+## Cross-Agent Collaboration — Issue #33 (2026-03-02)
+
+**Coordination with Jinx (Lead):**
+- Jinx provided comprehensive architecture specification (402 lines) with 5-phase workflow, implementation notes, test scenarios
+- Specification enabled parallel work: Vi implemented scripts while Mylo wrote tests
+- Key handoff: Jinx defined process detection patterns (pgrep for Linux, WMI for Windows), version comparison logic, deployment validation requirements
+
+**Coordination with Mylo (Tester):**
+- Mylo created 32-test suite validating core logic (version comparison, GitHub API parsing, ZIP validation)
+- Tests served as reference implementation: Vi translated Python test logic to bash and PowerShell
+- Mylo validated that file deployment preserves user data (timeline_*.json files not overwritten)
+- Test coverage enabled confidence in script correctness before manual platform testing
+
+**Learnings:**
+1. **Specification-driven parallel work:** Detailed architecture spec from Jinx allowed Vi and Mylo to work independently without blocking
+2. **Python as reference implementation:** Mylo's test functions provided executable documentation for shell script translation
+3. **Cross-platform complexity:** Windows and Linux fundamentally differ (file locking vs. inode swap, process management models). Native scripts (PowerShell, bash) proved simpler than abstraction layer
+4. **Idempotent by design is critical:** Cron jobs run on unknown schedule. Scripts must fail gracefully and produce same result on repeated runs
+5. **Process management is hard:** Capturing PID + command args, graceful stop with fallback to force kill, restart with original args — all platform-specific edge cases
+

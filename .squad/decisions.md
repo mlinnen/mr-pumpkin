@@ -1980,6 +1980,81 @@ This protocol design:
 
 ---
 
+### 2026-03-02: Issue #33 — Auto-Update Architecture Design
+
+**By:** Jinx (Lead)  
+**Date:** 2026-03-02  
+**Status:** Architecture Complete — Implementation in Progress
+
+**What:** Designed external script approach for automated version checking and deployment without manual intervention. Requires working as cron job (Linux/macOS/Raspberry Pi) or scheduled task (Windows).
+
+**Decision:** External script approach (separate `update.sh` and `update.ps1`, not embedded in pumpkin_face.py core)
+
+**Rationale:** 
+- Cleaner separation of concerns — graphics app doesn't manage system updates
+- Reliability — update logic runs independently, can modify main app while stopped
+- Simplicity — scheduled via standard OS tools without modifying core code
+- Safety — can't corrupt running process by overwriting it
+
+**5-Phase Update Workflow:**
+1. **Check** — Compare local VERSION file against latest GitHub release tag via API
+2. **Download** — Fetch new release ZIP (gh CLI preferred, direct URL fallback)
+3. **Stop** — Gracefully stop pumpkin_face.py if running (SIGTERM/taskkill with fallback)
+4. **Deploy** — Extract ZIP to temp, validate structure, copy files, run pip install
+5. **Restart** — Launch pumpkin_face.py with original command line arguments if was running
+
+**Key Design Choices:**
+- **Process detection:** Match full command line pattern (`pumpkin_face.py`), not process name
+- **Version comparison:** Semantic versioning (major.minor.patch), skip if local >= remote
+- **Graceful stop:** SIGTERM (Linux/macOS) or Stop-Process (Windows), wait 5 sec, force kill if stuck
+- **Deployment validation:** Check required files (pumpkin_face.py, VERSION, requirements.txt)
+- **Restart logic:** Capture original command arguments, launch as background process
+- **Logging:** Append-only log file with timestamps for cron job visibility
+- **Idempotent:** Running multiple times safe, logs "Already up-to-date" if no update
+- **Exit codes:** 0 = success, 1 = failure (for scheduled task monitoring)
+
+**Implementation Scope:**
+- Vi creates `update.sh` (Linux/macOS/Pi) and `update.ps1` (Windows)
+- Mylo validates version comparison logic, process detection, error handling (32 tests planned)
+- Vi adds documentation (README section + docs/auto-update.md)
+- Platform testing on Ubuntu, macOS, Windows, Raspberry Pi
+
+**Architectural Insight:** Update mechanism as external script enables cron/scheduler integration without coupling system administration logic to graphics rendering code. This pattern keeps core application focused on primary responsibility while providing automated update via standard OS tools.
+
+---
+
+### 2026-03-02: Issue #33 — Auto-Update Implementation Complete
+
+**By:** Vi (Backend Dev), Mylo (Tester)  
+**Date:** 2026-03-02  
+**Status:** Implementation Complete — Ready for Integration Testing
+
+**Deliverables:**
+- **update.sh** (339 lines) — Linux/macOS/Raspberry Pi update script with pgrep process detection, SIGTERM/SIGKILL stop, gh CLI/curl download, semantic version comparison
+- **update.ps1** (401 lines) — Windows update script with WMI process detection, Stop-Process fallback, Invoke-WebRequest download, identical 5-phase workflow
+- **docs/auto-update.md** (400+ lines) — Architecture explanation, platform setup instructions, cron/Task Scheduler examples, troubleshooting guide
+- **README.md** — Added Auto-Update section with quick start examples
+- **tests/test_auto_update.py** — 32 comprehensive tests (all passing)
+  - TestVersionComparison (11 tests): semantic versioning logic, 'v' prefix handling, multi-digit comparisons
+  - TestGitHubApiParsing (6 tests): JSON extraction, field validation, malformed data handling
+  - TestZipValidation (8 tests): ZIP integrity, required files, corrupted file handling
+  - TestFileOperations (4 tests): temp directory creation, deployment, user data preservation
+  - TestEdgeCases (3 tests): pre-release versions, large version numbers, non-existent directories
+
+**Key Implementation Details:**
+- **Version comparison:** Parse major.minor.patch as integer tuples for correct ordering (0.5.9 < 0.5.10)
+- **Download strategy:** Check for gh CLI availability, fallback to direct URL download
+- **Process detection:** Bash pgrep with bracket trick avoids grep match; PowerShell WMI query for CommandLine
+- **Graceful stop:** SIGTERM wait loop, SIGKILL if needed; Stop-Process with -Force fallback
+- **ZIP validation:** Check for pumpkin_face.py, VERSION, requirements.txt before overwriting
+- **Idempotent design:** Safe to run multiple times from cron jobs
+- **Logging:** YYYY-MM-DD HH:MM:SS | PHASE | Message format
+- **Exit codes:** 0 = success/already-up-to-date, 1 = failure
+
+**Branch & PR:** squad/33-auto-update → dev (PR #52)
+
+---
+
 
 ---
 
