@@ -14,15 +14,18 @@ Mr. Pumpkin is a controllable animated jack-o'-lantern face that listens for com
 - **Animate the nose** (wiggle, twitch, scrunch)
 - **Record and playback sequences** (timeline system for complex performances)
 
-All communication happens through simple text commands sent over TCP sockets.
+All communication happens through simple text commands sent over TCP sockets (port 5000) or WebSocket connections (port 5001).
 
 ## Connection Basics
 
-**Protocol:** TCP socket connection  
-**Default Port:** 5000  
-**Host:** `localhost` (or the IP address of the machine running Mr. Pumpkin)
+Mr. Pumpkin supports two connection methods:
 
-### Connection Pattern
+### TCP Socket Connection (Port 5000)
+
+**Protocol:** TCP socket  
+**Port:** 5000  
+**Host:** `localhost` (or the IP address of the machine running Mr. Pumpkin)  
+**Connection Style:** One connection per command
 
 Each command follows this pattern:
 
@@ -33,6 +36,21 @@ Each command follows this pattern:
 5. **Close** the connection
 
 **Important:** Use one connection per command. Don't try to reuse connections.
+
+### WebSocket Connection (Port 5001)
+
+**Protocol:** WebSocket  
+**Port:** 5001  
+**Host:** `ws://localhost:5001`  
+**Connection Style:** Persistent connection—send multiple commands without reconnecting  
+**Requirements:** The `websockets` library must be installed (`pip install websockets`). If not available, the WebSocket server will be disabled.
+
+WebSocket connections are persistent. Send multiple commands on the same connection, making them ideal for interactive control and streaming updates.
+
+### Which Should I Use?
+
+- **TCP (Port 5000):** Best for simple scripts, one-off commands, and fire-and-forget operations
+- **WebSocket (Port 5001):** Best for interactive applications, ongoing control sessions, real-time streaming, and reducing connection overhead when sending many commands
 
 ## Quick Start
 
@@ -55,6 +73,141 @@ send_command('happy')
 ```
 
 That's it! Five lines and you're controlling a pumpkin face.
+
+## WebSocket Connection
+
+WebSocket provides a persistent connection that lets you send multiple commands without reconnecting. This is more efficient for interactive applications and real-time control.
+
+### Prerequisites
+
+Install the `websockets` library on the server:
+
+```bash
+pip install websockets
+```
+
+Then restart Mr. Pumpkin to enable WebSocket support.
+
+### Python WebSocket Example
+
+```python
+import asyncio
+import websockets
+
+async def pumpkin_session():
+    async with websockets.connect('ws://localhost:5001') as ws:
+        # Send multiple commands on one persistent connection
+        await ws.send('happy')
+        await ws.send('blink')
+        await ws.send('gaze 45 30')
+        
+        # Commands that return responses
+        await ws.send('timeline_status')
+        response = await ws.recv()
+        print(response)
+        
+        await ws.send('list')
+        recordings = await ws.recv()
+        print(recordings)
+
+asyncio.run(pumpkin_session())
+```
+
+**Key Differences from TCP:**
+- One connection handles many commands (no reconnecting)
+- Responses only sent for commands that return data (fire-and-forget commands like `happy` or `blink` get no response)
+- Perfect for streaming control or interactive applications
+
+### Node.js WebSocket Example
+
+```javascript
+const WebSocket = require('ws');
+
+const ws = new WebSocket('ws://localhost:5001');
+
+ws.on('open', () => {
+    // Send multiple commands
+    ws.send('happy');
+    ws.send('blink');
+    ws.send('timeline_status');
+});
+
+ws.on('message', (data) => {
+    console.log('Response:', data.toString());
+});
+
+ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+});
+```
+
+**Install the `ws` package first:**
+```bash
+npm install ws
+```
+
+### Interactive Control Pattern
+
+WebSocket excels at continuous, interactive control:
+
+```python
+import asyncio
+import websockets
+
+async def interactive_pumpkin():
+    async with websockets.connect('ws://localhost:5001') as ws:
+        # Stream of control commands
+        emotions = ['happy', 'surprised', 'scared', 'neutral']
+        
+        for emotion in emotions:
+            await ws.send(emotion)
+            await asyncio.sleep(2)  # 2 seconds between expressions
+            await ws.send('blink')
+            await asyncio.sleep(1)
+        
+        # Check status at the end
+        await ws.send('timeline_status')
+        status = await ws.recv()
+        print(f"Final status: {status}")
+
+asyncio.run(interactive_pumpkin())
+```
+
+### Upload Timeline via WebSocket
+
+WebSocket uses a simpler single-message format for timeline uploads (unlike TCP's multi-step handshake):
+
+```python
+import asyncio
+import websockets
+import json
+
+async def upload_timeline_ws(filename, timeline_data):
+    async with websockets.connect('ws://localhost:5001') as ws:
+        # Single message: command + filename + JSON content
+        json_str = json.dumps(timeline_data)
+        message = f"upload_timeline {filename} {json_str}"
+        await ws.send(message)
+        
+        # Wait for response
+        response = await ws.recv()
+        print(response)  # "OK Saved to <filename>.json"
+
+# Usage
+timeline = {
+    "version": "1.0",
+    "duration_ms": 3000,
+    "commands": [
+        {"timestamp_ms": 0, "command": "happy"},
+        {"timestamp_ms": 1000, "command": "blink"},
+        {"timestamp_ms": 2000, "command": "neutral"}
+    ]
+}
+
+asyncio.run(upload_timeline_ws('my_show', timeline))
+```
+
+**Note:** WebSocket upload is simpler than TCP—just one message with the full command, filename, and JSON content inline.
 
 ## Command Reference
 
@@ -238,7 +391,9 @@ response = send_command('reset')
 
 ### Upload Timeline
 
-Upload a pre-made timeline file (multi-step protocol):
+Upload a pre-made timeline file. The protocol differs between TCP and WebSocket.
+
+#### TCP Upload (Multi-Step Protocol)
 
 ```python
 import socket
@@ -272,6 +427,29 @@ def upload_timeline(filename, json_content):
 with open('my_timeline.json', 'r') as f:
     timeline_data = f.read()
 response = upload_timeline('uploaded_show', timeline_data)
+```
+
+#### WebSocket Upload (Single Message)
+
+WebSocket uses a simpler single-message format:
+
+```python
+import asyncio
+import websockets
+import json
+
+async def upload_timeline_ws(filename, json_content):
+    async with websockets.connect('ws://localhost:5001') as ws:
+        # Single message with inline JSON
+        message = f"upload_timeline {filename} {json_content}"
+        await ws.send(message)
+        response = await ws.recv()
+        return response
+
+# Usage
+with open('my_timeline.json', 'r') as f:
+    timeline_data = f.read()
+response = asyncio.run(upload_timeline_ws('uploaded_show', timeline_data))
 ```
 
 ## Reading Responses
@@ -541,8 +719,23 @@ upload_timeline('custom_sequence', json.dumps(timeline))
 **Solutions:**
 - Use the server's IP address instead of `localhost`
 - Ensure the server is binding to `0.0.0.0` not just `127.0.0.1` (check `pumpkin_face.py`)
-- Configure firewall to allow port 5000
+- Configure firewall to allow port 5000 (TCP) and/or port 5001 (WebSocket)
 - Verify both machines are on the same network (or proper routing exists)
+
+### WebSocket Not Available
+
+**Problem:** Can't connect to port 5001, or WebSocket server not responding.
+
+**Symptoms:**
+- Connection refused on port 5001
+- Mr. Pumpkin console shows "websockets library not available, WebSocket server disabled"
+
+**Solutions:**
+- Install the `websockets` library: `pip install websockets`
+- Restart Mr. Pumpkin: `python pumpkin_face.py`
+- Verify port 5001 isn't being used by another process: `netstat -an | findstr 5001` (Windows) or `lsof -i :5001` (Linux/Mac)
+- Check for firewall blocking port 5001
+- Use TCP on port 5000 as a fallback if WebSocket isn't available
 
 ---
 

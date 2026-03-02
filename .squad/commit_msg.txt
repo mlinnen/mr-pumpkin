@@ -1,6 +1,0 @@
-docs: add end-user documentation for issue #53
-
-Add docs/index.md, docs/installation.md, and docs/building-a-client.md
-covering service installation, update scheduling, and client integration.
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
