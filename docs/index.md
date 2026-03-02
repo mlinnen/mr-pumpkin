@@ -13,6 +13,9 @@ Automated update scripts for keeping your Mr. Pumpkin installation current with 
 ### [Building a Client](building-a-client.md)
 Developer guide for creating client applications that send commands to Mr. Pumpkin via TCP (port 5000) or WebSocket (port 5001).
 
+### [Recording Skill](recording-skill.md)
+Describe an animation in plain English and have it automatically generated and uploaded to your pumpkin server using an LLM (Google Gemini).
+
 ## Quick Start
 
 Once installed, run Mr. Pumpkin with:

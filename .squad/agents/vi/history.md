@@ -593,3 +593,50 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 - Async/await examples for Python WebSocket (modern idiomatic approach)
 - Preserved all existing TCP docs (backward compatibility)
 - Surgical edits only — no rewrites of working content
+
+### Recording Skill Package (Issue #39 — WI-1, WI-2, WI-3, WI-7)
+
+**What:** Built the `skill/` package — LLM-powered timeline generator and upload client for Mr. Pumpkin.
+
+**Files created:**
+- `skill/__init__.py` — Package with public API exports
+- `skill/generator.py` — Prompt-to-Timeline generator
+- `skill/uploader.py` — TCP and WebSocket upload client
+- `skill/requirements.txt` — Skill-specific dependencies
+
+**Key import path pattern:** `skill/generator.py` uses `sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))` before `from timeline import Timeline` to handle the parent-directory import cleanly when running as a package.
+
+**LLM provider abstraction pattern:**
+- Abstract `LLMProvider` base class with single `generate(system_prompt, user_prompt) -> str` method
+- `GeminiProvider` reads API key from `GEMINI_API_KEY` (fallback: `GOOGLE_API_KEY`)
+- Provider passed as optional arg to `generate_timeline()` — defaults to `GeminiProvider`
+- Pattern enables swap to OpenAI / Anthropic / local models without changing call sites
+
+**System prompt strategy:**
+- Full 28-command vocabulary embedded as formatted table in system prompt constant `_SYSTEM_PROMPT`
+- Two few-shot example timelines included (surprised→relieved, getting sleepy)
+- Timing guidelines from Ekko's domain knowledge (blink ~300ms, expressions ~500ms gap)
+- Schema constraints: version "1.0", ascending time_ms, duration_ms = last time_ms + buffer
+
+**Repair heuristic pattern:**
+- `_repair(data)` normalises `timestamp_ms` → `time_ms` in command entries before validation
+- Handles common LLM mistake (our own docs had this inconsistency per architecture doc)
+- `_extract_json(text)` strips ```json ... ``` or ``` ... ``` code fences from LLM responses
+
+**Validation strategy:** Parse → Repair → `Timeline.from_dict()` — raises `ValueError` with clear message if validation fails.
+
+**TCP upload pattern (from client_example.py):**
+1. Connect with 10s timeout
+2. Send `upload_timeline <filename>\n`
+3. Wait for `READY` line
+4. Send JSON + `\n`
+5. Send `END_UPLOAD\n`
+6. Read response; raise `ValueError` on ERROR
+
+**WebSocket upload pattern:** Single-message `upload_timeline <filename> <json>`, async via `asyncio.run()`.
+
+**WebSocket optional dependency:** Uses `importlib.util.find_spec("websockets")` to check availability; falls back to TCP with `RuntimeWarning` if ws requested but unavailable.
+
+**Root requirements.txt conflict:** Root `requirements.txt` pins `websockets>=11.0,<12.0` but `skill/requirements.txt` needs `>=12.0`. Must be reconciled — see decisions inbox `vi-skill-package-decisions.md`.
+
+**Doc bug fixed (WI-1):** All 4 occurrences of `timestamp_ms` in `docs/building-a-client.md` changed to `time_ms` to match `TimelineEntry.from_dict()` which reads `data["time_ms"]`.
