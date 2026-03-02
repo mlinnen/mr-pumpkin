@@ -5,6 +5,16 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-03-02
+
+### Added
+- End-user documentation in `docs/` folder (issue #53)
+  - `docs/index.md` — documentation hub and quick-start guide
+  - `docs/installation.md` — running Mr. Pumpkin as a system service (Linux systemd, Windows Task Scheduler/NSSM)
+  - `docs/building-a-client.md` — comprehensive client integration guide with TCP and WebSocket protocols, full command reference, Python/Node.js/C# examples, timeline format, and troubleshooting
+
+---
+
 ## [0.5.5] - 2026-03-02
 
 ### Added
