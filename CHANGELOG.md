@@ -5,6 +5,25 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] - 2026-03-02
+
+### Added
+- AI-powered recording skill (`skill/` package) — describe an animation in plain English and have it generated and uploaded automatically using Google Gemini
+  - `skill/cli.py` — command-line interface (`python -m skill "make the pumpkin look confused"`)
+  - `skill/generator.py` — LLM-backed timeline generation with pluggable provider interface
+  - `skill/uploader.py` — TCP upload client with dry-run and validation support
+  - `skill/timing_guidelines.md` — LLM-facing timing reference used during generation
+- `docs/recording-skill.md` — user guide for the recording skill
+- `docs/timeline-schema.md` — full reference for the timeline JSON format, command vocabulary, and timing rules
+- Linked both new docs from `docs/index.md`
+
+### Fixed
+- TCP upload deadlock on Windows loopback — Nagle's algorithm was batching the JSON payload and `END_UPLOAD` sentinel into one TCP segment, causing the server's `recv` loop to miss the sentinel. Fixed with a line-buffered accumulation loop in `pumpkin_face.py`
+- CI release workflow now handles pre-existing GitHub release tags — uses `gh release upload --clobber` instead of failing on duplicate `gh release create`
+- CI release notes now correctly diff from the previous semver tag (not the previous tag on `main`) using `--notes-start-tag`
+
+---
+
 ## [0.5.7] - 2026-03-03
 
 ### Added

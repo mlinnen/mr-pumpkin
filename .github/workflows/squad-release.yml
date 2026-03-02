@@ -47,15 +47,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.version.outputs.tag }}"
-          ZIP="mr-pumpkin-v${{ steps.version.outputs.version }}.zip"
-          # Find the most recent semver tag that isn't the current one
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP="mr-pumpkin-v${VERSION}.zip"
+
+          # Extract this version's section from CHANGELOG.md as release notes
+          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md | sed '/^---$/d' | sed '/^[[:space:]]*$/d;/./!d')
+          if [ -n "$NOTES" ]; then
+            echo "$NOTES" > /tmp/release-notes.md
+            NOTES_FLAG="--notes-file /tmp/release-notes.md"
+          else
+            NOTES_FLAG="--generate-notes"
+          fi
+
+          # Find the most recent semver tag that isn't the current one (for --generate-notes fallback)
           PREV_TAG=$(git tag --sort=-version:refname \
             | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
             | grep -v "^${TAG}$" \
             | head -1)
+
           if gh release view "$TAG" > /dev/null 2>&1; then
             gh release upload "$TAG" "$ZIP" --clobber
-          elif [ -n "$PREV_TAG" ]; then
+            # Also update release notes if we have a CHANGELOG entry
+            if [ -f /tmp/release-notes.md ]; then
+              gh release edit "$TAG" --notes-file /tmp/release-notes.md
+            fi
+          elif [ "$NOTES_FLAG" = "--generate-notes" ] && [ -n "$PREV_TAG" ]; then
             gh release create "$TAG" \
               --title "$TAG" \
               --generate-notes \
@@ -65,7 +81,7 @@ jobs:
           else
             gh release create "$TAG" \
               --title "$TAG" \
-              --generate-notes \
+              $NOTES_FLAG \
               --latest \
               "$ZIP"
           fi
