@@ -567,3 +567,29 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 **Key insight:** The upload_timeline protocol is complex (5-step handshake) compared to other commands — deserves its own section with detailed example code.
 
 **Links to existing resources:** Points users to `client_example.py` for complete working implementation.
+
+## WebSocket Documentation Update
+
+**What:** Updated docs/building-a-client.md to document WebSocket support alongside existing TCP documentation.
+
+**Changes made:**
+1. **Intro update:** Changed "All communication happens through simple text commands sent over TCP sockets" to mention both TCP (port 5000) and WebSocket (port 5001)
+2. **Connection Basics expansion:** Split into two subsections (TCP and WebSocket) with clear comparison table
+3. **New WebSocket Connection section:** Comprehensive guide with Python async/await examples, Node.js examples, interactive control patterns
+4. **Upload Timeline:** Split into TCP (multi-step) vs WebSocket (single message) methods
+5. **Troubleshooting:** Added "WebSocket Not Available" entry (missing websockets library, port conflicts)
+
+**Key technical facts documented:**
+- Port 5001 for WebSocket (vs TCP on 5000)
+- Persistent connection model (one connection, many commands)
+- Requires websockets library (pip install websockets)
+- Same commands work on both protocols
+- Responses only sent for commands that return data (fire-and-forget commands get no response over WebSocket)
+- Upload timeline simpler on WebSocket: single message format vs TCP 5-step handshake
+- Server gracefully disables WebSocket if library not installed
+
+**Documentation philosophy:**
+- Side-by-side comparison helps users choose protocol (TCP for scripts, WebSocket for interactive/streaming)
+- Async/await examples for Python WebSocket (modern idiomatic approach)
+- Preserved all existing TCP docs (backward compatibility)
+- Surgical edits only — no rewrites of working content
