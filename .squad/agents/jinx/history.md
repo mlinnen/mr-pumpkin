@@ -153,3 +153,18 @@
 **Test fixes:** Removed `@pytest.mark.xfail` decorators from the 2 recording tests and updated test assertions to match TimelineEntry object structure (`.command` attribute, `.args["magnitude"]` for parameters, proper `.start()` initialization).
 
 **Key architectural insight:** Recording capture is a separate concern from command execution - command aliases must be explicitly whitelisted in BOTH the command router AND the recording capture logic to achieve full integration. All 21 wiggle_nose tests now pass.
+
+### Issue #53 — End-User Documentation (2026-02-27)
+
+**Documentation structure decisions:**
+- Created `docs/index.md` as GitHub Pages landing page with brief project description and navigation to all user guides
+- Created `docs/installation.md` as comprehensive service installation guide covering Linux systemd and Windows Task Scheduler/NSSM approaches
+- Positioned installation docs as end-user focused (step-by-step, minimal jargon) vs developer docs (building-a-client.md being created by Vi)
+- Documented both TCP (port 5000) and WebSocket (port 5001) server ports for completeness
+
+**Service architecture recommendations:**
+- **Linux/Raspberry Pi**: systemd service with `graphical.target` dependency, `DISPLAY=:0` environment variable, absolute paths
+- **Windows simplest approach**: Task Scheduler with `AtStartup` trigger, Interactive logon type (required for pygame/SDL2 display access)
+- **Windows advanced approach**: NSSM for true Windows Service behavior, though note graphical limitation (background services have restricted display access)
+
+**Key insight:** Task Scheduler with Interactive logon is the most practical Windows solution for Mr. Pumpkin since it's a graphical application requiring display access. NSSM is documented as advanced option but comes with desktop access limitations inherent to Windows Services.
