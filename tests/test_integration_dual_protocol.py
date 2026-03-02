@@ -679,15 +679,12 @@ class TestLargePayloads:
             "commands": commands
         }
         
-        # Save to file
-        timeline_file = recordings_dir / "test_large_ws.json"
-        timeline_file.write_text(json.dumps(timeline_data, indent=2))
+        # Upload via WebSocket using inline format: upload_timeline <filename> <json>
+        json_str = json.dumps(timeline_data)
+        response = ws_send_sync(f"upload_timeline test_large_ws {json_str}", timeout=5.0)
         
-        # Upload via WebSocket
-        response = ws_send_sync(f"upload_timeline test_large_ws {timeline_file}", timeout=5.0)
-        
-        # Should succeed or return OK
-        assert "ERROR" not in response or response == ""
+        # Should return OK
+        assert response == "OK Uploaded test_large_ws.json"
         
         # Verify file exists
         time.sleep(0.2)
