@@ -1974,6 +1974,94 @@ This protocol design:
 
 **What:** WebSocket clients send `upload_timeline` as a single inline message: `upload_timeline <filename> <json_string>`. The WebSocket handler (`_ws_handler` in `pumpkin_face.py`) intercepts this command **before** routing to `command_router`, parses filename and JSON content from the message, and calls `file_manager.upload_timeline(filename, json_content)` directly.
 
+---
+
+### 2026-02-27: Command Aliases Require Dual Whitelisting for Recording Integration
+
+**By:** Jinx (Lead)  
+**Issue:** #50  
+**Status:** Accepted
+
+**What:** Command aliases must be explicitly added to BOTH the command router (`command_handler.py`) and recording capture whitelist (`pumpkin_face.py` lines 1211+). Adding a command alias to the router alone does NOT automatically whitelist it for timeline recording.
+
+**Why:** Command execution and recording capture are separate architectural layers. The recording capture layer explicitly whitelists which commands are recordable, preventing accidental recording of debug/meta commands.
+
+**Pattern:** For magnitude-based nose commands like `wiggle_nose`, add identical parameter parsing in both layers:
+```python
+elif cmd == "wiggle_nose":
+    magnitude = 50.0
+    if len(parts) >= 2:
+        try:
+            magnitude = float(parts[1])
+        except ValueError:
+            pass
+    self.recording_session.record_command(cmd, {"magnitude": magnitude})
+```
+
+**Consequences:**
+- ✅ Explicit control over recordable commands
+- ⚠️ Manual synchronization required; risk of forgetting both locations
+- ⚠️ Duplicate parameter parsing logic
+
+**Validation:** All 21 `test_wiggle_nose_alias.py` tests pass (including 2 recording integration tests). Full suite: 410 passed, 41 failed (pre-existing TCP timeouts).
+
+**References:** Issue #50, `pumpkin_face.py` (lines 1211-1228), `command_handler.py` (wiggle_nose alias), tests: `tests/test_wiggle_nose_alias.py`
+
+---
+
+### 2026-03-01: wiggle_nose Test Coverage Complete
+
+**By:** Mylo (Tester)  
+**Issue:** #50  
+**Status:** ✅ Implemented
+
+**What:** Created comprehensive test suite `test_wiggle_nose_alias.py` with 21 tests covering command recognition, alias equivalence, edge cases, recording integration, and parameter parsing.
+
+**Why:** The `wiggle_nose` command alias added in PR #51 had zero dedicated test coverage (while `twitch_nose` had 45+ tests), creating regression risk.
+
+**Test Results:** 19 passed, 2 xfail (expected failures documenting a discovered bug)
+
+**Discovered Bug:** `wiggle_nose` is not included in the `_capture_command_for_recording()` whitelist in `pumpkin_face.py` (lines 1211-1228). Command executes correctly but is silently dropped from timeline recordings.
+
+**Follow-up:** Jinx added `wiggle_nose` handling to recording capture (documented in "Command Aliases Require Dual Whitelisting" decision above).
+
+**References:** PR #51, Issue #50, branch `squad/50-nose-wiggle-reset`, `tests/test_wiggle_nose_alias.py`
+
+---
+
+### 2026-03-01: Issue #33 Auto-Update Test Suite
+
+**By:** Mylo (Tester)  
+**Issue:** #33  
+**Status:** ✅ Complete — All 32 tests passing
+
+**What:** Created comprehensive test suite for auto-update logic per Jinx's architecture specification. Tests validate core logic to be embedded in `update.sh` and `update.ps1` scripts.
+
+**Coverage:** 32 tests across 5 test classes
+- TestVersionComparison (11 tests): Semantic version comparison logic
+- TestGitHubApiParsing (6 tests): JSON parsing for GitHub releases API
+- TestZipValidation (8 tests): ZIP file integrity and required file checking
+- TestFileOperations (4 tests): Temp directory creation and file deployment
+- TestEdgeCases (3 tests): Pre-release versions, large numbers, error conditions
+
+**Test File:** `tests/test_auto_update.py`
+
+**Key Patterns:**
+- Parse version as tuple of integers (major, minor, patch) for correct comparison
+- Validate ZIP contents without extraction (use `zipfile.ZipFile.namelist()`)
+- Preserve user data during deployment (skip `timeline_*.json` files when `preserve_configs=True`)
+
+**Limitations (v1):**
+- Pre-release versions (0.6.0-beta.1) not supported — will error
+- Rollback mechanism not tested
+- Process detection/restart not tested (shell-specific)
+
+**Dependencies:** Standard library only (pytest, json, tempfile, zipfile, pathlib, shutil)
+
+**For Vi:** Tests serve as reference implementation for shell script logic. Scripts should implement behavior matching these test criteria.
+
+**References:** Issue #33, `tests/test_auto_update.py`, branch `squad/33-auto-update`
+
 **Why:** TCP uses a multi-step handshake protocol (send filename → recv READY → send JSON → send END_UPLOAD). This stateful protocol cannot be replicated over WebSocket's single-message model. The `command_router` returns the string `"UPLOAD_MODE"` as a placeholder when it sees `upload_timeline` — this is meaningless to a WS client. The WebSocket handler therefore short-circuits `upload_timeline` and handles it inline, keeping both protocols functional with their respective designs.
 
 **Security:** Path separators (`/`, `\`) are rejected in the filename to prevent directory traversal. Invalid JSON is caught by `file_manager.upload_timeline` and returned as an `ERROR` response.
