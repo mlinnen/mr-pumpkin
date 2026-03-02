@@ -2,6 +2,11 @@
 
 Mr. Pumpkin is an animated 2D pumpkin face that can be controlled remotely via TCP or WebSocket commands. Designed for projection mapping onto 3D surfaces, it renders expressive faces using high-contrast black-and-white graphics optimized for real-world projection scenarios.
 
+## What's New
+
+### [What's New / Changelog](what-is-new.md)
+Full release history — every version's added features, fixes, and changes.
+
 ## User Guides
 
 ### [Getting Started: Installation](installation.md)
@@ -15,6 +20,9 @@ Developer guide for creating client applications that send commands to Mr. Pumpk
 
 ### [Recording Skill](recording-skill.md)
 Describe an animation in plain English and have it automatically generated and uploaded to your pumpkin server using an LLM (Google Gemini).
+
+### [Timeline JSON Schema](timeline-schema.md)
+Reference for the timeline JSON format: top-level structure, full command vocabulary, timing guidelines, and validation rules.
 
 ## Quick Start
 
