@@ -168,3 +168,33 @@
 - **Windows advanced approach**: NSSM for true Windows Service behavior, though note graphical limitation (background services have restricted display access)
 
 **Key insight:** Task Scheduler with Interactive logon is the most practical Windows solution for Mr. Pumpkin since it's a graphical application requiring display access. NSSM is documented as advanced option but comes with desktop access limitations inherent to Windows Services.
+
+### Issue #39 — LLM Recording Skill Architecture Analysis (2026-03-02)
+
+**Timeline JSON format (canonical from timeline.py):**
+- Schema: `{"version": "1.0", "duration_ms": int, "commands": [{"time_ms": int, "command": str, "args": {}}]}`
+- `TimelineEntry.from_dict()` expects `data["time_ms"]` as the key — NOT `timestamp_ms` (which docs/building-a-client.md incorrectly shows in examples)
+- `duration_ms` must equal or exceed the largest `time_ms` in commands
+- `args` is optional; omitted for simple commands like `blink`
+- Validation happens via `Timeline.from_dict()` which checks `version` and `commands` fields
+
+**Recording command vocabulary:**
+- 28+ distinct recordable commands identified from `_capture_command_for_recording()` in pumpkin_face.py
+- Commands split into: expressions (7), animations (5 no-arg), gaze (2 arg variants), eyebrows (8 no-arg + 3 numeric), head movement (5), nose (4), projection (3)
+- Expression commands are recorded as `set_expression` with `{"expression": "<name>"}` args — NOT as bare expression names
+
+**Upload API:**
+- TCP (port 5000): Multi-step handshake: `upload_timeline <name>\n` → `READY` → JSON + `\n` → `END_UPLOAD\n` → response
+- WebSocket (port 5001): Single message: `upload_timeline <name> <json_string>` → response
+- Both paths use `FileManager.upload_timeline()` which validates via `Timeline.from_dict()` before writing to `~/.mr-pumpkin/recordings/`
+- Filenames must not contain path separators
+
+**Skill architecture decision:**
+- Proposed as `skill/` Python package co-located in repo (shares `timeline.py` imports for validation)
+- Core components: LLM prompt-to-timeline generator, upload client, CLI entry point
+- LLM provider should be configurable (OpenAI default) via env vars
+- JSON repair layer recommended to handle common LLM output errors (e.g., `timestamp_ms` → `time_ms` key normalization)
+- Full work breakdown written to `.squad/decisions/inbox/jinx-issue39-architecture.md`
+
+**Documentation discrepancy found:**
+- `docs/building-a-client.md` uses `timestamp_ms` in timeline JSON examples, but `timeline.py` uses `time_ms`. This needs to be fixed regardless of issue #39, and is a trap the LLM generator will fall into if fed the docs as reference.

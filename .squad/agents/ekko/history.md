@@ -378,3 +378,60 @@ This establishes the pattern for rendering scalable shapes with vertex math. Key
 Nose animations use the same deterministic frame-based pattern as head movement (not time-based like old implementations). This ensures consistent behavior across different frame rates and simplifies testing. Progress advances by fixed increments each frame, making animation timing predictable and reproducible.
 
 📌 Team update (2026-02-23): Nose graphics and animations implemented for Issue #19
+
+### Animation Timing Guidelines (Issue #39: Recording Skill)
+
+**File:** `skill/timing_guidelines.md`
+
+**Purpose:** LLM-friendly document that specifies how long each command takes and how to space animations for natural feel. This document is embedded in the system prompt for the recording skill generator (Gemini) so the LLM can construct realistic animation sequences.
+
+**Key Timing Patterns Documented:**
+
+1. **Per-command durations** — empirically derived from graphics rendering:
+   - Blink: 200–300ms (250ms default)
+   - Expression transition: 300–600ms (depends on emotional shift magnitude)
+   - Gaze: 200–800ms (scales with angle: 200ms for ±10°, 800ms for ±80°)
+   - Head turns: 300–600ms (scaling with pixel displacement)
+   - Eyebrow movements: 150–400ms
+   - Eye rolls: 1000–1500ms (full 360° rotation)
+   - Nose animations: 200–500ms (twitch < scrunch < wiggle)
+
+2. **Gap rules for pacing:**
+   - Default minimum: 100–150ms between commands
+   - Expression transitions need 300–500ms breathing room (don't interrupt mid-transition)
+   - Eye movements can chain faster: 50–100ms (gaze → gaze → gaze)
+   - Head turns need exclusive time: 300–600ms gap before next major animation
+
+3. **Natural choreography patterns** — seven worked examples showing emotion-aligned sequences:
+   - Surprise: eyebrow_raise → set_expression surprised → gaze upward
+   - Wink & look: wink_right → gaze → happy expression
+   - Confused: asymmetric eyebrows → glance sideways
+   - Scared loop: scared expression → raised brows → rolling eyes → upward gaze
+   - Exploration: chained gaze commands 400ms apart simulating "looking around"
+
+4. **Anti-patterns to avoid:**
+   - Eye rolls during happy/sad/angry (conflicts with emotion)
+   - Back-to-back expression changes < 200ms (visual flicker)
+   - Head turns while sleeping (breaks immersion)
+   - Gaze > 70° (unnatural extremes)
+   - Overlapping blinks/winks (rapid fluttering)
+
+5. **Duration categories:**
+   - Short: 2–5 seconds (simple sequences)
+   - Medium: 5–15 seconds (multi-step choreography)
+   - Long: 15–30 seconds (elaborate loops)
+
+6. **Three worked examples** with detailed timing annotations:
+   - Simple greeting (3s): blink → wink → happy → gaze
+   - Scared reaction (5.5s): surprise → scared → rolling eyes → upward gaze → recovery
+   - Thoughtful exploration (8.5s): gaze scanning loop → thinking pose → head turn → realization/happiness
+
+**Design Pattern Insight:** Animation timing is orthogonal to the command vocabulary and JSON schema. By isolating timing knowledge in a single reference document, the LLM can focus on choreography choices (what emotion to convey) separately from technical constraints (how long a blink takes). This mirrors the graphics system's architecture where animations are modular and composable.
+
+**Verification:** Generated document is structured for AI comprehension:
+- Tables for quick reference (durations, command vocabulary)
+- Clear "things to avoid" with reasoning
+- Three complete worked examples showing annotation style
+- Consistent terminology matching codebase (time_ms, args, expression enums)
+
+📌 Team update (2026-03-02): Animation timing guidelines created for LLM skill generator (Issue #39)

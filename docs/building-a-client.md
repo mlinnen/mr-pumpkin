@@ -198,9 +198,9 @@ timeline = {
     "version": "1.0",
     "duration_ms": 3000,
     "commands": [
-        {"timestamp_ms": 0, "command": "happy"},
-        {"timestamp_ms": 1000, "command": "blink"},
-        {"timestamp_ms": 2000, "command": "neutral"}
+        {"time_ms": 0, "command": "happy"},
+        {"time_ms": 1000, "command": "blink"},
+        {"time_ms": 2000, "command": "neutral"}
     ]
 }
 
@@ -608,15 +608,15 @@ Timeline files are JSON documents that store recorded command sequences with pre
   "duration_ms": 5000,
   "commands": [
     {
-      "timestamp_ms": 0,
+      "time_ms": 0,
       "command": "happy"
     },
     {
-      "timestamp_ms": 1000,
+      "time_ms": 1000,
       "command": "blink"
     },
     {
-      "timestamp_ms": 2500,
+      "time_ms": 2500,
       "command": "gaze 45 30"
     }
   ]
@@ -636,12 +636,12 @@ timeline = {
     "created_at": datetime.utcnow().isoformat() + "Z",
     "duration_ms": 5000,
     "commands": [
-        {"timestamp_ms": 0, "command": "neutral"},
-        {"timestamp_ms": 500, "command": "eyebrow_raise"},
-        {"timestamp_ms": 1000, "command": "happy"},
-        {"timestamp_ms": 2000, "command": "blink"},
-        {"timestamp_ms": 3000, "command": "gaze 45 0"},
-        {"timestamp_ms": 5000, "command": "neutral"}
+        {"time_ms": 0, "command": "neutral"},
+        {"time_ms": 500, "command": "eyebrow_raise"},
+        {"time_ms": 1000, "command": "happy"},
+        {"time_ms": 2000, "command": "blink"},
+        {"time_ms": 3000, "command": "gaze 45 0"},
+        {"time_ms": 5000, "command": "neutral"}
     ]
 }
 
@@ -709,7 +709,7 @@ upload_timeline('custom_sequence', json.dumps(timeline))
 - Verify the file exists: `list` command should show it
 - Check JSON syntax if you created the file manually
 - Ensure timeline version is "1.0"
-- Verify `duration_ms` matches the longest `timestamp_ms` in commands
+- Verify `duration_ms` matches the longest `time_ms` in commands
 - Stop any active recording before playback: `record cancel` then `play <file>`
 
 ### Remote Connection Issues
