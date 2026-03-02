@@ -5,6 +5,21 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-03-02
+
+### Added
+- `update.sh` (Linux/macOS/Raspberry Pi) and `update.ps1` (Windows) auto-update scripts
+- 5-phase update workflow: check version → download → stop → deploy → restart
+- GitHub API version check with `gh` CLI preferred, direct URL download fallback
+- Process detection via command line pattern match — preserves original launch arguments
+- Graceful stop with SIGTERM/Stop-Process, 5s timeout, force kill fallback
+- ZIP validation before overwriting files; logs all operations to `mr-pumpkin-update.log`
+- Suitable for cron job (Linux/Pi) or Windows Task Scheduler scheduling
+- `docs/auto-update.md` — detailed platform setup guide
+- README Auto-Update section with cron/Task Scheduler examples
+
+---
+
 ## [0.5.4] - 2026-03-01
 
 ### Fixed
