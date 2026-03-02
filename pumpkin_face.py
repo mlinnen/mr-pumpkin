@@ -1484,6 +1484,23 @@ class PumpkinFace:
         try:
             async for message in websocket:
                 try:
+                    # WebSocket uses inline format: upload_timeline <filename> <json>
+                    # (TCP uses a multi-step handshake; WS sends everything in one message)
+                    if message.startswith("upload_timeline "):
+                        parts = message.split(maxsplit=2)
+                        if len(parts) < 3:
+                            await websocket.send("ERROR upload_timeline requires: upload_timeline <filename> <json>")
+                            continue
+                        filename = parts[1]
+                        if '/' in filename or '\\' in filename:
+                            await websocket.send("ERROR Invalid filename: path separators not allowed")
+                            continue
+                        json_content = parts[2]
+                        if not filename.endswith('.json'):
+                            filename = f"{filename}.json"
+                        self.file_manager.upload_timeline(filename, json_content)
+                        await websocket.send(f"OK Uploaded {filename}")
+                        continue
                     response = self.command_router.execute(message)
                     if response:  # Only send response if non-empty
                         await websocket.send(response)
