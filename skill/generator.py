@@ -168,7 +168,7 @@ class GeminiProvider(LLMProvider):
         ImportError: If the ``google-generativeai`` package is not installed.
     """
 
-    MODEL = "gemini-1.5-flash"
+    MODEL = "gemini-flash-latest"
 
     def __init__(self):
         try:
