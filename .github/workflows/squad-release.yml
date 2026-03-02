@@ -46,11 +46,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.version.outputs.tag }}" \
-            --generate-notes \
-            --latest \
-            mr-pumpkin-v${{ steps.version.outputs.version }}.zip
+          if gh release view "${{ steps.version.outputs.tag }}" > /dev/null 2>&1; then
+            gh release upload "${{ steps.version.outputs.tag }}" \
+              mr-pumpkin-v${{ steps.version.outputs.version }}.zip --clobber
+          else
+            gh release create "${{ steps.version.outputs.tag }}" \
+              --title "${{ steps.version.outputs.tag }}" \
+              --generate-notes \
+              --latest \
+              mr-pumpkin-v${{ steps.version.outputs.version }}.zip
+          fi
 
       - name: Verify release
         env:

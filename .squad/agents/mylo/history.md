@@ -722,3 +722,60 @@ All 41 failures are in `test_tcp_integration.py` — caused by TCP server connec
 - ✅ All edge cases covered per Jinx architecture spec
 - ✅ Zero new dependencies
 - ✅ Tests ready for Vi to include in PR
+
+### Recording Skill Test Suite (Issue #39) - 2026-03-02
+**Anticipatory test suite**: 60 tests across 3 test files for the LLM-powered recording skill
+
+**Test files created:**
+- 	ests/test_skill_generator.py — 27 tests for generate_timeline()
+- 	ests/test_skill_uploader.py — 20 tests for upload_timeline()
+- 	ests/test_skill_integration.py — 13 tests for generator + uploader pipeline
+
+**Test discovery context:**
+- Vi's skill/ package was already partially built when tests landed (skill/generator.py, skill/uploader.py, skill/__init__.py)
+- 60/60 tests pass against Vi's implementation (0 failures)
+- Several architecture-spec behaviors are confirmed implemented: repair heuristic (timestamp_ms→time_ms), code fence stripping, whitespace stripping, LLMProvider interface, GeminiProvider, custom host/port, protocol selection
+
+**Behaviors still to be validated (not yet in Vi's implementation per spec):**
+- Unknown command name validation (Vi's generator delegates to Timeline.from_dict() which may not check command vocabulary)
+- Strict version string validation (only "1.0" accepted)
+- Empty commands list rejection
+- Unsorted time_ms rejection (Timeline.from_dict() behavior unclear)
+- These will need adjustment once Vi adds _validate_extra() fully
+
+**Key implementation discoveries:**
+- upload_timeline() signature: (filename, timeline_dict, host, tcp_port, ws_port, protocol) — filename FIRST
+- tcp_port parameter (not 'port') separates TCP from WebSocket ports
+- Socket is NOT used as context manager — patch 'skill.uploader.socket.socket' not 'socket.socket'
+- Uses sendall() not send() for reliable multi-chunk sends
+- _recv_line() reads chunks until newline (mock recv.side_effect with b"READY\n" etc.)
+- WebSocket uses asyncio.run() via _upload_ws() helper — mockable at 'skill.uploader._upload_ws'
+- GeminiProvider takes NO constructor args — reads GEMINI_API_KEY from env internally
+- Also accepts GOOGLE_API_KEY as fallback (tests should strip both from env for key-missing tests)
+
+**Mocking patterns established for skill tests:**
+`python
+# TCP socket mock (correct pattern):
+with patch("skill.uploader.socket.socket") as MockSocket:
+    sock = MagicMock()
+    MockSocket.return_value = sock
+    sock.recv.side_effect = [b"READY\n", b"OK Uploaded foo.json\n"]
+    
+# WebSocket mock (mock the sync wrapper):
+with patch("skill.uploader._upload_ws") as mock_ws:
+    mock_ws.return_value = None
+    upload_timeline("foo", timeline, protocol="websocket")
+`
+
+**Testing philosophy for LLM skill tests:**
+- Never make real API calls — always mock LLMProvider.generate()
+- Test generator/uploader independently, then together in integration tests
+- Mark all test files with TODO comment for import adjustment once skill/ is finalized
+- Test repair heuristics specifically (timestamp_ms alias is a real LLM failure mode)
+- Verify no autoplay behavior after upload (architecture decision: upload-only, no side effects)
+
+**Quality metrics:**
+- ✅ 60/60 tests pass (100%)
+- ✅ All external dependencies mocked (no real LLM calls, no real TCP/WebSocket)
+- ✅ Covers 10 generator behaviors, 10 uploader behaviors, 3 integration scenarios
+- ✅ Graceful skip when skill/ not available (pytestmark pattern)

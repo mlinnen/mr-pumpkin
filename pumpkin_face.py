@@ -1421,28 +1421,37 @@ class PumpkinFace:
                                 # Signal ready for JSON data
                                 client_socket.sendall(b"READY\n")
                                 
-                                # Read JSON content until END_UPLOAD marker
+                                # Read JSON content until END_UPLOAD marker.
+                                # Use a line buffer so JSON and END_UPLOAD arriving
+                                # in the same TCP segment are handled correctly.
                                 json_lines = []
+                                upload_buf = b""
+                                upload_done = False
                                 while True:
-                                    json_line = client_socket.recv(4096).decode('utf-8').strip()
-                                    if not json_line:
+                                    chunk = client_socket.recv(4096)
+                                    if not chunk:
                                         response = "ERROR Connection lost while reading JSON"
                                         client_socket.sendall((response + '\n').encode('utf-8'))
                                         print(response)
                                         break
-                                    
-                                    if json_line == "END_UPLOAD":
-                                        # Upload the timeline
-                                        json_content = '\n'.join(json_lines)
-                                        self.file_manager.upload_timeline(filename, json_content)
-                                        if not filename.endswith('.json'):
-                                            filename = f"{filename}.json"
-                                        response = f"OK Uploaded {filename}"
-                                        client_socket.sendall((response + '\n').encode('utf-8'))
-                                        print(response)
+                                    upload_buf += chunk
+                                    while b"\n" in upload_buf:
+                                        line_bytes, upload_buf = upload_buf.split(b"\n", 1)
+                                        json_line = line_bytes.decode('utf-8').strip()
+                                        if json_line == "END_UPLOAD":
+                                            json_content = '\n'.join(json_lines)
+                                            self.file_manager.upload_timeline(filename, json_content)
+                                            if not filename.endswith('.json'):
+                                                filename = f"{filename}.json"
+                                            response = f"OK Uploaded {filename}"
+                                            client_socket.sendall((response + '\n').encode('utf-8'))
+                                            print(response)
+                                            upload_done = True
+                                            break
+                                        if json_line:
+                                            json_lines.append(json_line)
+                                    if upload_done:
                                         break
-                                    
-                                    json_lines.append(json_line)
                             except FileExistsError:
                                 response = f"ERROR File already exists: {filename}"
                                 client_socket.sendall((response + '\n').encode('utf-8'))
