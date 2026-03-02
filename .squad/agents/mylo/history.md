@@ -671,3 +671,54 @@ All 41 failures are in `test_tcp_integration.py` — caused by TCP server connec
 - Jinx should fix recording capture bug (add wiggle_nose to whitelist in pumpkin_face.py)
 - After fix, remove @pytest.mark.xfail from two recording tests
 - Verify all 21 tests pass without xfail markers
+
+---
+
+## 2026-03-02 — Auto-Update Test Suite (Issue #33)
+
+**Context:** Issue #33 requires auto-update scripts (`update.sh` and `update.ps1`) to check for updates, download releases, and deploy them. Since shell scripts are hard to unit test, created Python helper functions with comprehensive test coverage that validates the core logic to be embedded in the scripts.
+
+**Test suite created: `test_auto_update.py`**
+- **Location:** `tests/test_auto_update.py`
+- **Total tests:** 32 tests across 5 test classes
+- **Test run result:** ✅ 32 passed in 0.39s (100% success rate)
+- **Status:** Ready for Vi to include in PR when creating `squad/33-auto-update` branch
+
+**Test structure:**
+1. **TestVersionComparison** (11 tests)
+   - Semantic version comparison logic (major.minor.patch)
+   - Handles v prefix stripping and whitespace
+   - Multi-digit version numbers handled correctly
+   - Edge cases: same version, newer local, invalid format
+
+2. **TestGitHubApiParsing** (6 tests)
+   - Extract tag_name from GitHub release JSON
+   - Strip v prefix, handle missing fields
+   - Malformed JSON error handling
+
+3. **TestZipValidation** (8 tests)
+   - Required files: pumpkin_face.py, VERSION, requirements.txt
+   - Valid/invalid ZIP handling
+   - Subdirectory structure support
+
+4. **TestFileOperations** (4 tests)
+   - Temp directory creation
+   - File deployment with user data preservation
+   - Timeline files protected during updates
+
+5. **TestEdgeCases** (3 tests)
+   - Pre-release versions documented as v1 limitation
+   - Large version numbers, directory errors
+
+**Testing patterns established:**
+- Shell script logic via Python equivalents for testability
+- Semantic version comparison using integer tuples
+- ZIP validation without extraction
+- File preservation pattern for user data
+- Standard library only (no new dependencies)
+
+**Quality metrics:**
+- ✅ 100% test pass rate (32/32)
+- ✅ All edge cases covered per Jinx architecture spec
+- ✅ Zero new dependencies
+- ✅ Tests ready for Vi to include in PR
