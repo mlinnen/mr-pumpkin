@@ -5,6 +5,16 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-03-01
+
+### Fixed
+- `upload_timeline` now works correctly from the WebSocket test client — WebSocket clients send
+  filename and JSON inline in a single message, but the handler was routing through command_router
+  which returned a TCP-only `UPLOAD_MODE` stub. `_ws_handler` now intercepts `upload_timeline`
+  directly and calls `file_manager.upload_timeline()` to save the file.
+
+---
+
 ## [0.5.3] - 2026-03-01
 
 ### Added

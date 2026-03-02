@@ -532,3 +532,9 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 4. **TCP recv() deadlock pattern — no-response commands:** When a server conditionally sends a response (only `if response:`), a client that always calls `recv()` will deadlock if the server sends nothing. Both sides block waiting on the other. Fix: call `socket.shutdown(SHUT_WR)` after `send()` to signal EOF. The server's `recv()` returns `b""`, breaking its loop and closing the connection — which unblocks the client's `recv()` with empty data. This is the correct pattern for single-exchange TCP command protocols.
 
 **Unblocks:** Milestone 2 (WebSocket server setup) ready to begin
+
+## WS upload_timeline inline fix
+- WebSocket upload_timeline uses a single-message inline format: `upload_timeline <filename> <json>`  
+- TCP uses a multi-step handshake (READY/END_UPLOAD); the command_router returns `UPLOAD_MODE` as a placeholder — not suitable for WS  
+- Fix: intercept `upload_timeline` in `_ws_handler` before routing to command_router; call `file_manager.upload_timeline(filename, json_content)` directly  
+- Test update: send JSON content inline (not a file path), assert `OK Uploaded <filename>.json`
