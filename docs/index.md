@@ -16,6 +16,9 @@ Developer guide for creating client applications that send commands to Mr. Pumpk
 ### [Recording Skill](recording-skill.md)
 Describe an animation in plain English and have it automatically generated and uploaded to your pumpkin server using an LLM (Google Gemini).
 
+### [Timeline JSON Schema](timeline-schema.md)
+Reference for the timeline JSON format: top-level structure, full command vocabulary, timing guidelines, and validation rules.
+
 ## Quick Start
 
 Once installed, run Mr. Pumpkin with:
