@@ -3746,3 +3746,62 @@ All existing docs/*.md files received Jekyll front matter prepended (non-destruc
 ### CI/CD: squad-docs.yml
 
 Updated workflow: Ruby 3.2 + bundler caching, undle exec jekyll build from docs/, output to _site/, upload via ctions/upload-pages-artifact@v3, deploy via ctions/deploy-pages@v4. Trigger: push to preview branch touching docs/** or the workflow file.
+
+---
+
+## Decision: User Directive – PR Submission to Dev Branch
+
+**Date:** 2026-03-03T15:09:56Z  
+**Author:** Mike Linnen (via Copilot)  
+**Status:** Directive
+
+### Direction
+
+Squad feature branches must submit PRs to the dev branch (not preview). Mike Linnen reviews PRs personally — do not auto-merge.
+
+### Rationale
+
+User preference for review and approval workflow.
+
+
+---
+
+## Decision: Switch to On-Site Lunr.js Search for Jekyll Docs
+
+**Date:** 2026-03-03  
+**Author:** Vi (Backend Dev)  
+**Status:** Implemented  
+**Issue:** squad/57
+
+### Context
+
+The Jekyll documentation site previously used a GitHub search redirect, which:
+- Took users away from the documentation site
+- Required a GitHub account for best results
+- Searched the entire repository code rather than just documentation
+- Opened in a new window/tab
+
+### Implementation
+
+Replaced with client-side Lunr.js search:
+1. **search.json** – Jekyll-generated JSON index of site pages/posts
+2. **search.md** – Dedicated search results page at /search
+3. **search.js** – JavaScript Lunr index builder and results renderer
+4. **default.html** – Added baseurl meta tag, removed GitHub redirect
+
+### Benefits
+
+- Users remain on documentation site
+- Instant client-side results
+- Searches actual documentation content
+- No external dependencies except Lunr.js CDN
+- Works offline after initial load
+
+### Technical Details
+
+- Lunr.js from unpkg.com CDN
+- Search index built at search time
+- Title field boosted 10x for relevance
+- Content truncated to 600 chars in index
+- Results show title + 160 char preview
+
