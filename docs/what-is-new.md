@@ -5,6 +5,27 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.10] - 2026-03-03
+
+### Added
+- Recording chaining via `play_recording` command (issue #55) — embed one recording inside another using stack-based nested playback; maximum nesting depth is 5 levels. See [Timeline Schema](timeline-schema.md#recording-chaining) for details.
+- `help` command over TCP and WebSocket (issue #56) — returns a plain-text listing of all available commands with syntax; safe to call at any time including during timeline playback.
+
+---
+
+## [0.5.9] - 2026-03-02
+
+### Added
+- `docs/what-is-new.md` — full release history page linked from `docs/index.md`
+- `docs/timeline-schema.md` — full reference for timeline JSON format, command vocabulary, and timing rules
+
+### Fixed
+- CI release workflow now extracts the current version's CHANGELOG section as the release notes body; falls back to `--generate-notes` if no entry found
+- CI release workflow now patches pre-existing GitHub releases with updated notes via `gh release edit`
+- CI release notes now correctly diff from the previous semver tag using `--notes-start-tag`
+
+---
+
 ## [0.5.8] - 2026-03-02
 
 ### Added

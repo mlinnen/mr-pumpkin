@@ -16,6 +16,9 @@
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
 📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
 📌 Team update (2026-02-27): Issue triage Round 1: #39 (LLM skill P2, Vi+Mylo), #20 (lip-sync P2, Vi+Ekko) assigned — decided by Jinx
+📌 Team update (2026-03-02): Issue #39 architecture finalized: LLM provider abstraction, JSON validation, upload client, CLI entry point; 60/60 skill tests written (27 generator, 20 uploader, 13 integration) — decided by Jinx, Vi, Mylo, Ekko
+📌 Team update (2026-03-03): Issue #54 resolved: Migrated GeminiProvider from google-generativeai to google-genai SDK. Updated requirements.txt, all 27 tests pass — decided by Vi, Mylo
+📌 Team update (2026-03-03): Issue #56 resolved: Wrote help command test suite (29 tests, 28 pass). Flexible test patterns with forward-compatible JSON helper and state immutability verification. 582 total tests pass — decided by Vi, Mylo, Coordinator
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 
@@ -779,3 +782,68 @@ with patch("skill.uploader._upload_ws") as mock_ws:
 - ✅ All external dependencies mocked (no real LLM calls, no real TCP/WebSocket)
 - ✅ Covers 10 generator behaviors, 10 uploader behaviors, 3 integration scenarios
 - ✅ Graceful skip when skill/ not available (pytestmark pattern)
+
+## Learnings
+- Updated test_skill_generator.py to reference new package name 'google-genai' instead of 'google-generativeai' in ImportError test (issue #54). Removed redundant 'generativeai' check since new error message uses full package name.
+
+### Issue #55 — Recording Chaining Test Suite (2026-03-02)
+
+**Status:** Complete - comprehensive test suite written and all 11 tests pass
+
+**Test coverage achieved:**
+1. Single level chaining with correct command execution order (parent → sub → parent resume)
+2. Playback completes and stops correctly after chaining
+3. play_recording NOT dispatched to command callback (internal engine handling only)
+4. Stack cleared on stop() during mid-sub-recording playback
+5. Depth limit (5) enforcement - prevents infinite nesting
+6. Missing/invalid sub-recording file handling (graceful error, no crash)
+7. play_recording in _VALID_COMMANDS verification
+8. Multi-level nesting (parent → sub1 → sub2) with correct unwinding
+9. Stack depth status query accuracy during nested playback
+10. Empty filename in play_recording ignored safely
+11. play_recording near end of parent timeline behavior
+
+**Key patterns discovered:**
+- Stack-based playback uses tuple state: (timeline, position_ms, last_executed_index, filename)
+- Position advancement continues after popping from sub-recording back to parent
+- play_recording at exact duration boundary is edge case - parent may complete before sub executes
+- Stack depth is exposed via get_status()["stack_depth"] for debugging
+- Errors during sub-recording load don't stop parent playback (resilient design)
+
+**Testing approach:**
+- Used tmp_path fixture for isolated file I/O
+- Helper functions: make_timeline(), save_timeline() for test data setup
+- Mock callback to verify command execution order without actual command processing
+- Step-by-step update() calls to control playback progression deterministically
+
+**Test file:** tests/test_recording_chaining.py (11 tests, all passing)
+
+### Issue #56: help command tests (2026-03-04)
+📌 Team update (2026-03-04): Issue #56 — help command test suite written (28 tests passing) — Mylo
+
+**What was done:**
+- Wrote 	ests/test_help_command.py with 29 tests (28 pass, 1 skips gracefully when non-JSON response)
+- Vi had already implemented the help command in command_handler.py before tests were written
+
+**Implementation discovered (Vi's work):**
+- help command added to CommandRouter.execute() in command_handler.py
+- Returns structured plain text listing (not JSON): Commands:\n  <name>  - <description>
+- Each entry is left-aligned with fixed-width padding for the name column
+- Includes all commands: animations, eyebrow, head, nose, timeline, expressions, and help itself
+- Case-insensitive (handled by existing strip().lower() normalization)
+
+**Test coverage delivered (6 areas):**
+1. Non-empty response (length > 20 chars)
+2. All key command names present: play, stop, pause, resume, seek, record_start, record_stop, record_cancel, blink, gaze, help, expression names
+3. Syntax/argument indicators present (< > [ ] markers in response)
+4. Format validity: structured plain text with newlines and colons (JSON path gracefully skipped)
+5. Case variations: HELP, HeLp all return same response as help
+6. Edge cases: whitespace tolerance, help with subcommands doesn't crash, idempotent, no side effects on pumpkin state
+
+**Patterns applied:**
+- Followed 	est_wiggle_nose_alias.py pattern: pumpkin + outer fixtures, class-based grouping
+- Used # PROVISIONAL comments throughout (Vi's implementation was present; comments remain as documentation of test-first intent)
+- Helper _try_parse_json() allows tests to handle both JSON and plain-text responses gracefully
+
+**Key quality finding:**
+- help with unknown subcommand (e.g., "help unknown_xyz_command") passes because the response is long enough (> 20 chars) to count as a general help listing — the command currently ignores subcommand tokens

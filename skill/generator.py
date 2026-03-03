@@ -78,6 +78,7 @@ Respond with ONLY a valid JSON object matching this exact schema — no prose, n
 | projection_reset        | (none)                                                   | Reset projection offset                  |
 | jog_offset              | {"dx": int, "dy": int}                                   | Nudge projection by dx/dy pixels         |
 | set_offset              | {"x": int, "y": int}                                     | Absolute projection offset               |
+| play_recording          | {"filename": "<name>"}                                   | Embed another recording; resumes after it completes |
 
 ## Timing Guidelines
 
@@ -138,6 +139,7 @@ _VALID_COMMANDS = {
     "turn_left", "turn_right", "turn_up", "turn_down", "center_head",
     "twitch_nose", "wiggle_nose", "scrunch_nose", "reset_nose",
     "projection_reset", "jog_offset", "set_offset",
+    "play_recording",
 }
 
 
@@ -165,18 +167,19 @@ class GeminiProvider(LLMProvider):
 
     Raises:
         EnvironmentError: If no API key is found in the environment.
-        ImportError: If the ``google-generativeai`` package is not installed.
+        ImportError: If the ``google-genai`` package is not installed.
     """
 
     MODEL = "gemini-flash-latest"
 
     def __init__(self):
         try:
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types
         except ImportError as exc:
             raise ImportError(
-                "google-generativeai is required for GeminiProvider. "
-                "Install it with: pip install google-generativeai>=0.7.0"
+                "google-genai is required for GeminiProvider. "
+                "Install it with: pip install google-genai"
             ) from exc
 
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -185,20 +188,26 @@ class GeminiProvider(LLMProvider):
                 "No Gemini API key found. Set the GEMINI_API_KEY environment variable."
             )
 
-        genai.configure(api_key=api_key)
-        self._model = genai.GenerativeModel(
-            model_name=self.MODEL,
-            system_instruction=_SYSTEM_PROMPT,
-        )
+        self._client = genai.Client(api_key=api_key)
+        self._types = types
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate a response using Gemini.
 
-        The ``system_prompt`` parameter is ignored here because the system
-        instruction was embedded at construction time; this signature exists to
-        satisfy the ``LLMProvider`` interface.
+        Args:
+            system_prompt: System instruction for the model.
+            user_prompt: User message to generate a response for.
+
+        Returns:
+            Generated text response.
         """
-        response = self._model.generate_content(user_prompt)
+        response = self._client.models.generate_content(
+            model=self.MODEL,
+            contents=user_prompt,
+            config=self._types.GenerateContentConfig(
+                system_instruction=system_prompt,
+            )
+        )
         return response.text
 
 

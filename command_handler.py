@@ -456,6 +456,67 @@ class CommandRouter:
             print(response)
             return response
         
+        # Help command
+        if data == "help":
+            help_text = (
+                "Commands:\n"
+                "  blink                              - Trigger a blink animation\n"
+                "  wink_left                          - Trigger left eye wink animation\n"
+                "  wink_right                         - Trigger right eye wink animation\n"
+                "  roll_clockwise                     - Roll eyes clockwise\n"
+                "  roll_counterclockwise              - Roll eyes counter-clockwise\n"
+                "  gaze <h> <v>                       - Set gaze for both eyes (horizontal/vertical degrees)\n"
+                "  gaze <lh> <lv> <rh> <rv>          - Set gaze independently per eye (degrees)\n"
+                "  eyebrow_raise                      - Raise both eyebrows one step\n"
+                "  eyebrow_lower                      - Lower both eyebrows one step\n"
+                "  eyebrow_raise_left                 - Raise left eyebrow one step\n"
+                "  eyebrow_lower_left                 - Lower left eyebrow one step\n"
+                "  eyebrow_raise_right                - Raise right eyebrow one step\n"
+                "  eyebrow_lower_right                - Lower right eyebrow one step\n"
+                "  eyebrow_reset                      - Reset both eyebrows to neutral position\n"
+                "  eyebrow <value>                    - Set both eyebrows to absolute offset value\n"
+                "  eyebrow_left <value>               - Set left eyebrow to absolute offset value\n"
+                "  eyebrow_right <value>              - Set right eyebrow to absolute offset value\n"
+                "  projection_reset                   - Reset projection offset to default\n"
+                "  jog_offset <dx> <dy>               - Jog projection offset by dx/dy pixels\n"
+                "  set_offset <x> <y>                 - Set projection offset to absolute x/y pixels\n"
+                "  turn_left [amount]                 - Turn head left by amount pixels (default: 50)\n"
+                "  turn_right [amount]                - Turn head right by amount pixels (default: 50)\n"
+                "  turn_up [amount]                   - Turn head up by amount pixels (default: 50)\n"
+                "  turn_down [amount]                 - Turn head down by amount pixels (default: 50)\n"
+                "  center_head                        - Center head position\n"
+                "  wiggle_nose [magnitude]            - Wiggle nose (default magnitude: 50)\n"
+                "  twitch_nose [magnitude]            - Twitch nose (default magnitude: 50)\n"
+                "  scrunch_nose [magnitude]           - Scrunch nose (default magnitude: 50)\n"
+                "  reset_nose                         - Reset nose to neutral\n"
+                "  reset                              - Clear recording and playback state\n"
+                "  record_start                       - Start recording commands\n"
+                "  record_stop [filename]             - Stop recording and save (optional filename)\n"
+                "  record_cancel                      - Cancel active recording without saving\n"
+                "  play <filename>                    - Play a saved timeline file\n"
+                "  pause                              - Pause active playback\n"
+                "  resume                             - Resume paused playback\n"
+                "  stop                               - Stop active playback\n"
+                "  seek <ms>                          - Seek timeline to position in milliseconds\n"
+                "  timeline_status                    - Get timeline and recording status (JSON)\n"
+                "  recording_status                   - Get current recording status (JSON)\n"
+                "  list_recordings                    - List saved timeline files (JSON)\n"
+                "  list                               - Alias for list_recordings\n"
+                "  delete_recording <filename>        - Delete a saved timeline file\n"
+                "  rename_recording <old> <new>       - Rename a saved timeline file\n"
+                "  download_timeline <filename>       - Download timeline file as JSON content\n"
+                "  upload_timeline <filename>         - Upload a timeline file (enters upload mode)\n"
+                "  neutral                            - Set expression to neutral\n"
+                "  happy                              - Set expression to happy\n"
+                "  sad                                - Set expression to sad\n"
+                "  angry                              - Set expression to angry\n"
+                "  surprised                          - Set expression to surprised\n"
+                "  scared                             - Set expression to scared\n"
+                "  sleeping                           - Set expression to sleeping\n"
+                "  help                               - Show this help message"
+            )
+            return help_text
+
         # Status query commands
         if data == "timeline_status":
             status = self.pumpkin.timeline_playback.get_status()

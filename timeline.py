@@ -216,6 +216,8 @@ class Playback:
         self.filename: Optional[str] = None
         self._last_executed_index = -1
         self._command_callback = None
+        self._stack: List = []  # Stack for nested playback: list of (timeline, position_ms, last_executed_index, filename)
+        self._max_depth = 5  # Prevent infinite nesting
     
     def set_command_callback(self, callback):
         """Set callback function for executing commands.
@@ -250,6 +252,7 @@ class Playback:
         self.state = PlaybackState.STOPPED
         self.current_position_ms = 0
         self._last_executed_index = -1
+        self._stack.clear()
     
     def pause(self):
         """Pause playback at current position."""
@@ -306,7 +309,45 @@ class Playback:
             if cmd.time_ms > self.current_position_ms:
                 break
             
-            # Execute command
+            # Handle play_recording command (nested playback)
+            if cmd.command == "play_recording":
+                filename = cmd.args.get("filename", "")
+                if filename and len(self._stack) < self._max_depth:
+                    try:
+                        # Push current state onto stack
+                        self._stack.append((
+                            self.timeline,
+                            self.current_position_ms,
+                            i,  # Mark this command as executed
+                            self.filename
+                        ))
+                        
+                        # Load sub-recording
+                        if not filename.endswith('.json'):
+                            filename = f"{filename}.json"
+                        sub_filepath = self.recordings_dir / filename
+                        sub_timeline = Timeline.load(sub_filepath)
+                        
+                        # Switch to sub-recording
+                        self.timeline = sub_timeline
+                        self.filename = filename
+                        self.current_position_ms = 0
+                        self._last_executed_index = -1
+                        
+                        # Break out of loop since we switched timelines
+                        break
+                    except Exception as e:
+                        error_msg = f"Error loading sub-recording '{filename}' at {cmd.time_ms}ms: {e}"
+                        errors.append(error_msg)
+                        # Don't stop playback, just skip this command
+                        self._last_executed_index = i
+                elif len(self._stack) >= self._max_depth:
+                    error_msg = f"Maximum nesting depth ({self._max_depth}) reached at {cmd.time_ms}ms"
+                    errors.append(error_msg)
+                    self._last_executed_index = i
+                continue
+            
+            # Execute normal command
             if self._command_callback:
                 try:
                     self._command_callback(cmd.command, cmd.args)
@@ -320,7 +361,15 @@ class Playback:
         
         # Check if reached end (after executing commands)
         if self.current_position_ms >= self.timeline.duration_ms:
-            self.stop()
+            # Pop back to parent recording if there is one
+            if self._stack:
+                parent_timeline, parent_position, parent_index, parent_filename = self._stack.pop()
+                self.timeline = parent_timeline
+                self.current_position_ms = parent_position
+                self._last_executed_index = parent_index
+                self.filename = parent_filename
+            else:
+                self.stop()
         
         return errors
     
@@ -328,14 +377,15 @@ class Playback:
         """Get current playback status.
         
         Returns:
-            Dictionary with state, filename, position, duration, is_playing
+            Dictionary with state, filename, position, duration, is_playing, stack_depth
         """
         return {
             "state": self.state.value,
             "filename": self.filename,
             "position_ms": self.current_position_ms,
             "duration_ms": self.timeline.duration_ms if self.timeline else 0,
-            "is_playing": self.state == PlaybackState.PLAYING
+            "is_playing": self.state == PlaybackState.PLAYING,
+            "stack_depth": len(self._stack)
         }
     
     def get_duration(self, filename: Optional[str] = None) -> int:
