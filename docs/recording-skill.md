@@ -1,3 +1,10 @@
+---
+layout: page
+title: Recording Skill
+permalink: /recording-skill
+description: Describe an animation in plain English and have it automatically generated using AI.
+---
+
 # Recording Skill
 
 The Mr. Pumpkin recording skill lets you describe an animation in plain English and have it automatically generated and uploaded to your pumpkin server.

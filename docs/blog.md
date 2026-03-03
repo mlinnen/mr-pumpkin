@@ -1,0 +1,49 @@
+---
+layout: page
+title: Blog
+permalink: /blog
+---
+
+# Blog
+
+<ul class="post-list">
+  {% for post in paginator.posts %}
+  <li class="post-item">
+    <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
+    <div class="post-meta">
+      <time datetime="{{ post.date | date_to_xmlschema }}">{{ post.date | date: "%B %-d, %Y" }}</time>
+      {% if post.author %} · {{ post.author }}{% endif %}
+    </div>
+    {% if post.excerpt %}
+      <p class="post-excerpt">{{ post.excerpt | strip_html | truncate: 200 }}</p>
+    {% endif %}
+    <a href="{{ post.url | relative_url }}" class="post-read-more">Read more →</a>
+  </li>
+  {% endfor %}
+</ul>
+
+{% if paginator.total_pages > 1 %}
+<nav class="pagination">
+  {% if paginator.previous_page %}
+    <a href="{{ paginator.previous_page_path | relative_url }}">← Newer</a>
+  {% endif %}
+
+  {% for page in (1..paginator.total_pages) %}
+    {% if page == paginator.page %}
+      <span class="current">{{ page }}</span>
+    {% elsif page == 1 %}
+      <a href="{{ '/blog' | relative_url }}">{{ page }}</a>
+    {% else %}
+      <a href="{{ site.paginate_path | relative_url | replace: ':num', page }}">{{ page }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if paginator.next_page %}
+    <a href="{{ paginator.next_page_path | relative_url }}">Older →</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% if paginator.total_posts == 0 %}
+<p style="color: var(--text-muted); text-align: center; padding: 3rem 0;">No blog posts yet — check back soon! 🎃</p>
+{% endif %}
