@@ -816,3 +816,33 @@ with patch("skill.uploader._upload_ws") as mock_ws:
 - Step-by-step update() calls to control playback progression deterministically
 
 **Test file:** tests/test_recording_chaining.py (11 tests, all passing)
+
+### Issue #56: help command tests (2026-03-04)
+📌 Team update (2026-03-04): Issue #56 — help command test suite written (28 tests passing) — Mylo
+
+**What was done:**
+- Wrote 	ests/test_help_command.py with 29 tests (28 pass, 1 skips gracefully when non-JSON response)
+- Vi had already implemented the help command in command_handler.py before tests were written
+
+**Implementation discovered (Vi's work):**
+- help command added to CommandRouter.execute() in command_handler.py
+- Returns structured plain text listing (not JSON): Commands:\n  <name>  - <description>
+- Each entry is left-aligned with fixed-width padding for the name column
+- Includes all commands: animations, eyebrow, head, nose, timeline, expressions, and help itself
+- Case-insensitive (handled by existing strip().lower() normalization)
+
+**Test coverage delivered (6 areas):**
+1. Non-empty response (length > 20 chars)
+2. All key command names present: play, stop, pause, resume, seek, record_start, record_stop, record_cancel, blink, gaze, help, expression names
+3. Syntax/argument indicators present (< > [ ] markers in response)
+4. Format validity: structured plain text with newlines and colons (JSON path gracefully skipped)
+5. Case variations: HELP, HeLp all return same response as help
+6. Edge cases: whitespace tolerance, help with subcommands doesn't crash, idempotent, no side effects on pumpkin state
+
+**Patterns applied:**
+- Followed 	est_wiggle_nose_alias.py pattern: pumpkin + outer fixtures, class-based grouping
+- Used # PROVISIONAL comments throughout (Vi's implementation was present; comments remain as documentation of test-first intent)
+- Helper _try_parse_json() allows tests to handle both JSON and plain-text responses gracefully
+
+**Key quality finding:**
+- help with unknown subcommand (e.g., "help unknown_xyz_command") passes because the response is long enough (> 20 chars) to count as a general help listing — the command currently ignores subcommand tokens

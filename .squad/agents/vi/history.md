@@ -664,3 +664,16 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 **Import error message:** Changed from "google-generativeai is required..." to "google-genai is required for GeminiProvider. Install it with: pip install google-genai" (removed version constraint for cleaner message).
 
 **Tests:** All 27 tests in 	ests/test_skill_generator.py pass (they mock GeminiProvider so no actual package installation required for test suite).
+
+### Help Command (Issue #56)
+
+**What:** Added help command to CommandRouter.execute() in command_handler.py.
+
+**Pattern:** Placed the handler in the "status query" section (before 	imeline_status), matching the convention for read-only informational commands. Returns a plain-text formatted string (not JSON) because help is human-readable documentation, not machine-parseable state — consistent with OK ... / ERROR ... plain text responses for action feedback.
+
+**Key decisions:**
+1. **Plain text over JSON:** Status commands (	imeline_status, ecording_status, list_recordings) return JSON because callers parse them. help is for humans at a terminal or WebSocket client — plain text is the right format.
+2. **No recording capture:** help returns before the recording-capture code path, so it is never baked into a recorded timeline (correct — it's a query, not an animation command).
+3. **No playback pause:** Returns early before the is_timeline_command guard, so sending help during playback does NOT pause the animation.
+4. **Includes all commands:** All animation, eyebrow, projection, head, nose, timeline, recording, file-management, expression, and meta commands are documented with syntax and brief description.
+5. **Alias documented:** list alias for list_recordings is explicitly called out.
