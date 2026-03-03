@@ -3708,3 +3708,100 @@ Tests were written as provisional (against expected interface) but Vi had alread
 
 The `help` command fits naturally into the existing `CommandRouter.execute()` dispatch pattern. No new infrastructure needed.
 
+
+
+---
+
+## Decision: Jekyll for GitHub Pages Site (Issue #57)
+
+**By:** Vi (Backend Dev)  
+**Date:** 2026-03-03  
+**Issue:** #57
+
+### Technology Choice: Jekyll 4.3
+
+Use Jekyll (not Hugo, MkDocs, or plain HTML) for the GitHub Pages site.
+
+**Rationale:**
+- Jekyll is GitHub's native Pages engine — no custom CI build strictly required
+- Native pagination support via jekyll-paginate
+- Liquid templating allows DRY layouts (_layouts/, _data/navigation.yml)
+- Zero JavaScript framework overhead — pure server-rendered HTML
+- SEO tag support via jekyll-seo-tag
+
+### Structure Decisions
+
+**Custom layout over minima theme:** Used a fully custom _layouts/default.html for full design control for the dark pumpkin aesthetic. Minima is light-themed and would require deep overrides.
+
+**Blog posts in _posts/:** Moved blog content to docs/_posts/YYYY-MM-DD-title.md (Jekyll convention); docs/blog/ folder preserved with original file untouched.
+
+**Navigation via _data/navigation.yml:** All nav items defined once in a YAML data file and iterated in the layout — single source of truth.
+
+**Search: GitHub redirect, not lunr.js:** Simple GitHub search redirect rather than lunr.js to avoid a build-time index step and heavy JS.
+
+### Front Matter Convention
+
+All existing docs/*.md files received Jekyll front matter prepended (non-destructive): layout: page, 	itle:, permalink:, description:.
+
+### CI/CD: squad-docs.yml
+
+Updated workflow: Ruby 3.2 + bundler caching, undle exec jekyll build from docs/, output to _site/, upload via ctions/upload-pages-artifact@v3, deploy via ctions/deploy-pages@v4. Trigger: push to preview branch touching docs/** or the workflow file.
+
+---
+
+## Decision: User Directive – PR Submission to Dev Branch
+
+**Date:** 2026-03-03T15:09:56Z  
+**Author:** Mike Linnen (via Copilot)  
+**Status:** Directive
+
+### Direction
+
+Squad feature branches must submit PRs to the dev branch (not preview). Mike Linnen reviews PRs personally — do not auto-merge.
+
+### Rationale
+
+User preference for review and approval workflow.
+
+
+---
+
+## Decision: Switch to On-Site Lunr.js Search for Jekyll Docs
+
+**Date:** 2026-03-03  
+**Author:** Vi (Backend Dev)  
+**Status:** Implemented  
+**Issue:** squad/57
+
+### Context
+
+The Jekyll documentation site previously used a GitHub search redirect, which:
+- Took users away from the documentation site
+- Required a GitHub account for best results
+- Searched the entire repository code rather than just documentation
+- Opened in a new window/tab
+
+### Implementation
+
+Replaced with client-side Lunr.js search:
+1. **search.json** – Jekyll-generated JSON index of site pages/posts
+2. **search.md** – Dedicated search results page at /search
+3. **search.js** – JavaScript Lunr index builder and results renderer
+4. **default.html** – Added baseurl meta tag, removed GitHub redirect
+
+### Benefits
+
+- Users remain on documentation site
+- Instant client-side results
+- Searches actual documentation content
+- No external dependencies except Lunr.js CDN
+- Works offline after initial load
+
+### Technical Details
+
+- Lunr.js from unpkg.com CDN
+- Search index built at search time
+- Title field boosted 10x for relevance
+- Content truncated to 600 chars in index
+- Results show title + 160 char preview
+

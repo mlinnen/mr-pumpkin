@@ -435,3 +435,29 @@ Nose animations use the same deterministic frame-based pattern as head movement 
 - Consistent terminology matching codebase (time_ms, args, expression enums)
 
 📌 Team update (2026-03-02): Animation timing guidelines created for LLM skill generator (Issue #39)
+
+### SVG Logo Design for GitHub Pages Site Header (Issue #57)
+
+**File:** `docs/assets/img/logo.svg`
+
+**Design:** Widescreen logo (viewBox 0 0 200 60) for dark background (#1a1a1a) site header. Left side: jack-o-lantern pumpkin icon (~50px wide). Right side: "Mr. Pumpkin" text in system-ui sans-serif at 22px/600 weight.
+
+**Pumpkin Icon Construction:**
+- Three overlapping ellipses create classic pumpkin silhouette (center + two side lobes), all #FF6B00
+- Green stem: rounded rect, #3a7a20
+- White triangular eyes and nose using `<polygon>`
+- Jagged toothed mouth using a multi-point polygon (11 vertices tracing teeth + base)
+- Subtle ridge: semi-transparent vertical line through center lobe
+
+**Key SVG Patterns:**
+- `viewBox` enables scaling from 32px height to full desktop width without quality loss
+- Layering order: lobes → ridge → features (eyes/nose/mouth on top)
+- No external fonts or images — fully self-contained inline SVG
+- All feature colors: white (#FFFFFF) on orange (#FF6B00) body — consistent with projection mapping design language (high contrast features)
+- `role="img"` + `<title>` for accessibility
+
+**Design Insight:** The pumpkin lobe shape is most convincingly achieved with three overlapping ellipses (not a single distorted circle). The jagged mouth requires careful vertex ordering: trace the top jaw teeth, then close via the bottom jaw baseline. This produces a clean filled polygon with no stray strokes needed.
+
+📌 Team update (2026-03-03): SVG logo created for GitHub Pages header (Issue #57)
+
+📌 Team update (2026-03-03): Jekyll GitHub Pages site built by Vi for Issue #57; PR #58 open — Ekko contributed SVG logo (docs/assets/img/logo.svg)

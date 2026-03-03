@@ -1,4 +1,50 @@
-# Mr. Pumpkin — Documentation
+---
+layout: default
+title: Home
+permalink: /
+---
+
+<div class="hero">
+  <span class="hero-logo">🎃</span>
+  <h1>Mr. Pumpkin</h1>
+  <p class="tagline">Animate the darkness, project your face</p>
+  <p class="description">
+    An animated 2D pumpkin face that responds to network commands in real time.
+    Designed for projection mapping onto 3D surfaces — pure black-and-white contrast,
+    7 expressions, dual TCP/WebSocket control, and an AI recording skill.
+  </p>
+  <div class="hero-actions">
+    <a href="/mr-pumpkin/installation" class="btn btn-primary">🚀 Get Started</a>
+    <a href="https://github.com/mlinnen/mr-pumpkin" class="btn btn-outline" target="_blank" rel="noopener">⭐ GitHub</a>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-number">7</div>
+    <div class="stat-label">Expressions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">2</div>
+    <div class="stat-label">Protocols (TCP + WS)</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">430+</div>
+    <div class="stat-label">Tests</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">AI</div>
+    <div class="stat-label">Recording Skill</div>
+  </div>
+</div>
+
+<div class="demo-placeholder">
+  <span class="demo-icon">🎃</span>
+  <strong>Projection demo coming soon</strong><br>
+  Screenshot / demo GIF will appear here
+</div>
+
+## About Mr. Pumpkin
 
 Mr. Pumpkin is an animated 2D pumpkin face that can be controlled remotely via TCP or WebSocket commands. Designed for projection mapping onto 3D surfaces, it renders expressive faces using high-contrast black-and-white graphics optimized for real-world projection scenarios.
 

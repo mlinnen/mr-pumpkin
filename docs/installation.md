@@ -1,3 +1,10 @@
+---
+layout: page
+title: Installation & Usage
+permalink: /installation
+description: How to install Mr. Pumpkin and set it up to run as a service.
+---
+
 # Installing Mr. Pumpkin as a Service
 
 This guide shows how to set up Mr. Pumpkin to run automatically as a background service on Linux (Raspberry Pi) or Windows, so it starts on boot and runs continuously.
