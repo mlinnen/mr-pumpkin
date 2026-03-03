@@ -17,7 +17,7 @@
 📌 Team update (2026-02-27): Issue triage Round 1: #43 (websockets P1), #39 (LLM skill P2, Vi+Mylo), #33 (auto-updates P1), #20 (lip-sync P2, Vi+Ekko) — decided by Jinx
 📌 Team update (2026-03-02): Issue #39 architecture finalized: LLM provider abstraction, JSON validation, upload client, CLI entry point — decided by Jinx, Vi, Mylo, Ekko
 📌 Team update (2026-03-03): Issue #54 resolved: Migrated GeminiProvider from google-generativeai to google-genai SDK. Updated requirements.txt, all 27 tests pass — decided by Vi, Mylo
-📌 Team update (2026-03-03): Issue #56 resolved: Implemented help command returning plain-text command listing. 554 tests pass. Plain-text format chosen for human readability — decided by Vi, Mylo, Coordinator
+📌 Team update (2026-03-03): Issue #57 resolved: Built Jekyll 4.3 static site for GitHub Pages. Custom dark theme (orange #FF6B00 on #0d0d0d), 7 pages + blog, responsive nav, updated squad-docs.yml CI — decided by Vi
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
@@ -678,3 +678,23 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 3. **No playback pause:** Returns early before the is_timeline_command guard, so sending help during playback does NOT pause the animation.
 4. **Includes all commands:** All animation, eyebrow, projection, head, nose, timeline, recording, file-management, expression, and meta commands are documented with syntax and brief description.
 5. **Alias documented:** list alias for list_recordings is explicitly called out.
+
+### GitHub Pages Static Site (Issue #57)
+
+**Branch:** squad/57-github-pages-site  
+**PR:** #58
+
+Built full Jekyll 4.3 site under docs/ with 7 pages, dark pumpkin theme, and mobile navigation. Navigation driven by _data/navigation.yml. All existing docs/*.md files received Jekyll front matter (non-destructive). Blog posts migrated to docs/_posts/. Search implemented as a GitHub redirect. Updated squad-docs.yml CI workflow: Ruby 3.2 + bundler cache, undle exec jekyll build, deploy via ctions/deploy-pages@v4.
+
+**Key Decisions:**
+- Jekyll 4.3 over Hugo/MkDocs — native GitHub Pages engine
+- Custom _layouts/default.html over minima — full design control for dark theme
+- GitHub search redirect over lunr.js — no build-time index overhead
+- Trigger: push to preview branch touching docs/**
+
+📌 Team update (2026-03-03): Jekyll GitHub Pages site built for Issue #57; PR #58 open
+
+## 2026-03-03 10:45 - Lunr.js On-Site Search Implementation
+
+Replaced the GitHub-redirect search with a proper client-side search using Lunr.js for the Jekyll docs site. Created search.json to generate a Jekyll-based search index, added a search results page (search.md), rewrote search.js to build and query the Lunr index, and updated default.html with baseurl meta tag for path resolution. The search form now navigates to /search?q= instead of opening GitHub search in a new tab. This provides a better UX with instant on-site search results.
+

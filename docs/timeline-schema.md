@@ -1,3 +1,10 @@
+---
+layout: page
+title: Timeline JSON Schema
+permalink: /timeline-schema
+description: Reference for the timeline JSON format used by Mr. Pumpkin's recording system.
+---
+
 # Timeline JSON Schema
 
 A timeline is a JSON file that drives Mr. Pumpkin's animations. It defines a sequence of timed commands that control expressions, eye movements, eyebrows, head position, and more.

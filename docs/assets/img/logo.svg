@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60" role="img" aria-label="Mr. Pumpkin logo">
+  <title>Mr. Pumpkin</title>
+
+  <!-- Pumpkin icon (left side, ~50px wide, centered vertically) -->
+  <g transform="translate(4, 4)">
+
+    <!-- Stem -->
+    <rect x="22" y="1" width="5" height="8" rx="2" fill="#3a7a20"/>
+
+    <!-- Pumpkin body: center lobe + two side lobes for classic pumpkin shape -->
+    <!-- Left lobe -->
+    <ellipse cx="13" cy="32" rx="9" ry="13" fill="#FF6B00"/>
+    <!-- Right lobe -->
+    <ellipse cx="36" cy="32" rx="9" ry="13" fill="#FF6B00"/>
+    <!-- Center lobe (on top) -->
+    <ellipse cx="24" cy="30" rx="12" ry="15" fill="#FF6B00"/>
+    <!-- Subtle ridge lines -->
+    <line x1="24" y1="17" x2="24" y2="45" stroke="#e05a00" stroke-width="1.5" opacity="0.5"/>
+
+    <!-- Eyes: white triangles -->
+    <!-- Left eye -->
+    <polygon points="14,25 10,33 18,33" fill="white"/>
+    <!-- Right eye -->
+    <polygon points="34,25 30,33 38,33" fill="white"/>
+
+    <!-- Nose: small white triangle -->
+    <polygon points="24,32 21,37 27,37" fill="white"/>
+
+    <!-- Mouth: jagged jack-o-lantern smile -->
+    <polygon points="12,38 14,42 17,39 20,43 24,40 28,43 31,39 34,42 36,38 34,45 12,45" fill="white"/>
+
+  </g>
+
+  <!-- "Mr. Pumpkin" text (right side) -->
+  <text
+    x="58"
+    y="38"
+    font-family="system-ui, -apple-system, 'Segoe UI', Arial, sans-serif"
+    font-size="22"
+    font-weight="600"
+    fill="white"
+    letter-spacing="0.5"
+  >Mr. Pumpkin</text>
+
+</svg>

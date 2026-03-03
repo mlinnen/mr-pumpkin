@@ -1,3 +1,10 @@
+---
+layout: page
+title: Auto-Update Guide
+permalink: /auto-update
+description: Automated update scripts for keeping Mr. Pumpkin current with the latest releases.
+---
+
 # Auto-Update Guide
 
 ## Overview
