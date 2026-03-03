@@ -15,6 +15,9 @@
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
 📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
 📌 Team update (2026-02-27): Issue triage Round 1: #43 (websockets P1), #39 (LLM skill P2, Vi+Mylo), #33 (auto-updates P1), #20 (lip-sync P2, Vi+Ekko) — decided by Jinx
+📌 Team update (2026-03-02): Issue #39 architecture finalized: LLM provider abstraction, JSON validation, upload client, CLI entry point — decided by Jinx, Vi, Mylo, Ekko
+📌 Team update (2026-03-03): Issue #54 resolved: Migrated GeminiProvider from google-generativeai to google-genai SDK. Updated requirements.txt, all 27 tests pass — decided by Vi, Mylo
+📌 Team update (2026-03-03): Issue #56 resolved: Implemented help command returning plain-text command listing. 554 tests pass. Plain-text format chosen for human readability — decided by Vi, Mylo, Coordinator
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
@@ -640,3 +643,38 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 **Root requirements.txt conflict:** Root `requirements.txt` pins `websockets>=11.0,<12.0` but `skill/requirements.txt` needs `>=12.0`. Must be reconciled — see decisions inbox `vi-skill-package-decisions.md`.
 
 **Doc bug fixed (WI-1):** All 4 occurrences of `timestamp_ms` in `docs/building-a-client.md` changed to `time_ms` to match `TimelineEntry.from_dict()` which reads `data["time_ms"]`.
+
+### Google Gemini API Migration (Issue #54)
+
+**What:** Migrated GeminiProvider from deprecated google-generativeai package to the new google-genai package.
+
+**Files changed:**
+- skill/generator.py — Updated GeminiProvider.__init__() and generate() to use client-based API
+- equirements.txt — Added google-genai>=1.0.0 dependency
+
+**Key API changes:**
+- **Old:** import google.generativeai as genai + genai.configure(api_key) + genai.GenerativeModel(model_name, system_instruction)
+- **New:** rom google import genai + rom google.genai import types + genai.Client(api_key=api_key)
+
+**Pattern shift:**
+- Old API: Model instance with embedded system instruction, call model.generate_content(user_prompt)
+- New API: Client instance, call client.models.generate_content(model=..., contents=..., config=types.GenerateContentConfig(system_instruction=...))
+
+**Critical change:** The system_prompt parameter in generate() is now actually used (passed to system_instruction), whereas the old implementation ignored it in favor of _SYSTEM_PROMPT baked into the model at construction time.
+
+**Import error message:** Changed from "google-generativeai is required..." to "google-genai is required for GeminiProvider. Install it with: pip install google-genai" (removed version constraint for cleaner message).
+
+**Tests:** All 27 tests in 	ests/test_skill_generator.py pass (they mock GeminiProvider so no actual package installation required for test suite).
+
+### Help Command (Issue #56)
+
+**What:** Added help command to CommandRouter.execute() in command_handler.py.
+
+**Pattern:** Placed the handler in the "status query" section (before 	imeline_status), matching the convention for read-only informational commands. Returns a plain-text formatted string (not JSON) because help is human-readable documentation, not machine-parseable state — consistent with OK ... / ERROR ... plain text responses for action feedback.
+
+**Key decisions:**
+1. **Plain text over JSON:** Status commands (	imeline_status, ecording_status, list_recordings) return JSON because callers parse them. help is for humans at a terminal or WebSocket client — plain text is the right format.
+2. **No recording capture:** help returns before the recording-capture code path, so it is never baked into a recorded timeline (correct — it's a query, not an animation command).
+3. **No playback pause:** Returns early before the is_timeline_command guard, so sending help during playback does NOT pause the animation.
+4. **Includes all commands:** All animation, eyebrow, projection, head, nose, timeline, recording, file-management, expression, and meta commands are documented with syntax and brief description.
+5. **Alias documented:** list alias for list_recordings is explicitly called out.

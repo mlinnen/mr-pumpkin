@@ -118,6 +118,34 @@ class MyLocalModel(LLMProvider):
 timeline = generate_timeline("wave hello", provider=MyLocalModel())
 ```
 
+## Recording Chaining
+
+You can embed one recording inside another by using the `play_recording` command in a timeline. When the playback engine reaches a `play_recording` command, it pauses the parent timeline, plays the named sub-recording in full, and then resumes the parent from the next command.
+
+This lets you build reusable animation building-blocks (a slow blink, an excited wiggle) and compose them into larger sequences without duplicating content.
+
+### The LLM generator already knows this
+
+The recording skill's LLM generator has `play_recording` in its command vocabulary. You can describe chained animations in plain English:
+
+```bash
+python -m skill.cli "do our standard greeting animation, then look surprised and do the excitement wiggle" \
+  --filename composed_greeting
+```
+
+The LLM may choose to reference existing recordings by name using `play_recording` if you describe them in the prompt. If you want to guarantee chaining, name the sub-recordings explicitly:
+
+```bash
+python -m skill.cli "play 'slow_blink' then 'excited_wiggle' with a happy expression in between" \
+  --filename happy_sequence
+```
+
+### Depth limit
+
+Recordings can be nested up to **5 levels** deep. If a `play_recording` command is reached at the maximum depth, it is skipped (an error is logged) and the parent continues playing. Circular references (A → B → A) are prevented by this limit.
+
+---
+
 ## Playing back a recording
 
 After uploading, play the recording using the `play_timeline` command:

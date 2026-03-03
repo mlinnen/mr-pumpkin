@@ -471,6 +471,5 @@ class TestApiKeyMissing:
             assert (
                 "GEMINI_API_KEY" in error_str
                 or "api_key" in error_str.lower()
-                or "google-generativeai" in error_str
-                or "generativeai" in error_str
+                or "google-genai" in error_str
             )
