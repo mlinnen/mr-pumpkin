@@ -5,6 +5,17 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Recording chaining support (Issue #55) — timelines can now embed other recordings via the `play_recording` command, which plays the sub-recording to completion and then resumes the parent recording
+  - Stack-based nested playback in `Playback` class with depth limit of 5 to prevent circular references
+  - New `play_recording` command with `{"filename": "<name>"}` argument
+  - Status tracking includes `stack_depth` for debugging nested playback
+  - Added to LLM skill generator vocabulary for AI-assisted timeline creation
+
+---
+
 ## [0.5.9] - 2026-03-02
 
 ### Added

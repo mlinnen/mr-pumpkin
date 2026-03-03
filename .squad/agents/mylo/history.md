@@ -787,15 +787,32 @@ with patch("skill.uploader._upload_ws") as mock_ws:
 
 ### Issue #55 — Recording Chaining Test Suite (2026-03-02)
 
-**Status:** In progress - comprehensive test suite being written for nested recording playback feature
+**Status:** Complete - comprehensive test suite written and all 11 tests pass
 
-**Test scope (planned):**
-- Basic nesting: play_recording command embeds sub-recording, resumes parent after completion
-- Stack depth validation: depth limit of 5 enforced, error logged at limit
-- Circular reference protection: A → B → A stops at depth 5, doesn't infinite loop
-- Error handling: sub-recording load failure logged, parent continues unaffected
-- Stop behavior: entire stack cleared, nested context abandoned
-- Status tracking: get_status() returns stack_depth for debugging
-- Integration with existing timeline structure: play_recording works alongside all other commands
+**Test coverage achieved:**
+1. Single level chaining with correct command execution order (parent → sub → parent resume)
+2. Playback completes and stops correctly after chaining
+3. play_recording NOT dispatched to command callback (internal engine handling only)
+4. Stack cleared on stop() during mid-sub-recording playback
+5. Depth limit (5) enforcement - prevents infinite nesting
+6. Missing/invalid sub-recording file handling (graceful error, no crash)
+7. play_recording in _VALID_COMMANDS verification
+8. Multi-level nesting (parent → sub1 → sub2) with correct unwinding
+9. Stack depth status query accuracy during nested playback
+10. Empty filename in play_recording ignored safely
+11. play_recording near end of parent timeline behavior
 
-**Test coverage:** tests/test_recording_chaining.py
+**Key patterns discovered:**
+- Stack-based playback uses tuple state: (timeline, position_ms, last_executed_index, filename)
+- Position advancement continues after popping from sub-recording back to parent
+- play_recording at exact duration boundary is edge case - parent may complete before sub executes
+- Stack depth is exposed via get_status()["stack_depth"] for debugging
+- Errors during sub-recording load don't stop parent playback (resilient design)
+
+**Testing approach:**
+- Used tmp_path fixture for isolated file I/O
+- Helper functions: make_timeline(), save_timeline() for test data setup
+- Mock callback to verify command execution order without actual command processing
+- Step-by-step update() calls to control playback progression deterministically
+
+**Test file:** tests/test_recording_chaining.py (11 tests, all passing)
