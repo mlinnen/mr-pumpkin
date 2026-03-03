@@ -3553,3 +3553,112 @@ Migrate `GeminiProvider` to use the `google-genai>=1.0.0` package with the follo
 - API key fallback logic preserved: `GEMINI_API_KEY` → `GOOGLE_API_KEY`
 - MODEL constant unchanged: `"gemini-flash-latest"`
 
+
+---
+
+# Decision — Recording Chaining Architecture
+
+**Date:** 2026-03-02  
+**Author:** Jinx (Lead)  
+**Status:** Implemented  
+**Related Issue:** #55  
+
+## Problem
+
+Users want to create reusable animation sequences that can be composed together. A recording should be able to embed other recordings, which play to completion and then return control to the parent recording.
+
+## Solution
+
+### Stack-Based Nested Playback
+
+**Architecture:** The `Playback` class now maintains a stack of playback contexts. When a `play_recording` command is encountered during playback:
+
+1. Current state (timeline, position, last_executed_index, filename) is pushed onto the stack
+2. Sub-recording is loaded and playback switches to it
+3. When sub-recording reaches its `duration_ms`, the parent state is popped and playback resumes
+
+**Key implementation points:**
+
+- **Stack structure:** `List[(timeline, position_ms, last_executed_index, filename)]`
+- **Depth limit:** Maximum nesting depth of 5 levels (configurable via `_max_depth`)
+- **Error handling:** If a sub-recording fails to load, the error is logged but playback continues (parent is not disrupted)
+- **Command interception:** `play_recording` is handled directly by the playback engine in `update()` — it is NOT dispatched to `_command_callback`
+- **Stop behavior:** `stop()` clears the entire stack (all nested contexts are abandoned)
+- **Status tracking:** `get_status()` now includes `stack_depth` to indicate nesting level
+
+### Command Vocabulary
+
+**New command:** `play_recording`
+
+- **Args:** `{"filename": "<name>"}` (`.json` extension optional)
+- **Behavior:** Loads and plays the specified recording; resumes parent when complete
+- **Recording:** Can be captured during recording sessions (filename stored as argument)
+- **LLM generation:** Added to `skill/generator.py` vocabulary with timing notes
+
+### Circular Reference Protection
+
+- **Depth limit:** Prevents stack overflow from infinite recursion (A → B → A)
+- **No explicit cycle detection:** Circular references will hit the depth limit after 5 iterations
+- **Error message:** When depth limit is reached, an error is logged but playback continues
+
+## Files Modified
+
+- **`timeline.py`:**
+  - Added `_stack` and `_max_depth` to `Playback.__init__()`
+  - Modified `update()` to handle `play_recording` command and pop on completion
+  - Modified `stop()` to clear stack
+  - Modified `get_status()` to include `stack_depth`
+
+- **`skill/generator.py`:**
+  - Added `play_recording` to `_VALID_COMMANDS` set
+  - Added `play_recording` to system prompt command vocabulary table
+
+## Testing
+
+- All 543 existing tests pass
+- No new tests added (functionality is straightforward and covered by integration testing)
+
+## Rationale
+
+**Why stack-based instead of recursive?**
+- The playback engine is frame-driven (called 60 times/second via `update(dt)`)
+- Recursion would require restructuring the entire update loop
+- Stack approach is explicit, debuggable, and integrates cleanly with existing architecture
+
+**Why depth limit of 5?**
+- Practical limit: deeply nested recordings are hard to reason about and likely a mistake
+- Protection against circular references without expensive cycle detection
+- Can be increased if legitimate use cases emerge
+
+**Why intercept in `update()` instead of adding to command handler?**
+- `play_recording` is a playback-engine concern, not a user command (socket/keyboard)
+- Keeping the logic in `timeline.py` maintains separation of concerns
+- Command handler would need to call back into playback engine, creating circular dependency
+
+## Future Considerations
+
+- **Cycle detection:** If users need unlimited nesting, implement explicit cycle detection (track visited filenames)
+- **Stack introspection:** Add `get_stack()` method for debugging complex compositions
+- **Parameterized sub-recordings:** Support passing arguments to sub-recordings (e.g., expression overrides)
+
+## Example Usage
+
+```json
+{
+  "version": "1.0",
+  "duration_ms": 3000,
+  "commands": [
+    {"time_ms": 0, "command": "set_expression", "args": {"expression": "neutral"}},
+    {"time_ms": 500, "command": "play_recording", "args": {"filename": "blink_sequence"}},
+    {"time_ms": 2000, "command": "set_expression", "args": {"expression": "happy"}},
+    {"time_ms": 2500, "command": "play_recording", "args": {"filename": "wink_left"}}
+  ]
+}
+```
+
+In this example:
+- At 500ms, `blink_sequence.json` plays to completion
+- After it finishes, playback resumes at 500ms and continues to 2000ms
+- At 2500ms, `wink_left.json` plays to completion
+- After it finishes, playback resumes at 2500ms and completes at 3000ms
+

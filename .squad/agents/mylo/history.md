@@ -784,3 +784,18 @@ with patch("skill.uploader._upload_ws") as mock_ws:
 
 ## Learnings
 - Updated test_skill_generator.py to reference new package name 'google-genai' instead of 'google-generativeai' in ImportError test (issue #54). Removed redundant 'generativeai' check since new error message uses full package name.
+
+### Issue #55 — Recording Chaining Test Suite (2026-03-02)
+
+**Status:** In progress - comprehensive test suite being written for nested recording playback feature
+
+**Test scope (planned):**
+- Basic nesting: play_recording command embeds sub-recording, resumes parent after completion
+- Stack depth validation: depth limit of 5 enforced, error logged at limit
+- Circular reference protection: A → B → A stops at depth 5, doesn't infinite loop
+- Error handling: sub-recording load failure logged, parent continues unaffected
+- Stop behavior: entire stack cleared, nested context abandoned
+- Status tracking: get_status() returns stack_depth for debugging
+- Integration with existing timeline structure: play_recording works alongside all other commands
+
+**Test coverage:** tests/test_recording_chaining.py

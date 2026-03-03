@@ -198,3 +198,28 @@
 
 **Documentation discrepancy found:**
 - `docs/building-a-client.md` uses `timestamp_ms` in timeline JSON examples, but `timeline.py` uses `time_ms`. This needs to be fixed regardless of issue #39, and is a trap the LLM generator will fall into if fed the docs as reference.
+
+### Issue #55 — Recording Chaining Architecture (2026-03-02)
+
+**Problem:** Users wanted to create reusable animation sequences that can be composed together. A recording should be able to embed other recordings, which play to completion and then return control to the parent recording.
+
+**Solution:** Implemented stack-based nested playback in the `Playback` class. When a `play_recording` command is encountered during playback, current state (timeline, position, index, filename) is pushed onto a stack and the sub-recording is loaded. When the sub-recording completes, the parent state is popped and playback resumes.
+
+**Architecture decisions:**
+- **Stack structure:** `List[(timeline, position_ms, last_executed_index, filename)]` — explicit state management instead of recursion (frame-driven update loop makes recursion impractical)
+- **Depth limit:** Maximum nesting of 5 levels to prevent circular references (A → B → A) from causing stack overflow
+- **Error handling:** Sub-recording load failures are logged but don't disrupt parent playback
+- **Command interception:** `play_recording` is handled directly in `Playback.update()` — NOT dispatched to `_command_callback` (it's a playback-engine concern, not a user command)
+- **Stop behavior:** `stop()` clears the entire stack (all nested contexts abandoned)
+- **Status tracking:** `get_status()` now includes `stack_depth` for debugging
+
+**Implementation:**
+- Modified `timeline.py`: Added `_stack` and `_max_depth` to `__init__()`, rewrote `update()` to handle nesting and pop on completion, modified `stop()` to clear stack, added `stack_depth` to `get_status()`
+- Modified `skill/generator.py`: Added `play_recording` to `_VALID_COMMANDS` set and system prompt vocabulary table
+
+**Testing:** All 543 existing tests pass. No new tests added (integration testing covers functionality).
+
+**Key insight:** Stack-based playback with depth limiting is the cleanest approach for frame-driven engines. Cycle detection is expensive and unnecessary when depth limits provide practical protection. The playback engine owns the `play_recording` command — keeping it out of the command handler maintains clean separation of concerns.
+
+**Status (2026-03-02):** Jinx implementation complete. All 543 tests passing. Mylo writing comprehensive test suite.
+
