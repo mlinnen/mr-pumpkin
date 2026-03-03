@@ -78,6 +78,7 @@ Respond with ONLY a valid JSON object matching this exact schema — no prose, n
 | projection_reset        | (none)                                                   | Reset projection offset                  |
 | jog_offset              | {"dx": int, "dy": int}                                   | Nudge projection by dx/dy pixels         |
 | set_offset              | {"x": int, "y": int}                                     | Absolute projection offset               |
+| play_recording          | {"filename": "<name>"}                                   | Embed another recording; resumes after it completes |
 
 ## Timing Guidelines
 
@@ -138,6 +139,7 @@ _VALID_COMMANDS = {
     "turn_left", "turn_right", "turn_up", "turn_down", "center_head",
     "twitch_nose", "wiggle_nose", "scrunch_nose", "reset_nose",
     "projection_reset", "jog_offset", "set_offset",
+    "play_recording",
 }
 
 
