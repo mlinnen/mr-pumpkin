@@ -5,7 +5,7 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.10] - 2026-03-03
 
 ### Added
 - Recording chaining via `play_recording` command (issue #55) — embed one recording inside another using stack-based nested playback; maximum nesting depth is 5 levels. See [Timeline Schema](timeline-schema.md#recording-chaining) for details.
