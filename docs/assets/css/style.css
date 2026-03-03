@@ -158,15 +158,11 @@ pre code {
 
 .logo-fallback { display: none; }
 
-/* Show fallback when img fails — JS sets display:none on img */
+/* Show fallback only when img fails (onerror sets display:none on the img) */
 .site-logo img[style*="display: none"] + .logo-fallback,
 .site-logo img[style*="display:none"] + .logo-fallback {
   display: inline;
 }
-
-/* Always show fallback if img doesn't load naturally */
-.site-logo .logo-fallback { display: inline; }
-.site-logo img:not([src=""]):not([src$="404"]) { display: block; }
 
 /* --- Nav --- */
 .site-nav {
