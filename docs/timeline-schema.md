@@ -105,6 +105,16 @@ Typical `amount` range: 50–150 px. Allow 300–500ms between head movements.
 
 ---
 
+### Chaining / Sub-Recordings
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `play_recording` | `filename` (string, recording name) | Load and play another recording to completion, then resume the parent timeline |
+
+See [Recording Chaining](#recording-chaining) below for full details.
+
+---
+
 ### Projection
 
 These commands adjust display alignment and are not normally used in performative animations.
@@ -138,6 +148,25 @@ These commands adjust display alignment and are not normally used in performativ
 
 ---
 
+## Recording Chaining
+
+A timeline can embed another recording using `play_recording`. When the playback engine encounters this command it:
+
+1. **Pushes** the current timeline state (position, progress) onto an internal stack.
+2. **Loads** the named sub-recording from the recordings directory (`.json` extension is optional).
+3. **Plays** the sub-recording to completion.
+4. **Pops** the parent state and resumes from the point immediately after the `play_recording` command.
+
+**Nesting depth:** Up to **5 levels** of nesting are supported. If a `play_recording` command is encountered when the stack is already at depth 5 it is silently skipped and an error is logged; parent playback continues uninterrupted.
+
+**Missing files:** If the named recording file cannot be found or loaded, the error is logged and the `play_recording` command is skipped. Playback of the parent timeline continues normally.
+
+**Stopping:** Calling `stop` clears the entire stack — all nested contexts are abandoned and playback halts immediately.
+
+The pumpkin face never sees the `play_recording` command. It is intercepted and handled entirely by the playback engine before any callback to the face renderer.
+
+---
+
 ## Validation Rules
 
 1. `version` must be exactly `"1.0"`
@@ -146,6 +175,7 @@ These commands adjust display alignment and are not normally used in performativ
 4. `commands` array must be non-empty
 5. All `command` names must be from the vocabulary above
 6. `args` must only include valid keys for the given command
+7. `play_recording` args must include a non-empty `filename` key
 
 ---
 
@@ -166,3 +196,21 @@ These commands adjust display alignment and are not normally used in performativ
   ]
 }
 ```
+
+### Example with Recording Chaining
+
+```json
+{
+  "version": "1.0",
+  "duration_ms": 5000,
+  "commands": [
+    {"time_ms": 0,    "command": "set_expression", "args": {"expression": "neutral"}},
+    {"time_ms": 500,  "command": "play_recording",  "args": {"filename": "slow_blink"}},
+    {"time_ms": 1000, "command": "set_expression", "args": {"expression": "happy"}},
+    {"time_ms": 1500, "command": "play_recording",  "args": {"filename": "excited_wiggle"}},
+    {"time_ms": 4500, "command": "set_expression", "args": {"expression": "neutral"}}
+  ]
+}
+```
+
+In this example, `slow_blink` plays to completion before the expression switches to `happy`, and then `excited_wiggle` plays in full before the final neutral expression. Each sub-recording's duration determines when the parent timeline resumes.

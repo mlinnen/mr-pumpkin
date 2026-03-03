@@ -223,3 +223,28 @@
 
 **Status (2026-03-02):** Jinx implementation complete. All 543 tests passing. Mylo writing comprehensive test suite.
 
+### Documentation Update — Issues #55 and #56 (2026-03-02)
+
+**Scope:** Updated `docs/timeline-schema.md`, `docs/what-is-new.md`, and `docs/recording-skill.md` to document the recording chaining feature and the new `help` command.
+
+**Key documentation decisions:**
+- `play_recording` was placed under a new `### Chaining / Sub-Recordings` section in the timeline schema Command Vocabulary — distinct from all other command groups because it is a playback-engine directive, not a face command
+- The Recording Chaining prose section was added *after* the Command Vocabulary table but *before* Validation Rules in `timeline-schema.md`, so readers see the concept before validating their JSON
+- Added a chained example timeline to show `play_recording` in realistic context alongside standard commands
+- `docs/recording-skill.md` chaining section placed *before* "Playing back a recording" — teaches composition before playback, a natural learning order
+- `what-is-new.md` `[Unreleased]` block follows exact format of existing entries (### Added heading, concise bullet per feature, cross-reference link)
+
+**Help command (issue #56):**
+- `help` is handled in `command_handler.py` — returns a plain-text string listing all available commands with their syntax
+- Safe to call at any time including during playback; no side effects
+- Documented in `[Unreleased]` release notes only (not timeline schema, since it is a TCP/WebSocket command, not a timeline command)
+
+**Chaining architecture confirmed from timeline.py (lines 295–374):**
+- `play_recording` is intercepted in `Playback.update()` before `_command_callback` is ever called
+- Stack holds `(timeline, position_ms, last_executed_index, filename)` tuples
+- Depth check is `len(self._stack) < self._max_depth` (5); at limit, error is appended and command skipped
+- Sub-recording load failure: `except Exception` catches, appends error, skips command, parent continues
+- End-of-timeline pop: `if self._stack: parent = self._stack.pop()` → resume; else `self.stop()`
+- `stop()` calls `self._stack.clear()` — entire nesting context abandoned cleanly
+
+
