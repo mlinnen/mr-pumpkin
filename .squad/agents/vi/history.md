@@ -693,3 +693,8 @@ Built full Jekyll 4.3 site under docs/ with 7 pages, dark pumpkin theme, and mob
 - Trigger: push to preview branch touching docs/**
 
 📌 Team update (2026-03-03): Jekyll GitHub Pages site built for Issue #57; PR #58 open
+
+## 2026-03-03 10:45 - Lunr.js On-Site Search Implementation
+
+Replaced the GitHub-redirect search with a proper client-side search using Lunr.js for the Jekyll docs site. Created search.json to generate a Jekyll-based search index, added a search results page (search.md), rewrote search.js to build and query the Lunr index, and updated default.html with baseurl meta tag for path resolution. The search form now navigates to /search?q= instead of opening GitHub search in a new tab. This provides a better UX with instant on-site search results.
+
