@@ -1,0 +1,7 @@
+---
+layout: none
+---
+{% assign search_pages = site.pages | concat: site.posts %}
+[
+{% for page in search_pages %}{% if page.title %}{"title":{{ page.title | jsonify }},"url":{{ page.url | prepend: site.baseurl | jsonify }},"content":{{ page.content | strip_html | normalize_whitespace | truncate: 600 | jsonify }}}{% unless forloop.last %},{% endunless %}{% endif %}{% endfor %}
+]

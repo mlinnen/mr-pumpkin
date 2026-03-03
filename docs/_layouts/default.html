@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="baseurl" content="{{ site.baseurl }}">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% if page.title %}{{ page.title }} — {% endif %}{{ site.title }}</title>
   <meta name="description" content="{{ page.excerpt | default: site.description | strip_html | normalize_whitespace | truncate: 160 }}">
@@ -24,8 +25,8 @@
       </nav>
 
       <div class="header-search">
-        <form class="search-form" action="https://github.com/mlinnen/mr-pumpkin/search" method="get" target="_blank" rel="noopener">
-          <input type="text" name="q" placeholder="Search…" class="search-input" aria-label="Search">
+        <form class="search-form" role="search">
+          <input class="search-input" type="search" placeholder="Search…" aria-label="Search">
           <button type="submit" class="search-btn" aria-label="Submit search">🔍</button>
         </form>
       </div>
