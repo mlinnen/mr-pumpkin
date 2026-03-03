@@ -678,3 +678,18 @@ Successfully extracted ~660 lines of command parsing logic from TCP socket handl
 3. **No playback pause:** Returns early before the is_timeline_command guard, so sending help during playback does NOT pause the animation.
 4. **Includes all commands:** All animation, eyebrow, projection, head, nose, timeline, recording, file-management, expression, and meta commands are documented with syntax and brief description.
 5. **Alias documented:** list alias for list_recordings is explicitly called out.
+
+### GitHub Pages Static Site (Issue #57)
+
+**Branch:** squad/57-github-pages-site  
+**PR:** #58
+
+Built full Jekyll 4.3 site under docs/ with 7 pages, dark pumpkin theme, and mobile navigation. Navigation driven by _data/navigation.yml. All existing docs/*.md files received Jekyll front matter (non-destructive). Blog posts migrated to docs/_posts/. Search implemented as a GitHub redirect. Updated squad-docs.yml CI workflow: Ruby 3.2 + bundler cache, undle exec jekyll build, deploy via ctions/deploy-pages@v4.
+
+**Key Decisions:**
+- Jekyll 4.3 over Hugo/MkDocs — native GitHub Pages engine
+- Custom _layouts/default.html over minima — full design control for dark theme
+- GitHub search redirect over lunr.js — no build-time index overhead
+- Trigger: push to preview branch touching docs/**
+
+📌 Team update (2026-03-03): Jekyll GitHub Pages site built for Issue #57; PR #58 open
