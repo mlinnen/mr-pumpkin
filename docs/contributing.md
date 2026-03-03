@@ -77,3 +77,7 @@ New expressions follow the pattern in `pumpkin_face.py`'s `Expression` enum. New
 ## Code of Conduct
 
 Please be respectful and constructive. This project follows the [Contributor Covenant](https://www.contributor-covenant.org/) code of conduct.
+
+## License
+
+This project is released under the [MIT License]({{ '/license' | relative_url }}).
