@@ -2770,3 +2770,786 @@ client.shutdown(socket.SHUT_WR)  # Signal EOF so server breaks its recv loop
 - **Timeout on recv():** Fragile, adds latency, masks the real issue
 - **Sending a sentinel/ack from server for all commands:** Would require server changes and change the protocol contract
 - **Separate connection per command (already the case):** The pattern is correct; only the EOF signal was missing
+---
+
+### 2026-03-02: User directives — Issue #39 Recording Skill
+
+**By:** Mike Linnen (via Copilot)
+
+Four directives guide the recording skill implementation:
+
+**By:** Mike Linnen (via Copilot)
+**What:** Use Gemini as the initial LLM provider for the mr-pumpkin recording skill (issue #39). Design the provider layer to be pluggable so other providers (OpenAI, Anthropic, local models) can be swapped in later without rearchitecting.
+**Why:** User decision — captured for team memory and to guide Vi's implementation of the generator module.
+
+**By:** Mike Linnen (via Copilot)
+**What:** The recording skill must be AI-agnostic (not tied to Copilot MCP or any single platform). It is a user-facing skill for the mr-pumpkin application — end users invoke it to generate and upload animations. It is NOT a squad developer tool.
+**Why:** User decision — defines the packaging and audience for the skill. Influences how the CLI entry point is structured (standalone Python tool, invokable by any AI assistant or human user directly).
+
+**By:** Mike Linnen (via Copilot)
+**What:** If a timeline with the same filename already exists on the mr-pumpkin server, the skill should return an error. No silent overwrite.
+**Why:** User decision — captured for team memory and to guide Vi's implementation of the uploader module.
+
+**By:** Mike Linnen (via Copilot)
+**What:** After uploading a timeline, the skill should return immediately. No auto-play. Playback is the user's responsibility.
+**Why:** User decision — captured for team memory and to guide Vi's implementation of the uploader module.
+
+---
+
+# Architecture Decision — Issue #39: Mr. Pumpkin Recording Skill
+
+**Date:** 2026-03-02  
+**By:** Jinx (Lead)  
+**Issue:** #39 — Create a mr-pumpkin skill that allows a CLI with LLM capabilities to generate recordings using an AI prompt  
+**Status:** Proposed
+
+---
+
+## 1. Problem Statement
+
+Users want to create animated pumpkin face sequences (timeline recordings) using natural language instead of manually constructing JSON. A "skill" should translate prompts like *"make the pumpkin look surprised, then blink twice, look left, and smile"* into valid timeline JSON and upload it to the mr-pumpkin server.
+
+---
+
+## 2. Key Findings from Codebase Analysis
+
+### 2.1 Timeline JSON Format (Canonical)
+
+From `timeline.py`, the **authoritative** schema is:
+
+```json
+{
+  "version": "1.0",
+  "duration_ms": 5000,
+  "commands": [
+    {
+      "time_ms": 0,
+      "command": "set_expression",
+      "args": { "expression": "happy" }
+    },
+    {
+      "time_ms": 1000,
+      "command": "blink"
+    },
+    {
+      "time_ms": 2500,
+      "command": "gaze",
+      "args": { "x": 45.0, "y": 30.0 }
+    }
+  ]
+}
+```
+
+**Critical fields:**
+- `version`: Must be `"1.0"`
+- `duration_ms`: Integer, must equal or exceed the largest `time_ms`
+- `commands[].time_ms`: Integer milliseconds from start
+- `commands[].command`: String command name
+- `commands[].args`: Optional dict of command arguments
+
+**⚠️ Documentation discrepancy:** `docs/building-a-client.md` shows `timestamp_ms` as the key, but `TimelineEntry.from_dict()` reads `data["time_ms"]`. The skill must use `time_ms` (the code-level truth).
+
+### 2.2 Complete Command Vocabulary for Recordings
+
+From `_capture_command_for_recording()` in `pumpkin_face.py`, the recordable commands are:
+
+| Command | Args | Notes |
+|---------|------|-------|
+| `set_expression` | `{"expression": "<name>"}` | neutral, happy, sad, angry, surprised, scared, sleeping |
+| `blink` | *(none)* | Both eyes blink |
+| `wink_left` | *(none)* | Left eye wink |
+| `wink_right` | *(none)* | Right eye wink |
+| `roll_clockwise` | *(none)* | Eyes roll clockwise |
+| `roll_counterclockwise` | *(none)* | Eyes roll counter-clockwise |
+| `gaze` | `{"x": float, "y": float}` or `{"lx": float, "ly": float, "rx": float, "ry": float}` | -90 to +90 degrees |
+| `eyebrow_raise` | *(none)* | Raise both |
+| `eyebrow_lower` | *(none)* | Lower both |
+| `eyebrow_raise_left` | *(none)* | Raise left |
+| `eyebrow_lower_left` | *(none)* | Lower left |
+| `eyebrow_raise_right` | *(none)* | Raise right |
+| `eyebrow_lower_right` | *(none)* | Lower right |
+| `eyebrow_reset` | *(none)* | Reset to neutral |
+| `eyebrow` | `{"value": float}` or `{"left": float, "right": float}` | Numeric eyebrow control |
+| `turn_left` | `{"amount": int}` | Default 50px |
+| `turn_right` | `{"amount": int}` | Default 50px |
+| `turn_up` | `{"amount": int}` | Default 50px |
+| `turn_down` | `{"amount": int}` | Default 50px |
+| `center_head` | *(none)* | Return to center |
+| `twitch_nose` | `{"magnitude": float}` | Default 50.0 |
+| `wiggle_nose` | `{"magnitude": float}` | Default 50.0 |
+| `scrunch_nose` | `{"magnitude": float}` | Default 50.0 |
+| `reset_nose` | *(none)* | Return to neutral |
+| `projection_reset` | *(none)* | Reset projection offset |
+| `jog_offset` | `{"dx": int, "dy": int}` | Nudge projection |
+| `set_offset` | `{"x": int, "y": int}` | Absolute projection offset |
+
+### 2.3 Upload Mechanisms
+
+**TCP (Port 5000) — Multi-step handshake:**
+1. Send `upload_timeline <filename>\n`
+2. Wait for `READY` response
+3. Send JSON content + `\n`
+4. Send `END_UPLOAD\n`
+5. Read `OK Uploaded <filename>.json` or `ERROR ...`
+
+**WebSocket (Port 5001) — Single message:**
+1. Send `upload_timeline <filename> <json_string>`
+2. Read `OK Uploaded <filename>.json` or `ERROR ...`
+
+Both paths call `FileManager.upload_timeline()` which validates JSON structure via `Timeline.from_dict()` before saving to `~/.mr-pumpkin/recordings/`.
+
+### 2.4 What "Skill" Means Here
+
+This is **not** a squad skill (`.squad/skills/` contains team knowledge patterns). This is a **user-facing tool** — specifically, a capability that can be invoked from a CLI assistant (like GitHub Copilot CLI, or any LLM-powered CLI) to generate and upload timeline recordings.
+
+The closest analogy: a **Copilot Extension** or **MCP tool** that exposes mr-pumpkin animation generation as a callable capability.
+
+---
+
+## 3. Proposed Architecture
+
+### 3.1 Component: Prompt-to-Timeline Generator (Core)
+
+A Python module that:
+1. Takes a natural language description of an animation
+2. Constructs a system prompt containing the command vocabulary, JSON schema, and animation timing guidelines
+3. Calls an LLM API to generate timeline JSON
+4. Validates the generated JSON against the Timeline schema
+5. Returns a valid `Timeline` object
+
+**File:** `skill/generator.py` (new package)
+
+**Key design:** The LLM prompt engineering is the heart of this feature. The system prompt must include:
+- The full command vocabulary table (above)
+- The exact JSON schema with `time_ms` / `command` / `args`
+- Timing guidelines (e.g., "blinks take ~300ms", "allow 500ms between expressions for transitions")
+- Example timelines for few-shot learning
+- Constraints: version must be "1.0", time_ms must be sorted ascending, duration_ms must match
+
+### 3.2 Component: Upload Client
+
+A Python module that:
+1. Takes a `Timeline` object and a filename
+2. Connects to mr-pumpkin via TCP or WebSocket
+3. Uploads the timeline using the established protocol
+4. Returns success/failure status
+
+**File:** `skill/uploader.py`
+
+This is largely a refactored version of `client_example.py`'s `upload_timeline()` function, made importable and robust (retry, connection error handling, configurable host/port).
+
+### 3.3 Component: CLI Entry Point
+
+A command-line interface that:
+1. Accepts a natural language prompt (interactive or via argument)
+2. Calls the generator to produce timeline JSON
+3. Optionally previews the timeline (show commands, duration)
+4. Uploads to mr-pumpkin server (with `--upload` flag or interactive confirmation)
+5. Optionally saves to a local file (with `--save` flag)
+
+**File:** `skill/cli.py` or integrated into a Copilot extension
+
+### 3.4 Component: MCP Tool Definition (Optional/Future)
+
+If Mike wants this integrated as an MCP server for Copilot or other LLM CLIs:
+- Define as an MCP tool with `generate_animation` and `upload_animation` capabilities
+- Register in `.copilot/mcp-config.json`
+- This would allow Copilot CLI to call it directly
+
+---
+
+## 4. Work Breakdown
+
+### WI-1: Command Vocabulary Reference Document
+**Owner:** Jinx  
+**Effort:** 1 hour  
+**Description:** Create a machine-readable reference of all recordable commands with their args schemas. This becomes the system prompt material for the LLM and the validation schema for generated output.  
+**Dependencies:** None  
+**Deliverable:** `skill/command_reference.json` or embedded in generator module
+
+### WI-2: Prompt-to-Timeline Generator
+**Owner:** Vi (Backend)  
+**Effort:** 4-6 hours  
+**Description:** Core module that takes natural language → LLM API call → validated Timeline JSON. Includes system prompt engineering, LLM API integration, response parsing, and schema validation.  
+**Dependencies:** WI-1 (command vocabulary)  
+**Key decisions needed:**
+- LLM provider (OpenAI / Anthropic / configurable)
+- API key management (env var `MR_PUMPKIN_LLM_API_KEY` or provider-specific)
+- Model selection (GPT-4o-mini / Claude Haiku for cost efficiency, or configurable)
+
+### WI-3: Upload Client Library
+**Owner:** Vi (Backend)  
+**Effort:** 2-3 hours  
+**Description:** Refactor upload logic from `client_example.py` into an importable module with TCP and WebSocket support, connection error handling, and configurable host/port.  
+**Dependencies:** None (existing protocol is stable)  
+**Deliverable:** `skill/uploader.py`
+
+### WI-4: CLI Entry Point
+**Owner:** Vi (Backend)  
+**Effort:** 2-3 hours  
+**Description:** Command-line interface that orchestrates generation + upload. Supports `--prompt`, `--upload`, `--save`, `--host`, `--port`, `--preview` flags.  
+**Dependencies:** WI-2, WI-3  
+**Deliverable:** `skill/cli.py` (runnable as `python -m skill`)
+
+### WI-5: Test Suite
+**Owner:** Mylo (Tester)  
+**Effort:** 4-6 hours  
+**Description:** Tests covering:
+- Generator produces valid Timeline JSON for various prompts (mock LLM responses)
+- Generator rejects/repairs invalid LLM output (malformed JSON, unknown commands)
+- Uploader handles connection success, failure, timeout
+- CLI end-to-end with mocked LLM and mocked server
+- Edge cases: empty prompts, extremely long sequences, invalid command references  
+**Dependencies:** WI-2, WI-3, WI-4  
+**Deliverable:** `tests/test_skill_generator.py`, `tests/test_skill_uploader.py`, `tests/test_skill_cli.py`
+
+### WI-6: Documentation
+**Owner:** Jinx (with Vi)  
+**Effort:** 2 hours  
+**Description:** User-facing docs for the skill: how to install, configure LLM API key, run, example prompts. Add section to README and/or dedicated `docs/recording-skill.md`.  
+**Dependencies:** WI-4  
+**Deliverable:** `docs/recording-skill.md`, README update
+
+### WI-7 (Optional): MCP Tool Integration
+**Owner:** Vi (Backend)  
+**Effort:** 3-4 hours  
+**Description:** Package the skill as an MCP server so LLM CLIs (Copilot, etc.) can call it as a tool. Register in `.copilot/mcp-config.json`.  
+**Dependencies:** WI-4  
+**Deliverable:** `skill/mcp_server.py`, updated `.copilot/mcp-config.json`
+
+---
+
+## 5. Dependency Graph
+
+```
+WI-1 (Command Vocabulary)
+  └─► WI-2 (Generator) ──┐
+                          ├─► WI-4 (CLI) ──► WI-6 (Docs)
+WI-3 (Upload Client) ────┘                     │
+                                                └─► WI-7 (MCP, optional)
+WI-5 (Tests) depends on WI-2, WI-3, WI-4
+```
+
+---
+
+## 6. Key Design Decisions Required
+
+### Decision 1: LLM Provider
+**Options:**
+- **A) OpenAI (GPT-4o-mini)** — Widely available, cheap, good at structured JSON output, `response_format: json_object` mode
+- **B) Anthropic (Claude Haiku)** — Good at following structured prompts, XML/JSON output
+- **C) Configurable** — Support multiple providers via env var (`MR_PUMPKIN_LLM_PROVIDER=openai|anthropic`)
+
+**Recommendation:** Option C (configurable) with OpenAI as default. The generator module should abstract the LLM call behind an interface, making provider changes a config change, not a code change.
+
+### Decision 2: Where the Skill Lives
+**Options:**
+- **A) `skill/` package in the mr-pumpkin repo** — Co-located, shares timeline.py imports
+- **B) Separate repository** — Independent release cycle, pip-installable
+- **C) Single file** — Minimal footprint, easy distribution
+
+**Recommendation:** Option A (`skill/` package in-repo). The skill must import `Timeline` and `TimelineEntry` from `timeline.py` for validation. Keeping it co-located avoids version drift and circular dependencies. Can always be extracted later if it grows.
+
+### Decision 3: JSON Validation Strategy
+**Options:**
+- **A) Parse-and-validate** — Use `Timeline.from_dict()` to validate LLM output, reject if invalid
+- **B) Parse-repair-validate** — Attempt to fix common LLM errors (wrong key names, missing fields) before validation
+- **C) Schema-constrained generation** — Use OpenAI structured output or similar to force valid JSON
+
+**Recommendation:** Option B (parse-repair-validate). LLMs commonly make small errors like using `timestamp_ms` instead of `time_ms` (our own docs have this inconsistency!). A repair layer that normalizes known aliases before validation will dramatically improve success rate.
+
+### Decision 4: API Key Management
+**Recommendation:** Environment variable (`MR_PUMPKIN_LLM_API_KEY` or provider-specific like `OPENAI_API_KEY`). No keys in config files or source code. The CLI should error clearly if no key is found.
+
+---
+
+## 7. Risks and Open Questions
+
+### Risks
+1. **LLM output quality** — LLMs may generate plausible but invalid timelines (wrong command names, impossible arg values). Mitigation: strong system prompt + validation layer + repair heuristics.
+2. **Timing realism** — LLMs have no concept of how long animations "feel." A blink at 50ms would be invisible; 5000ms would be absurdly slow. Mitigation: include timing guidelines and examples in system prompt.
+3. **Cost** — Each generation call costs money. Mitigation: use efficient models (GPT-4o-mini, Haiku), cache common patterns, keep prompts concise.
+4. **API dependency** — Feature requires external API access. Mitigation: support local models (ollama) as future provider option.
+
+### Open Questions (Need Mike's Input)
+1. **LLM provider preference?** Does Mike have an existing OpenAI or Anthropic key/account?
+2. **Scope of "skill"?** Is this just a CLI tool, or should it integrate as an MCP tool for Copilot?
+3. **Playback after upload?** Should the skill automatically trigger `play <filename>` after upload, or just upload and let the user play manually?
+4. **Overwrite behavior?** If a recording with the same name exists, should the skill error, prompt, or auto-rename?
+
+---
+
+## 8. Recommended Starting Point
+
+**Build WI-1 (Command Vocabulary) and WI-2 (Generator) first.**
+
+The generator is the core value of this feature — everything else (upload, CLI, tests) is plumbing around existing patterns. Start with:
+
+1. Create the `skill/` package directory
+2. Build the command vocabulary reference (this is also useful documentation)
+3. Build the generator with a hardcoded OpenAI call, validate output against `Timeline.from_dict()`
+4. Test manually with real prompts to tune the system prompt
+
+Once the generator reliably produces valid JSON, WI-3 (uploader) and WI-4 (CLI) can be built quickly since they reuse existing protocol patterns.
+
+**Parallel work:** Mylo can write test stubs (WI-5) against the generator interface while Vi builds the implementation (WI-2), following the same test-first pattern used for timeline and projection mapping.
+
+---
+
+## 9. Ekko's Role
+
+Ekko (Graphics) has limited direct work here, but provides critical domain knowledge:
+- **Timing guidelines** for the system prompt — how long do expression transitions take? What's a natural blink duration? How fast should gaze movements be?
+- **Animation choreography review** — review generated timelines for visual quality
+- **Expression combination advice** — what combinations look good vs. glitchy (e.g., raising eyebrows during scared expression)
+
+This knowledge should be captured in WI-1 (command vocabulary) as timing annotations.
+
+
+---
+
+# Decision: Animation Timing Guidelines for Recording Skill Generator
+
+**Date:** 2026-03-02  
+**Owner:** Ekko (Graphics Dev)  
+**Issue:** #39 (Recording Skill) — Section 9 (Ekko's Role)  
+**Status:** Implemented
+
+---
+
+## Problem
+
+The recording skill generator (Issue #39) requires an LLM (Gemini) to construct natural-feeling pumpkin face animation timelines. Without explicit guidance on timing, the LLM would generate animations that violate the graphics system's constraints:
+- Commands placed too close together (visual glitches, overlapping animations)
+- Expressions interrupted during transitions (jarring flicker)
+- Unnatural animation durations (50ms blink = invisible; 5s expression = glacial)
+- Emotionally incongruous choreography (scared + eye rolls = confusing)
+
+The LLM needs documented patterns to understand:
+1. How long each command animation takes
+2. How long to wait between commands
+3. Which command combinations feel natural vs. wrong
+4. What animation durations feel believable (short/medium/long)
+
+---
+
+## Solution: Animation Timing Guidelines Document
+
+Created `skill/timing_guidelines.md` — a structured reference document written for AI comprehension.
+
+### Key Decisions
+
+**Decision 1: Per-Command Duration Table**
+- Each recordable command has a baseline duration (how long the animation "occupies" on the timeline)
+- Durations are empirically derived from graphics rendering constants:
+  - Blink: 200–300ms (from `transition_speed = 0.05`, rendering at 60 FPS)
+  - Expression transitions: 300–600ms (depends on emotional distance)
+  - Gaze: 200–800ms (scales with angle magnitude: ±10° = 200ms, ±80° = 800ms)
+  - Head turns: 300–600ms (scaling with pixel displacement)
+  - Eye rolls: 1000–1500ms (full 360° rotation at `rolling_speed = 0.01`)
+  - Nose animations: 200–500ms (twitch ~250ms, scrunch ~400ms, wiggle ~500ms)
+- **Why:** Gives LLM concrete targets instead of vague "make it feel natural."
+
+**Decision 2: Gap Rules Between Commands**
+- Default minimum gap: 100–150ms (safety buffer for rendering)
+- Expression transitions need 300–500ms breathing room (don't interrupt mid-transition)
+- Eye movements can chain faster: 50–100ms (gaze → gaze has natural flow)
+- Head turns need exclusive time: 300–600ms gap before next major animation
+- **Why:** Prevents visual artifacts from command overlap while allowing efficient pacing. Also reflects human perception: quick eye movements feel natural, but rapid expression flickers feel wrong.
+
+**Decision 3: Choreography Pattern Library**
+- Documented seven worked examples (surprise, wink, sleepy, confused, scared, exploration, disgust)
+- Each shows: command sequence → timing annotations → emotional interpretation
+- Examples emphasize orthogonal layering (brows + expression, gaze + head turn)
+- **Why:** Gives LLM templates for common emotional arcs and helps it avoid bad combinations.
+
+**Decision 4: Anti-Pattern Warnings**
+- Listed eight things that look wrong:
+  1. Eye rolls during happy/sad/angry (conflicts with emotion)
+  2. Back-to-back expression changes < 200ms (flicker)
+  3. Head turns while sleeping (breaks immersion)
+  4. Gaze > 70° (unnaturally extreme)
+  5. Overlapping blinks/winks (rapid fluttering)
+  6. Multiple rapid head turns (jittery)
+  7. Extreme eyebrow offsets (collision/clipping)
+  8. Gaze extremes during introspective expressions
+- **Why:** LLMs are good at pattern matching but can miss subtle visual conventions. Explicit warnings prevent likely failure modes.
+
+**Decision 5: Three Worked Examples with Full Annotations**
+- Example 1 (3s): Simple greeting (blink → wink → happy → gaze)
+- Example 2 (5.5s): Scared reaction (surprise → scared → roll → upward gaze → recovery)
+- Example 3 (8.5s): Thoughtful exploration (gaze scanning → thinking → head turn → realization)
+- Each shows exact `time_ms`, `command`, `args`, and explains timing choices
+- **Why:** Few-shot learning. LLMs improve dramatically with concrete examples in the system prompt.
+
+**Decision 6: Duration Categories (Total Animation Length)**
+- Short: 2–5 seconds (simple sequences)
+- Medium: 5–15 seconds (multi-step choreography)
+- Long: 15–30 seconds (elaborate loops)
+- Rule: Set `duration_ms` = `max(time_ms) + estimated_final_command_duration + 100ms buffer`
+- **Why:** Prevents timelines that end abruptly mid-animation or have silent gaps at the end.
+
+**Decision 7: Command Vocabulary Quick Reference**
+- Included table of all recordable commands with exact syntax
+- Mapped to JSON `"command"` and `"args"` fields
+- Noted optional vs. required arguments
+- **Why:** LLM must generate syntactically valid JSON. This table is the "truth" for what commands exist and how to format them.
+
+---
+
+## Design Rationale
+
+### Why This Document Structure?
+
+The guidelines are structured for **AI comprehension**, not human reading:
+
+1. **Tables for lookup** — LLM can quickly reference durations, command syntax, arg types
+2. **Explicit anti-patterns** — Instead of "avoid weird combinations," we list the specific wrongs with reasoning
+3. **Worked examples** — Concrete JSON with annotations teach-by-example more effectively than prose rules
+4. **Modular sections** — Duration rules, pacing rules, choreography patterns, anti-patterns are separate so LLM can selectively apply them
+5. **Cross-references to codebase** — When possible, notes the graphics system constants (e.g., `blink_speed = 0.03`, `rolling_duration = 1.0`)
+
+### Why Empirical Timings?
+
+Rather than generic guidelines ("blinks are quick"), we provide empirical ranges:
+- `blink: 200–300ms` instead of "fast"
+- `gaze: 200–800ms depending on angle` instead of "varies"
+
+**Why:** LLMs struggle with vague instructions. Concrete numbers in well-calibrated ranges let the LLM generate timelines that immediately feel correct.
+
+### Why Include Anti-Patterns?
+
+Standard guidance says "follow these rules." But LLMs often learn from implicit patterns in data. Anti-patterns make the implicit explicit:
+- Not just "use natural eye movements" but "rolling eyes during happy expression looks wrong because..."
+- Not just "space commands naturally" but "expression transitions need 300–500ms; don't interrupt them"
+
+**Why:** Reduces likelihood of the LLM violating visual conventions through ignorance.
+
+---
+
+## Verification
+
+### Completeness Check
+- ✅ All 27 recordable commands from `command_handler.py` covered
+- ✅ Command argument schemas match `Timeline.from_dict()` validation
+- ✅ Timing ranges derived from constants in `pumpkin_face.py`:
+  - `transition_speed = 0.05` → 300–600ms transitions
+  - `blink_speed = 0.03` → 200–300ms blink cycle
+  - `rolling_speed = 0.01` → 1000–1500ms full roll
+  - `head_movement_duration = 0.5` → 300–600ms head turns
+- ✅ Choreography examples tested mentally against codebase behavior
+- ✅ Anti-patterns derived from actual graphics limitations (collision detection, expression state machine, rendering order)
+
+### AI-Readability Check
+- ✅ Clear section headers for navigation
+- ✅ Tables with consistent columns
+- ✅ Code blocks for JSON examples with line-by-line annotations
+- ✅ Both prescriptive ("do this") and descriptive ("here's why") explanations
+- ✅ Cross-references to command vocabulary for consistency
+
+---
+
+## Impact
+
+### For the Recording Skill Generator
+- LLM can now produce timelines that feel natural on first pass
+- Reduces need for post-generation validation/repair
+- Enables the generator to make choreography choices (emotion → animation sequence) separately from timing mechanics
+
+### For Future Animation Work
+- Timing document is a reference for any feature that generates or validates timelines
+- Can be extended with new animation types (e.g., lip-sync commands if added)
+- Establishes pattern: animation behavior is documented for both human and AI comprehension
+
+### For Team Knowledge
+- Graphics timing knowledge is captured formally (not just in code)
+- New team members can understand animation constraints without reverse-engineering the renderer
+- Creates vocabulary (e.g., "orthogonal animations") for discussing choreography
+
+---
+
+## Related Artifacts
+
+- **Source code:** `pumpkin_face.py` (animation constants, expression state machine, rendering)
+- **Architecture:** `.squad/decisions/inbox/jinx-issue39-architecture.md` (section 9 references this)
+- **Graphics history:** `.squad/agents/ekko/history.md` (nose, eyebrow, head movement patterns)
+- **Generated document:** `skill/timing_guidelines.md` (embedded in LLM system prompt)
+
+---
+
+## Future Refinements
+
+If the LLM produces suboptimal timelines:
+1. Adjust duration ranges based on actual output quality
+2. Add more worked examples (happy loops, angry sequences, mixed emotions)
+3. Refine anti-pattern descriptions with more specific visual examples
+4. Test with different LLM models (GPT-4, Claude, Gemini) and adjust language for each
+
+If new features are added (e.g., lip-sync, eye color changes):
+1. Add command timing for new feature
+2. Document interactions with existing commands
+3. Update anti-patterns if new feature conflicts with existing choreography
+
+
+---
+
+# Implementation Decisions — Vi: Skill Package (Issue #39)
+
+**Date:** 2026-03-02
+**By:** Vi (Backend)
+**Relates to:** WI-1, WI-2, WI-3, WI-7 from jinx-issue39-architecture.md
+
+---
+
+## Decision 1: Gemini as Default LLM Provider (Resolved)
+
+**Decision:** Use `GeminiProvider` (gemini-1.5-flash) as the default per Mike's directive in `copilot-directive-20260302-llm-provider.md`.
+
+**API key strategy:** `GEMINI_API_KEY` env var, fallback to `GOOGLE_API_KEY`. Clear `EnvironmentError` if neither present.
+
+**Model choice:** `gemini-1.5-flash` — cheap, fast, strong at JSON generation. Per Mike's input.
+
+---
+
+## Decision 2: Provider Abstraction (Resolved)
+
+**Decision:** Abstract base class `LLMProvider` with single `generate(system_prompt, user_prompt) -> str` method. `GeminiProvider` is the first implementation.
+
+**Rationale:** Mike explicitly requested provider-agnostic design. Future providers (OpenAI, Anthropic, local Ollama) can be added without touching call sites.
+
+**Note:** `GeminiProvider.__init__` embeds the system instruction in the model object at construction time, so the `system_prompt` parameter to `generate()` is ignored. This is a known trade-off — the interface is clean but the system prompt must be set at construction, not at call time. If a future provider needs per-call system prompts, the interface signature supports it.
+
+---
+
+## Decision 3: System Prompt Embedding Strategy (Resolved)
+
+**Decision:** Embed full command vocabulary table and two example timelines directly in `_SYSTEM_PROMPT` constant in `generator.py`.
+
+**Rationale:** Architecture doc (WI-1) recommended embedding rather than importing from codebase. This makes `generator.py` self-contained and testable in isolation without running pumpkin_face.py.
+
+**Few-shot examples chosen:** "surprised then relieved" (emotion transition) and "getting sleepy" (progressive animation). These cover the most common use cases and teach the model timing conventions.
+
+---
+
+## Decision 4: No Autoplay After Upload (Resolved)
+
+**Decision:** `upload_timeline()` returns after successful upload without sending a `play` command. Per Mike's directive in `copilot-directive-20260302-upload-no-autoplay.md`.
+
+---
+
+## Decision 5: Error on Duplicate Filename (Resolved)
+
+**Decision:** If the server responds with an ERROR (including "already exists"), `upload_timeline()` raises `ValueError(response)`. No silent overwrite, no rename. Per Mike's directive in `copilot-directive-20260302-upload-error-on-duplicate.md`.
+
+---
+
+## Decision 6: WebSocket Optional Dependency (Resolved)
+
+**Decision:** Check `importlib.util.find_spec("websockets")` before attempting WebSocket upload. Fall back to TCP with `RuntimeWarning` if `ws` protocol was requested but the library is unavailable.
+
+**Rationale:** Matches pattern described in architecture doc — WebSocket support is optional. Users without the library should still be able to use TCP.
+
+---
+
+## ⚠️ Open Issue: Root requirements.txt Websocket Version Conflict
+
+**Problem:** Root `requirements.txt` pins `websockets>=11.0,<12.0`. The `skill/requirements.txt` needs `websockets>=12.0` (for updated API compatibility). These ranges are mutually exclusive.
+
+**Impact:** If a user installs both, pip will conflict. The root requirement prevents upgrading to >=12.0.
+
+**Recommended resolution (for Jinx / Mike):**
+- Option A: Relax root constraint to `websockets>=11.0` (no upper bound) — test that pumpkin_face.py WebSocket server still works on websockets 12.x
+- Option B: Add skill dependencies to root `requirements.txt` and bump websockets to `>=12.0` — requires regression test of WS server on new version
+- Option C: Keep `skill/requirements.txt` separate and document that users must upgrade websockets manually for skill features
+
+**Current state:** Left `requirements.txt` unchanged pending this decision. Did NOT silently modify the root requirements to avoid breaking the existing WebSocket server.
+
+---
+
+## Decision 7: sys.path Manipulation for timeline Import (Resolved)
+
+**Decision:** Use `sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))` at the top of `generator.py` to import `timeline.py` from the project root.
+
+**Rationale:** `skill/` is co-located with `timeline.py` in the same repo. This is the cleanest approach without requiring packaging or a setup.py. The path manipulation is idempotent (inserting the same directory twice has no effect on lookups).
+
+**Alternative considered:** Relative import `from ..timeline import Timeline` — but this requires `skill/` to be installed as a package, which conflicts with the simple "run from repo root" model.
+
+
+---
+
+# Mylo's Testing Notes — Recording Skill (Issue #39)
+
+**Date:** 2026-03-02  
+**By:** Mylo (Tester)  
+**For:** Vi, Jinx  
+**Status:** Tests written and passing (60/60)
+
+---
+
+## Summary
+
+Three anticipatory test files written for the recording skill (Issue #39):
+- `tests/test_skill_generator.py` — 27 tests
+- `tests/test_skill_uploader.py` — 20 tests  
+- `tests/test_skill_integration.py` — 13 tests
+
+All 60 tests currently pass against Vi's partial implementation.
+
+---
+
+## Testing Decisions Made
+
+### 1. Mock at the right boundary
+
+**Decision:** Patch `skill.uploader.socket.socket` (module-local), not `socket.socket` globally.
+
+Vi's uploader does `import socket` at the top of `skill/uploader.py`, so patching the module-local reference is the correct approach. Patching `socket.socket` globally would have no effect.
+
+### 2. WebSocket tests mock the sync wrapper
+
+**Decision:** Mock `skill.uploader._upload_ws` rather than trying to mock the async `websockets.connect`.
+
+The async internals are hard to mock correctly without `pytest-asyncio`. Since `_upload_ws` is a thin sync wrapper, mocking it directly is cleaner, faster, and more stable.
+
+### 3. Empty commands list = ValueError (anticipatory)
+
+**Decision:** Test expects `ValueError` for a timeline with empty `commands: []`.
+
+Rationale: An empty timeline is semantically useless — uploading it would waste server storage. The architecture spec says the generator should return "valid" timelines, and a timeline with no commands is not useful. **Vi should confirm this behavior in `_validate_extra()`.**
+
+### 4. Unsorted time_ms = ValueError (anticipatory)
+
+**Decision:** Test expects `ValueError` when commands are out of ascending order.
+
+Rationale: The architecture spec explicitly says "time_ms values MUST be sorted in ascending order." This should be caught in validation before upload. **Vi's `_validate_extra()` implementation should confirm this.**
+
+### 5. Unknown command names = ValueError (anticipatory)
+
+**Decision:** Test expects `ValueError` containing the bad command name.
+
+Rationale: `_VALID_COMMANDS` set exists in generator.py. The spec says "All command values MUST come from the vocabulary." Currently `Timeline.from_dict()` may not validate this — `_validate_extra()` is the right place.
+
+### 6. GEMINI_API_KEY missing test includes ImportError
+
+**Decision:** `test_missing_api_key_raises_before_api_call` accepts `ImportError` in addition to `EnvironmentError`.
+
+Rationale: If `google-generativeai` package is not installed, `GeminiProvider.__init__` raises `ImportError` before even checking the API key. Both cases mean "can't use Gemini" — the test accepts either.
+
+---
+
+## Open Questions for Vi
+
+### Q1: Does `_validate_extra()` check command names against `_VALID_COMMANDS`?
+
+The `_validate_extra` function is called before `Timeline.from_dict()`. Tests expect it to:
+- Raise `ValueError("unknown command: <name>")` for command names not in `_VALID_COMMANDS`
+- Raise `ValueError` for empty `commands` list  
+- Raise `ValueError` for unsorted `time_ms` values
+
+If not implemented yet, tests for these will fail once the `TODO: adjust imports` tests are fully active.
+
+### Q2: Does `Timeline.from_dict()` validate version string?
+
+Test `test_wrong_version_string_raises_value_error` expects `"version": "2.0"` to fail.
+Test `test_null_version_raises_value_error` expects `"version": null` to fail.
+
+If `Timeline.from_dict()` only checks for key presence (not value), these may pass through incorrectly. Mylo recommends `_validate_extra()` enforce `data.get("version") == "1.0"`.
+
+### Q3: Should `upload_timeline()` accept `timeline` as first positional arg instead of `filename`?
+
+Current signature: `upload_timeline(filename, timeline_dict, ...)`
+
+This is slightly counterintuitive — callers generated the timeline dict and are providing it + a chosen filename. A `(timeline_dict, filename)` order might feel more natural. However, changing this is a **breaking API change** once any user adopts it, so decide early.
+
+### Q4: Protocol alias — is `"ws"` or `"websocket"` the canonical value?
+
+Both are accepted in the uploader. Tests use `"websocket"`. The architecture spec says `"ws"` or `"websocket"`. Consider documenting the canonical value in the docstring.
+
+---
+
+## Import Path Note
+
+All three test files have this at the top:
+
+```python
+# TODO: adjust imports once skill/ package is finalized
+```
+
+If `skill/` is moved, renamed, or restructured, update these imports:
+```python
+from skill.generator import generate_timeline, GeminiProvider, LLMProvider
+from skill.uploader import upload_timeline
+```
+
+---
+
+## Quality Gate Recommendation
+
+Before merging the skill PR, Mylo recommends:
+
+1. ✅ All 60 skill tests pass (currently passing)
+2. ⬜ `_validate_extra()` enforces: non-empty commands, sorted time_ms, valid command names
+3. ⬜ Version field validation ("1.0" only)
+4. ⬜ Run full test suite (all 430+ tests) — no regressions
+5. ⬜ Manual smoke test: real Gemini API call → upload to live server
+
+
+---
+
+# Decision: Migrate GeminiProvider to google-genai Package
+
+**Date:** 2026-03-02  
+**Decided by:** Vi (Backend Dev)  
+**Context:** Issue #54 — Switch AI recorder from old google-generativeai to google.genai
+
+## Problem
+
+The `GeminiProvider` class in `skill/generator.py` used the deprecated `google-generativeai` package. Google has released a new official SDK `google-genai` with a different API pattern (client-based instead of module-level configuration).
+
+## Decision
+
+Migrate `GeminiProvider` to use the `google-genai>=1.0.0` package with the following changes:
+
+1. **Import change:**
+   - Old: `import google.generativeai as genai`
+   - New: `from google import genai` and `from google.genai import types`
+
+2. **Client instantiation pattern:**
+   - Old: Module-level `genai.configure(api_key=api_key)` + `GenerativeModel` instance
+   - New: `genai.Client(api_key=api_key)` stored as `self._client`
+
+3. **Content generation:**
+   - Old: `self._model.generate_content(user_prompt)` with system instruction baked into model at construction
+   - New: `self._client.models.generate_content(model=..., contents=..., config=types.GenerateContentConfig(system_instruction=...))`
+
+4. **System prompt handling:**
+   - Old: System instruction was embedded at construction time; `system_prompt` parameter in `generate()` was ignored
+   - New: `system_prompt` parameter is passed to `system_instruction` in the config at generation time
+
+5. **Dependency:**
+   - Added `google-genai>=1.0.0` to `requirements.txt`
+
+## Rationale
+
+- Aligns with Google's official SDK direction (new package is actively maintained)
+- Client-based pattern is more explicit and testable
+- Enables dynamic system prompts (no longer baked into model instance)
+- Maintains backward compatibility with existing `GeminiProvider` interface
+
+## Impact
+
+- **No breaking changes** to public API (`GeminiProvider` class name and method signatures unchanged)
+- **Behavioral change:** System prompt can now vary per `generate()` call (though current usage passes the same `_SYSTEM_PROMPT` constant)
+- **Tests:** All 27 existing tests pass without modification (they mock the provider)
+
+## Files Changed
+
+- `skill/generator.py` — `GeminiProvider` class (lines 160-202)
+- `requirements.txt` — Added `google-genai>=1.0.0`
+
+## Notes
+
+- ImportError message updated to reflect new package name
+- API key fallback logic preserved: `GEMINI_API_KEY` → `GOOGLE_API_KEY`
+- MODEL constant unchanged: `"gemini-flash-latest"`
+

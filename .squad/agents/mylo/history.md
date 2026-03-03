@@ -16,6 +16,8 @@
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen  
 📌 Team update (2026-02-25): Test suite reorganization verified (189 tests passing) — decided by Mylo
 📌 Team update (2026-02-27): Issue triage Round 1: #39 (LLM skill P2, Vi+Mylo), #20 (lip-sync P2, Vi+Ekko) assigned — decided by Jinx
+📌 Team update (2026-03-02): Issue #39 architecture finalized: LLM provider abstraction, JSON validation, upload client, CLI entry point; 60/60 skill tests written (27 generator, 20 uploader, 13 integration) — decided by Jinx, Vi, Mylo, Ekko
+📌 Team update (2026-03-03): Issue #54 resolved: Migrated GeminiProvider from google-generativeai to google-genai SDK. Updated requirements.txt, all 27 tests pass — decided by Vi, Mylo
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 
@@ -779,3 +781,6 @@ with patch("skill.uploader._upload_ws") as mock_ws:
 - ✅ All external dependencies mocked (no real LLM calls, no real TCP/WebSocket)
 - ✅ Covers 10 generator behaviors, 10 uploader behaviors, 3 integration scenarios
 - ✅ Graceful skip when skill/ not available (pytestmark pattern)
+
+## Learnings
+- Updated test_skill_generator.py to reference new package name 'google-genai' instead of 'google-generativeai' in ImportError test (issue #54). Removed redundant 'generativeai' check since new error message uses full package name.
