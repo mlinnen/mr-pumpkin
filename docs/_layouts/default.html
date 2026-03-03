@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% if page.title %}{{ page.title }} — {% endif %}{{ site.title }}</title>
+  <meta name="description" content="{{ page.excerpt | default: site.description | strip_html | normalize_whitespace | truncate: 160 }}">
+  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+  {% seo %}
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="{{ '/' | relative_url }}" class="site-logo">
+        <img src="{{ '/assets/img/logo.svg' | relative_url }}" alt="Mr. Pumpkin logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
+        <span class="logo-fallback">🎃 Mr. Pumpkin</span>
+      </a>
+
+      <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav class="site-nav" id="site-nav">
+        {% for item in site.data.navigation %}
+          <a href="{{ item.url }}" class="nav-link{% if page.url == item.url %} active{% endif %}">{{ item.title }}</a>
+        {% endfor %}
+      </nav>
+
+      <div class="header-search">
+        <form class="search-form" action="https://github.com/mlinnen/mr-pumpkin/search" method="get" target="_blank" rel="noopener">
+          <input type="text" name="q" placeholder="Search…" class="search-input" aria-label="Search">
+          <button type="submit" class="search-btn" aria-label="Submit search">🔍</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main class="site-main">
+    <div class="container">
+      {{ content }}
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p class="footer-brand">🎃 Mr. Pumpkin</p>
+      <p class="footer-copy">© 2026 Mike Linnen — <a href="https://github.com/mlinnen/mr-pumpkin/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></p>
+      <nav class="footer-nav">
+        <a href="https://github.com/mlinnen/mr-pumpkin" target="_blank" rel="noopener">GitHub</a>
+        <a href="{{ '/contributing' | relative_url }}">Contributing</a>
+        <a href="https://github.com/mlinnen/mr-pumpkin/issues" target="_blank" rel="noopener">Issues</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="{{ '/assets/js/search.js' | relative_url }}"></script>
+  <script>
+    // Hamburger menu toggle
+    const toggle = document.querySelector('.nav-toggle');
+    const nav = document.getElementById('site-nav');
+    if (toggle && nav) {
+      toggle.addEventListener('click', function() {
+        const expanded = this.getAttribute('aria-expanded') === 'true';
+        this.setAttribute('aria-expanded', String(!expanded));
+        nav.classList.toggle('open');
+      });
+    }
+  </script>
+</body>
+</html>

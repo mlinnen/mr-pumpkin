@@ -1,3 +1,10 @@
+---
+layout: page
+title: Building a Client
+permalink: /building-a-client
+description: Developer guide for creating client applications that control Mr. Pumpkin.
+---
+
 # Building a Client for Mr. Pumpkin
 
 This guide explains how to build a client application to control Mr. Pumpkin remotely. Whether you're integrating it into a home automation system, building a Halloween display, or creating an interactive performance, this document will help you get started.

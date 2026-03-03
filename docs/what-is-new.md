@@ -1,3 +1,10 @@
+---
+layout: page
+title: What's New
+permalink: /what-is-new
+description: Full release history — every version's added features, fixes, and changes.
+---
+
 # What's New in Mr. Pumpkin
 
 All notable changes to Mr. Pumpkin will be documented in this file.

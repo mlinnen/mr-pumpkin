@@ -1,0 +1,32 @@
+title: Mr. Pumpkin
+description: Animated 2D pumpkin face for projection mapping
+baseurl: "/mr-pumpkin"
+url: "https://mlinnen.github.io"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+
+# Plugins
+plugins:
+  - jekyll-paginate
+  - jekyll-seo-tag
+
+# Pagination
+paginate: 5
+paginate_path: "/blog/page:num/"
+
+# Blog posts
+permalink: /blog/:year/:month/:day/:title/
+
+# Exclude from build
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - node_modules
+
+# Collections
+collections:
+  posts:
+    output: true
