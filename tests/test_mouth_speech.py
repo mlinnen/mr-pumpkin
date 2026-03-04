@@ -198,12 +198,21 @@ class TestMouthVisemePoints:
         assert len(points) == 2
         assert points == [(cx - 50, cy), (cx + 50, cy)]
     
-    def test_wide_viseme_returns_two_points(self, pumpkin):
-        """Wide viseme returns 2-point line: [(cx-170, cy), (cx+170, cy)]."""
+    def test_wide_viseme_returns_multi_point_curve(self, pumpkin):
+        """Wide viseme returns multi-point curve with upturn at corners."""
         cx, cy = 960, 620
         points = pumpkin._get_viseme_points(cx, cy, "wide")
-        assert len(points) == 2
-        assert points == [(cx - 170, cy), (cx + 170, cy)]
+        # Should be a curve with 21 points
+        assert len(points) > 2
+        # Leftmost point should be at cx-170, rightmost at cx+170
+        assert points[0][0] == cx - 170
+        assert points[-1][0] == cx + 170
+        # Corner points should be higher (lower y) than center point
+        center_y = points[10][1]  # Middle point
+        left_corner_y = points[0][1]
+        right_corner_y = points[-1][1]
+        assert left_corner_y < center_y
+        assert right_corner_y < center_y
     
     def test_open_viseme_returns_empty_list(self, pumpkin):
         """Open viseme returns [] (filled shape drawn by _draw_mouth)."""
@@ -231,6 +240,18 @@ class TestMouthVisemePoints:
         # Should return viseme points (2-point line for "closed")
         assert len(points) == 2
         assert points[0][1] == points[1][1]  # Horizontal line (same Y)
+    
+    def test_wide_viseme_override_in_get_mouth_points(self, pumpkin):
+        """When mouth_viseme="wide", _get_mouth_points returns multi-point curve."""
+        pumpkin.set_mouth_viseme("wide")
+        pumpkin.current_expression = Expression.NEUTRAL
+        
+        cx = pumpkin.width // 2
+        cy = pumpkin.height // 2
+        
+        points = pumpkin._get_mouth_points(cx, cy)
+        # Should return wide viseme curve (21 points)
+        assert len(points) > 2
 
 
 class TestMouthEdgeCases:

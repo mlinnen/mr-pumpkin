@@ -242,7 +242,16 @@ class PumpkinFace:
         if viseme == "closed":
             return [(cx - 50, cy), (cx + 50, cy)]
         elif viseme == "wide":
-            return [(cx - 170, cy), (cx + 170, cy)]
+            # Wide spread lips (EE/IH) — flat center with slight upturn at corners
+            half_w = 170
+            points = []
+            for i in range(0, 21):
+                t = i / 20.0
+                x = int(cx - half_w + t * half_w * 2)
+                edge = abs(t - 0.5) * 2  # 0 at center, 1 at edges
+                y = int(cy - edge * edge * 20)  # max 20px upturn at corners
+                points.append((x, y))
+            return points
         elif viseme in ("open", "rounded"):
             return []  # Filled shapes — drawn by _draw_mouth
         return []
