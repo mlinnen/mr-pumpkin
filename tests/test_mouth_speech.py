@@ -199,11 +199,11 @@ class TestMouthVisemePoints:
         assert points == [(cx - 50, cy), (cx + 50, cy)]
     
     def test_wide_viseme_returns_two_points(self, pumpkin):
-        """Wide viseme returns 2-point line: [(cx-90, cy), (cx+90, cy)]."""
+        """Wide viseme returns 2-point line: [(cx-170, cy), (cx+170, cy)]."""
         cx, cy = 960, 620
         points = pumpkin._get_viseme_points(cx, cy, "wide")
         assert len(points) == 2
-        assert points == [(cx - 90, cy), (cx + 90, cy)]
+        assert points == [(cx - 170, cy), (cx + 170, cy)]
     
     def test_open_viseme_returns_empty_list(self, pumpkin):
         """Open viseme returns [] (filled shape drawn by _draw_mouth)."""

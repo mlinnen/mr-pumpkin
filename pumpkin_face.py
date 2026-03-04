@@ -242,7 +242,7 @@ class PumpkinFace:
         if viseme == "closed":
             return [(cx - 50, cy), (cx + 50, cy)]
         elif viseme == "wide":
-            return [(cx - 90, cy), (cx + 90, cy)]
+            return [(cx - 170, cy), (cx + 170, cy)]
         elif viseme in ("open", "rounded"):
             return []  # Filled shapes — drawn by _draw_mouth
         return []
