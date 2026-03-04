@@ -16,6 +16,22 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
+### Squad Announcement Blog Post (2026-03-04)
+
+Created `docs/_posts/2026-03-04-built-with-squad.md` announcing the Mr. Pumpkin project with emphasis on being fully built by Brady Gaster's Squad agentic coding platform. Post covers:
+
+- **Project introduction**: Mr. Pumpkin's core capability (animated 2D pumpkin face for projection mapping, TCP/WebSocket control)
+- **Squad platform overview**: Brady Gaster's vision for orchestrating specialized AI agents
+- **Team cast introduction**: Jinx (Lead), Ekko (Graphics), Vi (Backend), Mylo (Tester), Scribe (Memory), Ralph (Monitor) with role descriptions
+- **Parallel execution model**: How Squad enables fan-out work, reviewer gates, persistent memory, and autonomous domain ownership
+- **Concrete example**: Issue #59 (mouth speech control) showing sequential vs. parallel workflow
+- **Results & outcomes**: 543 tests, 50+ commands, zero human commits, full documentation
+- **Call to action**: Highlighting Brady Gaster's Squad as the enabling technology
+
+Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.md` (first-person narrative by Jinx, section headers with dividers, closing with italicized takeaway) and matches site style precisely.
+
+**Key insight**: This post celebrates the genuine accomplishment of an entire open-source project delivered through agentic team orchestration. It's not marketing—it's documentation of what became possible with Squad.
+
 ### .squad/ Git Tracking Evolution
 - **Original policy (2026-02-20)**: `.squad/` blocked from `preview` and `main` branches via `.gitignore` entries, `squad-main-guard.yml` workflow (rejected PRs containing `.squad/` files), and validation check in `squad-preview.yml`. Rationale was to keep squad coordination state off release branches.
 - **Policy reversal (Issue #40, 2026-02-26)**: All guards removed. `.squad/` now tracked on all branches like any other project directory. Squad state (decisions, histories, routing rules, agent charters) flows through normal git workflow. This allows team evolution history to be preserved and shared across branches.
