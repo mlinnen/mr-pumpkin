@@ -5,7 +5,7 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.11] - 2026-03-03
+## [0.5.11] - 2026-03-04
 
 ### Added
 - GitHub Pages static website ([#57](https://github.com/mlinnen/mr-pumpkin/issues/57)) — full Jekyll site deployed via GitHub Actions to `https://mlinnen.github.io/mr-pumpkin/`
@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Blog section with paginated post listing using `jekyll-paginate`
   - `_data/navigation.yml` as single source of truth for nav items
   - `docs/Gemfile.lock` for reproducible local builds; `docs/.gitignore` excludes `_site/` and Jekyll caches
+- Mouth speech control (Issue #59) — independent viseme-based mouth animation orthogonal to face expressions
+  - 5 viseme shapes: `closed` (M/B/P), `open` (AH/AA), `wide` (EE/IH), `rounded` (OO/OH), `neutral` (releases to expression)
+  - 6 new commands: `mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral`, `mouth <viseme>`
+  - Smooth transition animation between viseme shapes
+  - Updated `client_example.py` and `docs/timeline-schema.md` with mouth command documentation
 
 ---
 

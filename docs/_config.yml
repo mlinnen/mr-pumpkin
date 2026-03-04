@@ -18,6 +18,7 @@ paginate_path: "/blog/page:num/"
 
 # Blog posts
 permalink: /blog/:year/:month/:day/:title/
+future: true
 
 # Exclude from build
 exclude:

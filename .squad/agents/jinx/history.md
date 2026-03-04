@@ -16,6 +16,22 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
+### Squad Announcement Blog Post (2026-03-04)
+
+Created `docs/_posts/2026-03-04-built-with-squad.md` announcing the Mr. Pumpkin project with emphasis on being fully built by Brady Gaster's Squad agentic coding platform. Post covers:
+
+- **Project introduction**: Mr. Pumpkin's core capability (animated 2D pumpkin face for projection mapping, TCP/WebSocket control)
+- **Squad platform overview**: Brady Gaster's vision for orchestrating specialized AI agents
+- **Team cast introduction**: Jinx (Lead), Ekko (Graphics), Vi (Backend), Mylo (Tester), Scribe (Memory), Ralph (Monitor) with role descriptions
+- **Parallel execution model**: How Squad enables fan-out work, reviewer gates, persistent memory, and autonomous domain ownership
+- **Concrete example**: Issue #59 (mouth speech control) showing sequential vs. parallel workflow
+- **Results & outcomes**: 543 tests, 50+ commands, zero human commits, full documentation
+- **Call to action**: Highlighting Brady Gaster's Squad as the enabling technology
+
+Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.md` (first-person narrative by Jinx, section headers with dividers, closing with italicized takeaway) and matches site style precisely.
+
+**Key insight**: This post celebrates the genuine accomplishment of an entire open-source project delivered through agentic team orchestration. It's not marketing—it's documentation of what became possible with Squad.
+
 ### .squad/ Git Tracking Evolution
 - **Original policy (2026-02-20)**: `.squad/` blocked from `preview` and `main` branches via `.gitignore` entries, `squad-main-guard.yml` workflow (rejected PRs containing `.squad/` files), and validation check in `squad-preview.yml`. Rationale was to keep squad coordination state off release branches.
 - **Policy reversal (Issue #40, 2026-02-26)**: All guards removed. `.squad/` now tracked on all branches like any other project directory. Squad state (decisions, histories, routing rules, agent charters) flows through normal git workflow. This allows team evolution history to be preserved and shared across branches.
@@ -246,5 +262,55 @@
 - Sub-recording load failure: `except Exception` catches, appends error, skips command, parent continues
 - End-of-timeline pop: `if self._stack: parent = self._stack.pop()` → resume; else `self.stop()`
 - `stop()` calls `self._stack.clear()` — entire nesting context abandoned cleanly
+
+### Issue #59 — Mouth Speech Control Architecture (2026-03-03)
+
+**Architectural decision:** Implemented mouth speech control as orthogonal state machine following established eyebrow/nose pattern. Mouth has expression-driven base shape plus speech override state (`mouth_viseme` variable). When override active, viseme shape replaces expression mouth. When `mouth_viseme = None`, expression system controls mouth (backward compatible).
+
+**Viseme vocabulary:** 5 shapes covering ~80% of English phonemes:
+- CLOSED (M, B, P): horizontal line 100px width, thickness 8px
+- WIDE (EE, IH): horizontal line 180px width, thickness 6px  
+- OPEN (AH, AA): ellipse 80×60px
+- ROUNDED (OO, OH): circle radius 25px
+- NEUTRAL: clears override, returns to expression-driven mouth
+
+**Command API:** 
+- Socket commands: `mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral`
+- Compact timeline syntax: `mouth <viseme_name>` with args `{"viseme": "open"}`
+- Recording capture: all commands captured via `_capture_command_for_recording()` pattern
+
+**State variables added to PumpkinFace.__init__:**
+- `mouth_viseme`: None or "closed"|"open"|"wide"|"rounded" (override state)
+- `mouth_transition_progress`: 0.0 → 1.0 (blend progress)
+- `mouth_transition_speed`: 0.15 (3× faster than expression transitions for snappy speech)
+
+**Rendering modifications:**
+- `_get_mouth_points()`: checks `mouth_viseme` first, falls back to expression-driven mouth
+- `_get_viseme_points()`: new helper generating geometry for each viseme
+- `_draw_mouth()`: handles viseme-specific filled shapes (ellipse for OPEN, circle for ROUNDED) and line thickness (6px for WIDE, 8px default)
+
+**Design rationale:**
+- **Consistency:** Matches eyebrow_offset/nose_offset architecture where feature state is orthogonal to expression
+- **Non-breaking:** All existing expression mouths preserved when speech inactive
+- **Composable:** Speech layers with any expression (speak while HAPPY, ANGRY, etc.)
+- **Client-friendly:** Audio analysis systems send viseme commands at 10-20 Hz without managing expression state
+- **Projection-safe:** Geometric primitives maintain 21:1 contrast ratio
+
+**Work breakdown:** Vi (state, commands, recording, 3-4 hours), Ekko (geometry, rendering, 2-3 hours), Mylo (test suite 15-20 tests, 4-5 hours). 2-day implementation with 6 checkpoints.
+
+**Key insight:** Viseme override state allows rapid mouth shape changes (50-100ms transitions) independent of expression state machine transitions (slower, 200-300ms). This separation enables realistic speech animation at 10-20 Hz update rates while preserving expression-driven mouth shapes for non-speech states.
+
+### Issue #59 — Documentation (Mouth Commands) (2026-03-03)
+
+**Task:** Update `docs/timeline-schema.md` with a new Mouth section documenting the 6 viseme commands added in Issue #59 implementation.
+
+**Changes made:**
+- Added `### Mouth` section to Command Vocabulary after Nose section
+- Documented 5 shorthand commands: `mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral` (each with `—` for no args)
+- Documented compact syntax: `mouth` command with `viseme` arg accepting values: `closed|open|wide|rounded|neutral`
+- Added contextual note: "Use mouth commands to synchronize facial animation with speech synthesis. Viseme-based mouth shapes support natural lip-sync during dialogue."
+- Matched style exactly with existing Eyebrows and Nose sections (markdown table format, horizontal rules, consistent formatting)
+
+**Key architectural insight:** Timeline documentation stays synchronized with command_handler.py vocabulary. The compact `mouth <viseme>` syntax in the schema matches the socket command router pattern and provides alternative to five separate shorthand commands for programmatic generation.
 
 

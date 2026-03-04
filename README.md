@@ -550,6 +550,25 @@ pytest tests/test_tcp_integration.py -v
 
 **Total:** 27 integration tests covering all critical dual-protocol scenarios.
 
+## Development
+
+Mr. Pumpkin was built using [**Squad**](https://github.com/bradygaster/squad) — an agentic coding solution created by [Brady Gaster](https://github.com/bradygaster) that orchestrates a team of specialized AI agents to collaboratively design, build, test, and document software.
+
+### The Squad Team
+
+The following AI agents collaborated to develop Mr. Pumpkin, drawn from the **Arcane** universe:
+
+| Agent | Role | Responsibility |
+|-------|------|----------------|
+| 🏗️ **Jinx** | Lead | Architecture, scope decisions, code review |
+| ⚛️ **Ekko** | Graphics Dev | 2D rendering, animations, facial expressions |
+| 🔧 **Vi** | Backend Dev | Network socket server, command handling, timeline playback |
+| 🧪 **Mylo** | Tester | Test suite, quality assurance, edge cases |
+| 📋 **Scribe** | Memory & Logging | Decisions, session logs, cross-agent context |
+| 🔄 **Ralph** | Work Monitor | Work queue, backlog tracking, issue triage |
+
+> Want to build your own project with an AI team like this? Check out [Brady Gaster's Squad](https://github.com/bradygaster/squad).
+
 ## License
 
 MIT
