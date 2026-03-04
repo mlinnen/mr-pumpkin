@@ -112,6 +112,21 @@ Typical `amount` range: 50–150 px. Allow 300–500ms between head movements.
 
 ---
 
+### Mouth
+
+| Command | Args | Description |
+|---------|------|-------------|
+| `mouth_closed` | — | Lips together (M, B, P sounds) |
+| `mouth_open` | — | Open jaw (AH, AA sounds) |
+| `mouth_wide` | — | Wide spread lips (EE, IH sounds) |
+| `mouth_rounded` | — | Rounded lips (OO, OH sounds) |
+| `mouth_neutral` | — | Release mouth to expression-driven control |
+| `mouth` | `viseme`: `closed` \| `open` \| `wide` \| `rounded` \| `neutral` | Set mouth by viseme name |
+
+Use mouth commands to synchronize facial animation with speech synthesis. Viseme-based mouth shapes support natural lip-sync during dialogue.
+
+---
+
 ### Chaining / Sub-Recordings
 
 | Command | Args | Description |

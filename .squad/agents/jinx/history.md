@@ -284,4 +284,17 @@
 
 **Key insight:** Viseme override state allows rapid mouth shape changes (50-100ms transitions) independent of expression state machine transitions (slower, 200-300ms). This separation enables realistic speech animation at 10-20 Hz update rates while preserving expression-driven mouth shapes for non-speech states.
 
+### Issue #59 — Documentation (Mouth Commands) (2026-03-03)
+
+**Task:** Update `docs/timeline-schema.md` with a new Mouth section documenting the 6 viseme commands added in Issue #59 implementation.
+
+**Changes made:**
+- Added `### Mouth` section to Command Vocabulary after Nose section
+- Documented 5 shorthand commands: `mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral` (each with `—` for no args)
+- Documented compact syntax: `mouth` command with `viseme` arg accepting values: `closed|open|wide|rounded|neutral`
+- Added contextual note: "Use mouth commands to synchronize facial animation with speech synthesis. Viseme-based mouth shapes support natural lip-sync during dialogue."
+- Matched style exactly with existing Eyebrows and Nose sections (markdown table format, horizontal rules, consistent formatting)
+
+**Key architectural insight:** Timeline documentation stays synchronized with command_handler.py vocabulary. The compact `mouth <viseme>` syntax in the schema matches the socket command router pattern and provides alternative to five separate shorthand commands for programmatic generation.
+
 

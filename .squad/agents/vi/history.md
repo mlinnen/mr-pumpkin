@@ -751,3 +751,6 @@ Replaced the GitHub-redirect search with a proper client-side search using Lunr.
 
 **Files modified:**
 - command_handler.py — Added mouth commands (lines 303-358), updated help text (lines 492-497)
+
+## Learnings
+Updated client_example.py to document mouth speech commands (mouth_closed, mouth_open, mouth_wide, mouth_rounded, mouth_neutral) in both module docstring and interactive help text (Issue #59).
