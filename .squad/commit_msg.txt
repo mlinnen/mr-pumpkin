@@ -1,8 +1,0 @@
-Squad: Session log and decision capture for Issue #59 (mouth speech control)
-
-- Orchestration log: Jinx's architecture planning work
-- Session log: Issue #59 planning with requirements and outcomes
-- Decision merged: Mouth viseme orthogonal state machine design
-- Inbox cleared: jinx-mouth-speech-architecture.md merged and deleted
-
-Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

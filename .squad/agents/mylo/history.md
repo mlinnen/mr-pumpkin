@@ -19,6 +19,7 @@
 📌 Team update (2026-03-02): Issue #39 architecture finalized: LLM provider abstraction, JSON validation, upload client, CLI entry point; 60/60 skill tests written (27 generator, 20 uploader, 13 integration) — decided by Jinx, Vi, Mylo, Ekko
 📌 Team update (2026-03-03): Issue #54 resolved: Migrated GeminiProvider from google-generativeai to google-genai SDK. Updated requirements.txt, all 27 tests pass — decided by Vi, Mylo
 📌 Team update (2026-03-03): Issue #56 resolved: Wrote help command test suite (29 tests, 28 pass). Flexible test patterns with forward-compatible JSON helper and state immutability verification. 582 total tests pass — decided by Vi, Mylo, Coordinator
+📌 Team update (2026-03-03): Issue #59 test suite completed: Created comprehensive mouth speech control test suite with 30 tests across 5 classes (TestMouthStateManagement, TestMouthStateOrthogonality, TestMouthCommandRouting, TestMouthVisemePoints, TestMouthEdgeCases). All 30 tests pass. Total test suite: 613 tests — decided by Mylo
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 
@@ -39,6 +40,14 @@
 - Minimum contrast ratio: 15:1 for reliable projection
 - No intermediate colors allowed - binary black/white only
 - All six expressions must work in projection mode
+
+### Mouth Speech Control Testing (Issue #59)
+- Created comprehensive test suite: tests/test_mouth_speech.py with 30 tests
+- 5 test classes covering state management, orthogonality, command routing, viseme geometry, edge cases
+- Test pattern: fixtures for pumpkin and router, state-only validation (no rendering)
+- Visemes: "closed" (2-point line 100px), "wide" (2-point line 180px), "open" (filled), "rounded" (filled)
+- Validated: mouth_viseme state persistence across expressions, command routing through CommandRouter
+- All tests verify orthogonal state (viseme independent of expression state machine)
 
 ### Key Test Coverage Areas
 - Color validation at multiple sample points (corners, edges, center)

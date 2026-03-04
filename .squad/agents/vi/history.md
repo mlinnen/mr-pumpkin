@@ -698,3 +698,56 @@ Built full Jekyll 4.3 site under docs/ with 7 pages, dark pumpkin theme, and mob
 
 Replaced the GitHub-redirect search with a proper client-side search using Lunr.js for the Jekyll docs site. Created search.json to generate a Jekyll-based search index, added a search results page (search.md), rewrote search.js to build and query the Lunr index, and updated default.html with baseurl meta tag for path resolution. The search form now navigates to /search?q= instead of opening GitHub search in a new tab. This provides a better UX with instant on-site search results.
 
+## 2026-03-03 - Mouth Speech State Variables (Issue #59)
+
+**What:** Added orthogonal mouth/speech control state machine infrastructure to PumpkinFace — first step implementing independent mouth control for speech simulation.
+
+**Changes made:**
+1. **State variables (line 115-118):** Added three mouth control variables after nose animation state block:
+   - `self.mouth_viseme` — Current viseme override (None or "closed"|"open"|"wide"|"rounded")
+   - `self.mouth_transition_progress` — Transition progress 0.0 → 1.0
+   - `self.mouth_transition_speed = 0.15` — Faster than expression transitions (0.05) for snappy speech
+
+2. **Public API methods (after line 539):** Added `set_mouth_viseme()` and `reset_mouth()`:
+   - `set_mouth_viseme(viseme)` — Sets mouth to a viseme ("closed", "open", "wide", "rounded", "neutral", or None), resets transition progress
+   - `reset_mouth()` — Clears speech override, returns mouth to expression-driven control
+
+3. **Update loop (line 1107-1109):** Added mouth transition progress update in main update loop, placed between nose animation update and expression transition update:
+   ```python
+   if self.mouth_transition_progress < 1.0:
+       self.mouth_transition_progress = min(1.0, self.mouth_transition_progress + self.mouth_transition_speed)
+   ```
+
+**Architecture pattern:** Follows the established orthogonal state machine pattern (same as eyebrows and nose). Mouth speech control is INDEPENDENT of the expression system — visemes can override expression-driven mouth shapes during speech, then release control back to the expression when done.
+
+**Next steps:** Ekko will integrate these state variables into `_get_mouth_points()` and `_draw_mouth()` to blend viseme shapes with expression shapes. Command handler integration will come later.
+
+
+## 2026-03-03 - Mouth Speech Commands Added (Issue #59)
+
+**What:** Added mouth/speech control commands to CommandRouter in command_handler.py — second step implementing interactive mouth control for speech simulation.
+
+**Commands added (before TIMELINE COMMANDS section, after reset_nose):**
+1. **Individual viseme shorthand commands:**
+   - mouth_closed — Set mouth to closed viseme (M, B, P sounds)
+   - mouth_open — Set mouth to open viseme (AH, AA sounds)
+   - mouth_wide — Set mouth to wide viseme (EE, IH sounds)
+   - mouth_rounded — Set mouth to rounded viseme (OO, OH sounds)
+   - mouth_neutral — Release mouth to expression-driven control
+
+2. **Parameterized command:**
+   - mouth <viseme> — Set mouth to named viseme (closed/open/wide/rounded/neutral)
+   - Uses startswith("mouth ") pattern to match
+   - Validates viseme name against valid set
+   - Provides error message for invalid viseme names
+
+**Implementation pattern:** Followed the established pattern from wiggle_nose command:
+- Recording check: if self.pumpkin.recording_session.is_recording: self.pumpkin._capture_command_for_recording(data)
+- Calls self.pumpkin.set_mouth_viseme(viseme) method added in previous task
+- All commands return "" (empty string) like other animation commands
+- Parameterized command uses data.split() to extract viseme name
+
+**Help text updated:** Added 6 mouth command entries to help_text string before eset entry.
+
+**Files modified:**
+- command_handler.py — Added mouth commands (lines 303-358), updated help text (lines 492-497)

@@ -112,6 +112,11 @@ class PumpkinFace:
         self.nose_animation_end_time = None  # When animation will end
         self.nose_animation_duration = 0.0  # Total duration in seconds
         
+        # Mouth/speech control state (orthogonal to expression state machine)
+        self.mouth_viseme = None            # Current viseme override: None or "closed"|"open"|"wide"|"rounded"
+        self.mouth_transition_progress = 1.0    # 0.0 → 1.0 transition to target viseme
+        self.mouth_transition_speed = 0.15      # Faster than expression transitions (0.05) for snappy speech
+        
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
@@ -190,6 +195,10 @@ class PumpkinFace:
         mouth_y = cy + 80
         mouth_width = 150
         
+        # Speech override active: render viseme instead of expression mouth
+        if self.mouth_viseme is not None:
+            return self._get_viseme_points(cx, mouth_y, self.mouth_viseme)
+        
         if self.current_expression == Expression.HAPPY:
             # Smile
             points = []
@@ -218,6 +227,25 @@ class PumpkinFace:
         
         # Neutral
         return [(int(cx - mouth_width), int(mouth_y)), (int(cx + mouth_width), int(mouth_y))]
+    
+    def _get_viseme_points(self, cx: int, cy: int, viseme: str) -> list:
+        """Generate mouth points for speech viseme.
+        
+        Args:
+            cx: Face center X
+            cy: Mouth Y position (pre-calculated: center_y + 80)
+            viseme: Viseme name ("closed", "open", "wide", "rounded")
+        
+        Returns:
+            List of (x, y) tuples for line rendering, or [] for filled shapes
+        """
+        if viseme == "closed":
+            return [(cx - 50, cy), (cx + 50, cy)]
+        elif viseme == "wide":
+            return [(cx - 90, cy), (cx + 90, cy)]
+        elif viseme in ("open", "rounded"):
+            return []  # Filled shapes — drawn by _draw_mouth
+        return []
     
     def _draw_eyes(self, surface: pygame.Surface, left_pos: Tuple[int, int], right_pos: Tuple[int, int]):
         eye_radius = 40
@@ -476,6 +504,16 @@ class PumpkinFace:
     
     def _draw_mouth(self, surface: pygame.Surface, points: list, cx: int, cy: int):
         if not points or len(points) < 2:
+            mouth_y = cy + 80
+            # Speech viseme filled shapes take priority over expression shapes
+            if self.mouth_viseme == "open":
+                pygame.draw.ellipse(surface, self.FEATURE_COLOR,
+                                   (cx - 40, mouth_y - 30, 80, 60))
+                return
+            elif self.mouth_viseme == "rounded":
+                pygame.draw.circle(surface, self.FEATURE_COLOR, (cx, mouth_y), 25)
+                return
+            # Expression-driven filled shapes (existing behavior)
             if self.current_expression == Expression.SURPRISED:
                 # O-shaped mouth - white filled circle
                 pygame.draw.circle(surface, self.FEATURE_COLOR, (cx, cy + 80), 30)
@@ -486,10 +524,11 @@ class PumpkinFace:
             return
         
         # Draw thick white lines for mouth curves
+        thickness = 6 if self.mouth_viseme == "wide" else 8
         for i in range(len(points) - 1):
             p1 = (int(points[i][0]), int(points[i][1]))
             p2 = (int(points[i+1][0]), int(points[i+1][1]))
-            pygame.draw.line(surface, self.FEATURE_COLOR, p1, p2, 8)
+            pygame.draw.line(surface, self.FEATURE_COLOR, p1, p2, thickness)
     
     def set_eyebrow(self, left: float, right: float = None):
         """Set eyebrow offsets. Negative = raise, positive = lower. Clamped to [-50, +50].
@@ -532,6 +571,23 @@ class PumpkinFace:
         """Reset both eyebrows to neutral position."""
         self.eyebrow_left_offset = 0.0
         self.eyebrow_right_offset = 0.0
+
+    def set_mouth_viseme(self, viseme: str):
+        """Set mouth to speech viseme. None or "neutral" returns to expression control.
+        
+        Args:
+            viseme: One of "closed", "open", "wide", "rounded", "neutral", or None
+        """
+        if viseme == "neutral" or viseme is None:
+            self.mouth_viseme = None  # Release override
+        else:
+            self.mouth_viseme = viseme
+        self.mouth_transition_progress = 0.0  # Start transition
+
+    def reset_mouth(self):
+        """Reset mouth to expression-driven control (clear speech override)."""
+        self.mouth_viseme = None
+        self.mouth_transition_progress = 1.0
 
     def jog_projection(self, dx: int, dy: int):
         """Adjust projection offset by delta pixels. Clamped to [-500, +500].
@@ -1081,6 +1137,10 @@ class PumpkinFace:
         
         # Handle nose animations
         self._update_nose_animation()
+        
+        # Update mouth viseme transition
+        if self.mouth_transition_progress < 1.0:
+            self.mouth_transition_progress = min(1.0, self.mouth_transition_progress + self.mouth_transition_speed)
         
         # Handle expression transitions
         if self.transition_progress < 1.0:

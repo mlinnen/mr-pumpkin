@@ -300,6 +300,59 @@ class CommandRouter:
             print("Resetting nose to neutral")
             return ""
         
+        # Handle mouth speech commands
+        if data == "mouth_closed":
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            self.pumpkin.set_mouth_viseme("closed")
+            print("Mouth set to closed viseme")
+            return ""
+        
+        if data == "mouth_open":
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            self.pumpkin.set_mouth_viseme("open")
+            print("Mouth set to open viseme")
+            return ""
+        
+        if data == "mouth_wide":
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            self.pumpkin.set_mouth_viseme("wide")
+            print("Mouth set to wide viseme")
+            return ""
+        
+        if data == "mouth_rounded":
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            self.pumpkin.set_mouth_viseme("rounded")
+            print("Mouth set to rounded viseme")
+            return ""
+        
+        if data == "mouth_neutral":
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            self.pumpkin.set_mouth_viseme("neutral")
+            print("Mouth released to expression control")
+            return ""
+        
+        # Handle parameterized mouth command: "mouth <viseme_name>"
+        if data.startswith("mouth "):
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            try:
+                parts = data.split()
+                viseme = parts[1]
+                valid_visemes = {"closed", "open", "wide", "rounded", "neutral"}
+                if viseme not in valid_visemes:
+                    print(f"Error: unknown viseme '{viseme}'. Valid: {', '.join(sorted(valid_visemes))}")
+                else:
+                    self.pumpkin.set_mouth_viseme(viseme)
+                    print(f"Mouth set to viseme: {viseme}")
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing mouth command: {e}")
+            return ""
+        
         # ===== TIMELINE COMMANDS =====
         
         # Reset command (clears recording and playback state)
@@ -489,6 +542,12 @@ class CommandRouter:
                 "  twitch_nose [magnitude]            - Twitch nose (default magnitude: 50)\n"
                 "  scrunch_nose [magnitude]           - Scrunch nose (default magnitude: 50)\n"
                 "  reset_nose                         - Reset nose to neutral\n"
+                "  mouth_closed                       - Set mouth to closed viseme (M, B, P sounds)\n"
+                "  mouth_open                         - Set mouth to open viseme (AH, AA sounds)\n"
+                "  mouth_wide                         - Set mouth to wide viseme (EE, IH sounds)\n"
+                "  mouth_rounded                      - Set mouth to rounded viseme (OO, OH sounds)\n"
+                "  mouth_neutral                      - Release mouth to expression-driven control\n"
+                "  mouth <viseme>                     - Set mouth to named viseme (closed/open/wide/rounded/neutral)\n"
                 "  reset                              - Clear recording and playback state\n"
                 "  record_start                       - Start recording commands\n"
                 "  record_stop [filename]             - Stop recording and save (optional filename)\n"
