@@ -247,4 +247,41 @@
 - End-of-timeline pop: `if self._stack: parent = self._stack.pop()` → resume; else `self.stop()`
 - `stop()` calls `self._stack.clear()` — entire nesting context abandoned cleanly
 
+### Issue #59 — Mouth Speech Control Architecture (2026-03-03)
+
+**Architectural decision:** Implemented mouth speech control as orthogonal state machine following established eyebrow/nose pattern. Mouth has expression-driven base shape plus speech override state (`mouth_viseme` variable). When override active, viseme shape replaces expression mouth. When `mouth_viseme = None`, expression system controls mouth (backward compatible).
+
+**Viseme vocabulary:** 5 shapes covering ~80% of English phonemes:
+- CLOSED (M, B, P): horizontal line 100px width, thickness 8px
+- WIDE (EE, IH): horizontal line 180px width, thickness 6px  
+- OPEN (AH, AA): ellipse 80×60px
+- ROUNDED (OO, OH): circle radius 25px
+- NEUTRAL: clears override, returns to expression-driven mouth
+
+**Command API:** 
+- Socket commands: `mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral`
+- Compact timeline syntax: `mouth <viseme_name>` with args `{"viseme": "open"}`
+- Recording capture: all commands captured via `_capture_command_for_recording()` pattern
+
+**State variables added to PumpkinFace.__init__:**
+- `mouth_viseme`: None or "closed"|"open"|"wide"|"rounded" (override state)
+- `mouth_transition_progress`: 0.0 → 1.0 (blend progress)
+- `mouth_transition_speed`: 0.15 (3× faster than expression transitions for snappy speech)
+
+**Rendering modifications:**
+- `_get_mouth_points()`: checks `mouth_viseme` first, falls back to expression-driven mouth
+- `_get_viseme_points()`: new helper generating geometry for each viseme
+- `_draw_mouth()`: handles viseme-specific filled shapes (ellipse for OPEN, circle for ROUNDED) and line thickness (6px for WIDE, 8px default)
+
+**Design rationale:**
+- **Consistency:** Matches eyebrow_offset/nose_offset architecture where feature state is orthogonal to expression
+- **Non-breaking:** All existing expression mouths preserved when speech inactive
+- **Composable:** Speech layers with any expression (speak while HAPPY, ANGRY, etc.)
+- **Client-friendly:** Audio analysis systems send viseme commands at 10-20 Hz without managing expression state
+- **Projection-safe:** Geometric primitives maintain 21:1 contrast ratio
+
+**Work breakdown:** Vi (state, commands, recording, 3-4 hours), Ekko (geometry, rendering, 2-3 hours), Mylo (test suite 15-20 tests, 4-5 hours). 2-day implementation with 6 checkpoints.
+
+**Key insight:** Viseme override state allows rapid mouth shape changes (50-100ms transitions) independent of expression state machine transitions (slower, 200-300ms). This separation enables realistic speech animation at 10-20 Hz update rates while preserving expression-driven mouth shapes for non-speech states.
+
 
