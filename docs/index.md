@@ -70,6 +70,11 @@ Describe an animation in plain English and have it automatically generated and u
 ### [Timeline JSON Schema](timeline-schema.md)
 Reference for the timeline JSON format: top-level structure, full command vocabulary, timing guidelines, and validation rules.
 
+## Behind the Scenes
+
+### [Development Story](development-story.md)
+How Mr. Pumpkin was built using [Brady Gaster's Squad](https://github.com/bradygaster/squad) agentic coding solution — meet the AI team (cast from the Arcane universe) that designed, built, and tested this project.
+
 ## Quick Start
 
 Once installed, run Mr. Pumpkin with:

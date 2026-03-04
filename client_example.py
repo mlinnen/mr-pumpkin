@@ -9,6 +9,13 @@ Usage:
       - 2 args: both eyes look at same angle
       - 4 args: left eye (x1,y1), right eye (x2,y2)
       - Angles: -90 to +90 degrees (0=straight, +X=right, +Y=up)
+    Or mouth speech commands (for speech animation):
+      - mouth_closed: Lips together (M, B, P sounds)
+      - mouth_open: Open jaw (AH, AA sounds)
+      - mouth_wide: Wide spread lips (EE, IH sounds)
+      - mouth_rounded: Rounded lips (OO, OH sounds)
+      - mouth_neutral: Release to expression-driven mouth
+      - mouth <viseme>: Set by name (closed/open/wide/rounded/neutral)
     Or recording commands:
       - record start: Begin recording commands
       - record stop <filename>: Save recording with given filename
@@ -137,6 +144,13 @@ if __name__ == "__main__":
     print("Animation commands: blink, roll_clockwise, roll_counterclockwise")
     print("Gaze command: gaze <x> <y> [<x2> <y2>]")
     print("  Examples: 'gaze 45 30' (both eyes), 'gaze -90 0 90 45' (independent)")
+    print("Mouth speech commands:")
+    print("  mouth_closed - Lips together (M, B, P sounds)")
+    print("  mouth_open - Open jaw (AH, AA sounds)")
+    print("  mouth_wide - Wide spread lips (EE, IH sounds)")
+    print("  mouth_rounded - Rounded lips (OO, OH sounds)")
+    print("  mouth_neutral - Release to expression-driven mouth")
+    print("  mouth <viseme> - Set by name (closed/open/wide/rounded/neutral)")
     print("Recording commands:")
     print("  record start - Begin recording")
     print("  record stop <filename> - Save recording")
