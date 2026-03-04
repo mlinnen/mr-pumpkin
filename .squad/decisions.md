@@ -3805,3 +3805,27 @@ Replaced with client-side Lunr.js search:
 - Content truncated to 600 chars in index
 - Results show title + 160 char preview
 
+
+---
+
+### 2026-03-03: Mouth Speech Control Architecture — Issue #59
+
+**By:** Jinx (Lead)
+
+**Date:** 2026-03-03 21:31
+
+**Issue:** #59 — Mouth speech control
+
+**What:** Mouth speech control implemented as orthogonal state machine following eyebrow/nose pattern. Mouth has base shape from expression system and speech override state (\mouth_viseme\ variable) with 5 viseme shapes (CLOSED, OPEN, WIDE, ROUNDED, NEUTRAL). When \mouth_viseme\ is set, viseme shape overrides expression-driven mouth. When \mouth_viseme = None\, expression system controls mouth (existing behavior preserved).
+
+**Why:** 
+- **Consistency:** Matches established eyebrow_offset and nose_offset architecture where feature state is orthogonal to expression state machine
+- **Non-breaking:** All existing expression mouth shapes continue to work when speech override is inactive
+- **Composable:** Speech can layer with any expression (e.g., speak while HAPPY, ANGRY, etc.) enabling rich emotional + speech combinations
+- **Recording-ready:** Commands capture to timeline just like gaze, eyebrow, and nose commands for playback and composition
+- **Client simplicity:** Audio analysis systems can send viseme commands at 10-20 Hz via TCP/WebSocket without managing expression state
+- **Projection-safe:** All 5 viseme shapes use pure geometric primitives (lines, circles, ellipses) with FEATURE_COLOR (255,255,255) on BACKGROUND_COLOR (0,0,0) maintaining 21:1 contrast ratio
+
+**Implementation:** 5 viseme vocabulary covers ~80% of English phonemes with simple shapes: CLOSED (horizontal line 100px), WIDE (horizontal line 180px), OPEN (ellipse 80x60), ROUNDED (circle radius 25), NEUTRAL (releases override). Transition speed 0.15 (3× faster than expression transitions) for snappy speech animation. Commands: \mouth_closed\, \mouth_open\, \mouth_wide\, \mouth_rounded\, \mouth_neutral\, plus \mouth <viseme_name>\ for compact timeline syntax.
+
+**Work distribution:** Vi (state variables, commands, recording capture, 3-4 hours), Ekko (viseme geometry, rendering logic, 2-3 hours), Mylo (test suite 15-20 tests, 4-5 hours). Total 2-day implementation with 6 checkpoints.

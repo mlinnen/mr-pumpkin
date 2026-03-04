@@ -12,6 +12,23 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.11] - 2026-03-04
+
+### Added
+- GitHub Pages static website — full Jekyll site deployed via GitHub Actions at `https://mlinnen.github.io/mr-pumpkin/`
+  - Pages: Home (hero + stats), Features, Installation & Usage, Documentation, Blog, Contributing
+  - Dark pumpkin theme with `#FF6B00` orange accents; mobile-responsive with hamburger nav
+  - Two-row header: 🎃 logo (left, links home) + search on top row; nav tabs on bottom row
+  - On-site search powered by Lunr.js — no redirect to GitHub, searches content locally in the browser
+  - Blog section with paginated post listing
+- Mouth speech control (Issue #59) — independent viseme-based mouth animation orthogonal to face expressions. Send viseme commands at ~20Hz from audio analysis to drive lip sync.
+  - 5 viseme shapes: `closed` (M/B/P sounds), `open` (AH/AA sounds), `wide` (EE/IH sounds), `rounded` (OO/OH sounds), `neutral` (releases back to expression-driven mouth)
+  - 6 commands: `mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral`, and `mouth <viseme>` (parameterized form)
+  - Smooth animated transitions between shapes at configurable speed
+  - See [Timeline Schema](timeline-schema.md#mouth-speech-control) for full command reference.
+
+---
+
 ## [0.5.10] - 2026-03-03
 
 ### Added

@@ -459,5 +459,71 @@ Nose animations use the same deterministic frame-based pattern as head movement 
 **Design Insight:** The pumpkin lobe shape is most convincingly achieved with three overlapping ellipses (not a single distorted circle). The jagged mouth requires careful vertex ordering: trace the top jaw teeth, then close via the bottom jaw baseline. This produces a clean filled polygon with no stray strokes needed.
 
 📌 Team update (2026-03-03): SVG logo created for GitHub Pages header (Issue #57)
-
+
 📌 Team update (2026-03-03): Jekyll GitHub Pages site built by Vi for Issue #57; PR #58 open — Ekko contributed SVG logo (docs/assets/img/logo.svg)
+
+### Viseme Mouth Rendering (Issue #59)
+
+**Implementation:** Added visual rendering for speech visemes to support lip-sync animation. This allows the mouth to override expression-driven shapes when speaking.
+
+**Architecture — Speech Override Pattern:**
+- `_get_mouth_points()` checks `self.mouth_viseme` at the TOP before any expression logic
+- If viseme active → delegate to `_get_viseme_points()` instead of expression mouth
+- If viseme None → fall through to existing expression rendering (no behavior change)
+- This creates clean separation: speech overrides expressions when active
+
+**Viseme Shapes Implemented:**
+| Viseme | Type | Rendering Method |
+|--------|------|-----------------|
+| `"closed"` | Line | Horizontal line 100px wide (cx±50), thickness 8 |
+| `"wide"` | Line | Horizontal line 180px wide (cx±90), thickness 6 |
+| `"open"` | Filled | Ellipse 80×60px at (cx-40, mouth_y-30) |
+| `"rounded"` | Filled | Circle radius 25px at (cx, mouth_y) |
+
+All visemes positioned at `mouth_y = center_y + 80` (same as expression mouths).
+
+**Rendering Flow:**
+1. `_get_viseme_points(cx, cy, viseme)` returns point list or empty list
+   - Line visemes ("closed", "wide"): return 2-point line
+   - Filled visemes ("open", "rounded"): return empty list
+2. `_draw_mouth()` checks empty points first:
+   - If viseme "open" or "rounded" → draw filled shape, early return
+   - Else fall through to expression shapes (surprised/scared)
+3. For non-empty points: thickness depends on viseme
+   - "wide" viseme uses thickness 6 (thinner for wider line)
+   - All other mouths use thickness 8
+
+**Key Implementation Details:**
+- `_get_viseme_points()` added AFTER `_get_mouth_points()` (line 231)
+- Speech override check added at TOP of `_get_mouth_points()` (line 198-200)
+- Viseme filled shapes take PRIORITY in `_draw_mouth()` (line 508-515)
+- Line thickness made dynamic: `thickness = 6 if self.mouth_viseme == "wide" else 8` (line 527)
+- No changes to expression mouth logic — all existing expressions preserved
+
+**Graphics Pattern — Override Architecture:**
+This establishes the pattern for temporary feature overrides that don't disturb underlying state machines. The viseme system:
+- Doesn't modify `current_expression` or expression transition logic
+- Short-circuits the rendering path, not the state path
+- Returns to expression control when `mouth_viseme = None`
+- Uses early-return pattern to cleanly separate code paths
+
+**State Management (by Vi):**
+- `self.mouth_viseme`: Current viseme name or None
+- `set_mouth_viseme(viseme)`: Activate speech override
+- `reset_mouth()`: Return to expression control
+- State persists across frames until explicitly reset
+
+**Projection Mapping Consistency:**
+- All visemes use white features (255,255,255) on black background
+- Line thicknesses (6-8px) maintain visibility at projection distances
+- Filled shapes sized for clear visibility: 80×60 ellipse, radius 25 circle
+- Position consistency: all mouths at same vertical offset (cy + 80)
+
+**Verification:**
+- Syntax check passes
+- All four viseme shapes implemented per spec
+- Expression mouths unchanged (happy, sad, angry, surprised, scared, neutral, sleeping)
+- No changes to eyes, eyebrows, nose, or other features
+
+📌 Team update (2026-03-03): Viseme mouth rendering implemented for Issue #59 lip-sync feature
+
