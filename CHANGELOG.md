@@ -5,6 +5,28 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.12] - 2026-03-05
+
+### Added
+- Squad v0.8.20 upgrade — new GitHub Actions workflow templates for squad automation
+  - `squad-ci.yml` — CI gating on PRs to dev, preview, main, and insider branches
+  - `squad-docs.yml` — documentation build and validation workflow
+  - `squad-heartbeat.yml` — scheduled heartbeat for label routing and issue triage
+  - `squad-insider-release.yml` — automated insider/preview release workflow
+  - `squad-issue-assign.yml` — automatic issue assignment based on `squad:{member}` labels
+  - `squad-label-enforce.yml` — enforces squad label schema on issues and PRs
+  - `squad-main-guard.yml` — branch protection and merge gate for main
+  - `squad-preview.yml` — preview deployment validation workflow
+  - `squad-promote.yml` — promotion workflow from insider → preview → main
+  - `squad-release.yml` — automated release tagging and GitHub release creation
+  - `squad-triage.yml` — issue triage routing to squad members
+  - `sync-squad-labels.yml` — syncs squad member roster labels to GitHub
+- `squad.config.ts` — project-level Squad configuration (model tiers, routing rules, casting universe allowlist, platform settings)
+- Blog post: "Built With Squad: An Entire Creative Coding Project Delivered by an AI Team" — covers the full development story: parallel fan-out, reviewer gates, persistent memory, and the complete Mr. Pumpkin feature set built by the AI team
+- Updated squad identity, casting state, and project-conventions skill with session learnings
+
+---
+
 ## [0.5.11] - 2026-03-04
 
 ### Added

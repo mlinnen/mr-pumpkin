@@ -221,7 +221,7 @@ The future of development isn't bigger models. It's better teams.
 
 Interested in the Mr. Pumpkin project? It's all open source:
 
-- 📦 **Repository**: [mr-pumpkin](https://github.com/your-org/mr-pumpkin)
+- 📦 **Repository**: [mr-pumpkin](https://github.com/mlinnen/mr-pumpkin)
 - 🎨 **Graphics architecture**: See `docs/timeline-schema.md` for command vocabulary and projection mapping constraints
 - 🔌 **Backend integration**: See `docs/building-a-client.md` for TCP/WebSocket protocol examples
 - 🧪 **Testing patterns**: The test suite in `tests/` documents projection validation specificity
