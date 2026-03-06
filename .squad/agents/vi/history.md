@@ -777,3 +777,46 @@ Updated client_example.py to document mouth speech commands (mouth_closed, mouth
 - Used `google.genai` (not `google.generativeai`) to match existing GeminiProvider pattern in generator.py
 - Logged at INFO level for analysis results (segment/beat/pause counts), DEBUG for file operations, WARNING for retries
 - get_provider() factory function allows future providers (Whisper, AssemblyAI, etc.) without client code changes
+
+
+## Learnings
+
+**2025-01-XX: Timeline audio_file field (#68)**
+- Added optional udio_file field to Timeline class for audio playback pairing
+- Implemented lazy pygame imports inside Playback methods (not module-level) to avoid initialization overhead
+- Audio playback is non-fatal: exceptions are caught and logged as warnings, animation continues without audio
+- pygame.mixer.music provides simple single-file audio playback (load → play → stop)
+- Backward compatibility maintained: audio_file is optional in JSON, older timelines continue working
+
+**2025-01-XX: upload_audio endpoint implementation (#67)**
+
+**What:** Added upload_audio server endpoint and client uploader to support audio file uploads for lip-sync/animation workflows.
+
+**Key implementation patterns:**
+1. **Protocol duality (TCP + WebSocket):** Mirrored existing upload_timeline pattern exactly — TCP uses multi-step handshake (command → READY → bytes → END_UPLOAD), WebSocket uses single-message base64 encoding
+2. **Binary upload handling:** TCP handler accumulates raw bytes in chunks (4096), scans for delimiter in buffer, reassembles full audio file from chunk list
+3. **Command routing exclusion:** Both upload_timeline and upload_audio bypass CommandRouter to handle socket-specific multi-step protocols directly in server handlers
+4. **Auto-extension logic:** Server auto-appends .mp3 if filename has no extension, validates against allowed set (.mp3, .wav, .ogg)
+5. **FileManager parallel:** upload_audio() method saves raw bytes with filepath.write_bytes(), validates format, raises FileExistsError if duplicate
+
+**Files modified:**
+- pumpkin_face.py: TCP handler (line 1537+), WebSocket handler (line 1580+)
+- timeline.py: FileManager.upload_audio() method
+- command_handler.py: Help text entry for upload_audio
+- skill/uploader.py: upload_audio() client function with TCP and WS helpers
+
+**Byte boundary handling approach:**
+- Used chunked accumulation with delimiter scanning (similar to upload_timeline line-based approach but for binary data)
+- Buffer reset after each scan to prevent memory bloat on large audio files
+- Kept upload_buf as sliding window for END_UPLOAD detection only
+- Early break on delimiter match prevents reading extra data
+
+**Protocol decision:**
+- TCP: upload_audio <filename> → wait READY → send raw bytes → send END_UPLOAD
+- WebSocket: upload_audio <filename> <base64-encoded-bytes> (single message)
+- Reason: Matches existing upload_timeline conventions for team consistency
+
+**Pattern consistency:**
+- Followed exact error message format from upload_timeline
+- Reused FileExistsError exception pattern from FileManager.upload_timeline
+- Client uploader signature matches upload_timeline (filename, data, host, ports, protocol) for API symmetry
