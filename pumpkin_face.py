@@ -1045,8 +1045,23 @@ class PumpkinFace:
         elif command == "scrunch_nose":
             magnitude = args.get("magnitude", 50.0)
             self._start_nose_scrunch(magnitude)
+        elif command == "wiggle_nose":
+            magnitude = args.get("magnitude", 50.0)
+            self._start_nose_twitch(magnitude)  # wiggle aliases to twitch (no separate implementation)
         elif command == "reset_nose":
             self._reset_nose()
+        
+        # Mouth viseme commands
+        elif command == "mouth_closed":
+            self.set_mouth_viseme("closed")
+        elif command == "mouth_open":
+            self.set_mouth_viseme("open")
+        elif command == "mouth_wide":
+            self.set_mouth_viseme("wide")
+        elif command == "mouth_rounded":
+            self.set_mouth_viseme("rounded")
+        elif command == "mouth_neutral":
+            self.set_mouth_viseme("neutral")
         
         else:
             raise ValueError(f"Unknown timeline command: {command}")
@@ -1462,8 +1477,8 @@ class PumpkinFace:
                         if not data:
                             break
                         
-                        # Route commands through CommandRouter (except upload_timeline)
-                        if not data.lower().startswith("upload_timeline "):
+                        # Route commands through CommandRouter (except upload_timeline and upload_audio)
+                        if not (data.lower().startswith("upload_timeline ") or data.lower().startswith("upload_audio ")):
                             response = self.command_router.execute(data)
                             if response:  # Only send response if non-empty
                                 client_socket.sendall((response + '\n').encode('utf-8'))
@@ -1535,6 +1550,59 @@ class PumpkinFace:
                                 print(response)
                             continue
                         
+                        if data.startswith("upload_audio "):
+                            try:
+                                parts = data.split(maxsplit=1)
+                                if len(parts) < 2:
+                                    response = "ERROR Missing filename"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    continue
+                                
+                                filename = parts[1]
+                                
+                                # Validate filename (no path separators)
+                                if '/' in filename or '\\' in filename:
+                                    response = "ERROR Invalid filename: path separators not allowed"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    continue
+                                
+                                # Ensure audio extension (accept .mp3, .wav, .ogg, .m4a, .aac, .flac)
+                                if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
+                                    filename = filename + '.mp3'
+                                
+                                # Signal ready for binary data
+                                client_socket.sendall(b"READY\n")
+                                
+                                # Read raw bytes until END_UPLOAD
+                                upload_buf = b""
+                                upload_done = False
+                                while True:
+                                    chunk = client_socket.recv(4096)
+                                    if not chunk:
+                                        response = "ERROR Connection lost while reading audio"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        break
+                                    upload_buf += chunk
+                                    # Check for END_UPLOAD marker (sent as final line after audio bytes)
+                                    if b"\nEND_UPLOAD\n" in upload_buf:
+                                        audio_data, _ = upload_buf.split(b"\nEND_UPLOAD\n", 1)
+                                        upload_done = True
+                                        break
+                                
+                                if upload_done:
+                                    audio_bytes = audio_data
+                                    self.file_manager.upload_audio(filename, audio_bytes)
+                                    response = f"OK Uploaded {filename}"
+                                    client_socket.sendall((response + '\n').encode('utf-8'))
+                                    print(response)
+                            except FileExistsError:
+                                response = f"ERROR File already exists: {filename}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                            except Exception as e:
+                                response = f"ERROR {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                            continue
+                        
                         # ===== END TIMELINE COMMANDS =====
                     client_socket.close()
                 except Exception as e:
@@ -1577,6 +1645,22 @@ class PumpkinFace:
                         if not filename.endswith('.json'):
                             filename = f"{filename}.json"
                         self.file_manager.upload_timeline(filename, json_content)
+                        await websocket.send(f"OK Uploaded {filename}")
+                        continue
+                    if message.startswith("upload_audio "):
+                        parts = message.split(maxsplit=2)
+                        if len(parts) < 3:
+                            await websocket.send("ERROR upload_audio requires: upload_audio <filename> <base64-bytes>")
+                            continue
+                        filename = parts[1]
+                        if '/' in filename or '\\' in filename:
+                            await websocket.send("ERROR Invalid filename: path separators not allowed")
+                            continue
+                        if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
+                            filename = filename + '.mp3'
+                        import base64
+                        audio_bytes = base64.b64decode(parts[2])
+                        self.file_manager.upload_audio(filename, audio_bytes)
                         await websocket.send(f"OK Uploaded {filename}")
                         continue
                     response = self.command_router.execute(message)

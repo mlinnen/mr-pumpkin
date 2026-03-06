@@ -153,6 +153,80 @@ Recordings can be nested up to **5 levels** deep. If a `play_recording` command 
 
 ---
 
+## Audio Lip-Sync Recording
+
+The `lipsync_cli` tool generates a recording where the pumpkin's mouth moves in sync with spoken audio. It uses Google Gemini to analyze the audio file, extract per-word timing and emotional tone, then produces a timeline with mouth viseme commands automatically timed to the speech.
+
+### How it works
+
+1. The audio file is uploaded to the Gemini File API
+2. **Pass 1** — word-level timing extraction: which words occur at which millisecond
+3. **Pass 2** — emotion and pacing analysis: happy/sad/scared/surprised/angry, tempo, and duration
+4. A timeline is generated combining expression commands (from emotion) and mouth viseme commands (from word timing)
+5. Both the timeline JSON and the audio file are uploaded to the Mr. Pumpkin server
+6. Playback plays the audio and timeline simultaneously — fully synchronized
+
+### Quick start
+
+```bash
+python -m skill.lipsync_cli speech.mp3 --filename halloween_speech
+```
+
+This uploads `halloween_speech.json` (timeline) and `halloween_speech.mp3` (audio) to the server.
+
+### Usage
+
+```
+python -m skill.lipsync_cli <audio_file> [options]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `audio_file` | required | Path to audio file (`.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.flac`) |
+| `-f`, `--filename` | stem of audio file | Name to store the recording as (no extension) |
+| `--prompt` | auto | Extra context added to the Gemini analysis prompt |
+| `--host` | `localhost` | Mr. Pumpkin server hostname or IP |
+| `--tcp-port` | `5000` | TCP server port |
+| `--ws-port` | `5001` | WebSocket server port |
+| `--protocol` | `tcp` | Upload protocol: `tcp` or `ws` |
+| `--dry-run` | off | Analyze and print the timeline without uploading |
+| `--audio-provider` | `gemini` | Audio analysis provider |
+
+### Supported audio formats
+
+| Format | Gemini analysis | Pygame playback |
+|--------|----------------|-----------------|
+| `.mp3` | ✅ | ✅ |
+| `.wav` | ✅ | ✅ |
+| `.ogg` | ✅ | ✅ |
+| `.m4a` | ✅ | ❌ |
+| `.aac` | ✅ | ❌ |
+| `.flac` | ✅ | ❌ |
+
+> **Tip:** If you only have `.m4a` or `.aac`, convert first:
+> ```bash
+> ffmpeg -i speech.m4a speech.mp3
+> ```
+
+### Preview before uploading
+
+```bash
+python -m skill.lipsync_cli speech.mp3 --dry-run
+```
+
+Prints the generated timeline JSON without uploading anything.
+
+### Playing the recording
+
+After upload, play it the same way as any other recording:
+```
+play halloween_speech
+```
+
+The pumpkin's mouth will animate in sync with the audio automatically.
+
+---
+
 ## Playing back a recording
 
 After uploading, play the recording using the `play_timeline` command:

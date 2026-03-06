@@ -26,6 +26,11 @@ Mr. Pumpkin is a fully-featured animated pumpkin face built for real-world proje
     <p>Record command sequences with millisecond timing, save as JSON timelines, and replay frame-accurately.</p>
   </div>
   <div class="feature-card">
+    <span class="feature-icon">🎙️</span>
+    <h3>Audio Lip-Sync</h3>
+    <p>Feed an audio file to Google Gemini — it extracts per-word timing and emotion, then generates a timeline with mouth visemes synchronized to the speech.</p>
+  </div>
+  <div class="feature-card">
     <span class="feature-icon">🤖</span>
     <h3>AI Recording Skill</h3>
     <p>Describe an animation in plain English — Google Gemini generates a full timeline JSON and uploads it automatically.</p>
@@ -71,6 +76,26 @@ Mr. Pumpkin is a fully-featured animated pumpkin face built for real-world proje
 - `raise_left_eyebrow` / `lower_left_eyebrow` — individual eyebrow control
 - `raise_right_eyebrow` / `lower_right_eyebrow`
 - `wiggle_nose` / `reset_nose` — nose animation
+
+### AI Recording Skills
+
+**Text-to-animation:**
+```bash
+python -m skill.cli "make the pumpkin look confused" --filename confused
+```
+
+**Audio lip-sync:**
+```bash
+python -m skill.lipsync_cli speech.mp3 --filename my_speech
+```
+Uploads the audio file alongside the timeline — playback is fully synchronized. Requires `GEMINI_API_KEY`.
+
+### Mouth / Viseme Commands
+- `mouth_closed` — M/B/P sounds
+- `mouth_open` — AH/AA sounds
+- `mouth_wide` — EE/IH sounds
+- `mouth_rounded` — OO/OH sounds
+- `mouth_neutral` — releases back to expression-driven mouth
 
 ### Gaze Control
 ```
