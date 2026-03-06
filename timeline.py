@@ -75,9 +75,10 @@ class Timeline:
         duration_ms: Total duration in milliseconds
     """
     
-    def __init__(self, commands: Optional[List[TimelineEntry]] = None, version: str = "1.0"):
+    def __init__(self, commands: Optional[List[TimelineEntry]] = None, version: str = "1.0", audio_file: Optional[str] = None):
         self.version = version
         self.commands = commands or []
+        self.audio_file = audio_file  # optional: paired audio filename (e.g., "my_song.mp3")
         self._update_duration()
     
     def _update_duration(self):
@@ -122,11 +123,14 @@ class Timeline:
     
     def to_dict(self) -> Dict[str, Any]:
         """Serialize timeline to dictionary for JSON encoding."""
-        return {
+        d = {
             "version": self.version,
             "duration_ms": self.duration_ms,
             "commands": [cmd.to_dict() for cmd in self.commands]
         }
+        if self.audio_file is not None:
+            d["audio_file"] = self.audio_file
+        return d
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Timeline':
@@ -141,7 +145,8 @@ class Timeline:
             raise ValueError("Timeline missing 'commands' field")
         
         commands = [TimelineEntry.from_dict(cmd) for cmd in data["commands"]]
-        timeline = cls(commands=commands, version=data["version"])
+        audio_file = data.get("audio_file")  # optional field
+        timeline = cls(commands=commands, version=data["version"], audio_file=audio_file)
         
         # Validate duration matches
         if "duration_ms" in data and timeline.duration_ms != data["duration_ms"]:
@@ -246,6 +251,19 @@ class Playback:
         self.current_position_ms = 0
         self._last_executed_index = -1
         self.state = PlaybackState.PLAYING
+        
+        # Start audio playback if timeline has an audio_file field
+        if self.timeline.audio_file:
+            audio_path = self.recordings_dir / self.timeline.audio_file
+            try:
+                import pygame
+                pygame.mixer.music.load(str(audio_path))
+                pygame.mixer.music.play()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Audio playback failed for %s: %s", self.timeline.audio_file, e
+                )
     
     def stop(self):
         """Stop playback and reset to beginning."""
@@ -253,6 +271,13 @@ class Playback:
         self.current_position_ms = 0
         self._last_executed_index = -1
         self._stack.clear()
+        # Stop audio if playing
+        try:
+            import pygame
+            if pygame.mixer.get_init():
+                pygame.mixer.music.stop()
+        except Exception:
+            pass
     
     def pause(self):
         """Pause playback at current position."""
