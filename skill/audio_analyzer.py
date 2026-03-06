@@ -175,8 +175,10 @@ class GeminiAudioProvider(AudioAnalysisProvider):
         logger.info(f"Uploading {audio_path} ({mime_type}) to Gemini...")
 
         # Upload audio file
-        with open(audio_path, "rb") as f:
-            uploaded_file = self._client.files.upload(path=audio_path, mime_type=mime_type)
+        uploaded_file = self._client.files.upload(
+            file=audio_path,
+            config={"mime_type": mime_type},
+        )
         
         file_name = uploaded_file.name
         logger.debug(f"Uploaded as {file_name}, waiting for ACTIVE state...")
