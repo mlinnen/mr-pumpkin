@@ -16,6 +16,15 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
+### v0.5.13 Release (2026-03-06)
+
+Successfully executed full release cycle:
+- VERSION bumped from 0.5.12 → 0.5.13
+- dev → preview → main merge chain completed
+- Release tag `v0.5.13` created and pushed to GitHub
+- All v0.5.13 CHANGELOG and docs/what-is-new.md entries already in place (audio lip-sync feature, SDK fixes, format fixes, blog post)
+- Release captures audio lip-sync recording feature, Gemini SDK v1.x fixes, and mouth viseme command dispatch fixes
+
 ### Audio Lip-Sync Blog Post (2026-03-06)
 
 Created `docs/_posts/2026-03-06-audio-lipsync.md` covering the audio lip-sync recording feature (issue #66 / PR #74). Post covers:
