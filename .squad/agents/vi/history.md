@@ -754,3 +754,26 @@ Replaced the GitHub-redirect search with a proper client-side search using Lunr.
 
 ## Learnings
 Updated client_example.py to document mouth speech commands (mouth_closed, mouth_open, mouth_wide, mouth_rounded, mouth_neutral) in both module docstring and interactive help text (Issue #59).
+
+### Audio Analysis Provider Implementation (Issue #69)
+
+**What:** Implemented `skill/audio_analyzer.py` — Gemini multimodal audio analysis for lip-sync and beat-driven animation.
+
+**Key patterns:**
+1. **ABC pattern mirrors LLMProvider:** AudioAnalysisProvider abstract base class with single `analyze_audio()` method, following exact same pattern as `skill/generator.py` LLMProvider for consistency
+2. **Two-pass Gemini analysis:** Pass 1 extracts structured timing JSON (speech_segments, beats, pauses), Pass 2 extracts emotion as single word — separation prevents mixed-format responses
+3. **File upload lifecycle:** Upload with `client.files.upload()`, poll `client.files.get()` until state == "ACTIVE" (required by Gemini), clean up with `client.files.delete()` in finally block
+4. **Graceful JSON retry:** First parse attempt with lenient prompt, retry once with strict "JSON only" prompt if JSONDecodeError, then raise descriptive ValueError with both error messages
+5. **MIME type detection:** Map file extensions (.mp3, .wav, .ogg, etc.) to MIME types for upload — critical for Gemini to accept audio files
+6. **Dataclass hierarchy:** WordTiming, BeatEvent, PauseSegment nested in AudioAnalysis — clean structured data for downstream timeline builder
+
+**Gotchas found:**
+- Gemini file upload requires polling `get(name=file.name)` until state=="ACTIVE" before analysis — immediate use fails
+- JSON responses sometimes wrapped in markdown fences even when prompt says "ONLY JSON" — always strip with regex fallback
+- Emotion responses can be verbose (e.g., "The dominant emotion is happy") — need `.strip().lower()` and validation against expected set
+- File cleanup in finally block prevents orphaned files in Gemini storage even if analysis fails
+
+**Implementation decisions:**
+- Used `google.genai` (not `google.generativeai`) to match existing GeminiProvider pattern in generator.py
+- Logged at INFO level for analysis results (segment/beat/pause counts), DEBUG for file operations, WARNING for retries
+- get_provider() factory function allows future providers (Whisper, AssemblyAI, etc.) without client code changes

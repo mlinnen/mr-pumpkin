@@ -856,3 +856,89 @@ with patch("skill.uploader._upload_ws") as mock_ws:
 
 **Key quality finding:**
 - help with unknown subcommand (e.g., "help unknown_xyz_command") passes because the response is long enough (> 20 chars) to count as a general help listing — the command currently ignores subcommand tokens
+
+### Issue #72: Audio Analyzer Test Scaffold (2026-03-05)
+📌 Team update (2026-03-05): Issue #72 — Comprehensive test scaffold for audio_analyzer.py written (tests-first approach) — Mylo
+
+**Task context:**
+- Vi building skill/audio_analyzer.py in parallel (implementation discovered already in progress)
+- Tests written from architecture spec (.squad/decisions/jinx-issue66-architecture.md)
+- Based on Audio-to-Animation mapping skill pattern from .squad/skills/audio-to-animation-mapping-SKILL.md
+
+**Test file created:** tests/test_audio_analyzer.py
+
+**Test coverage delivered (4 areas, ~700 lines):**
+
+1. **AudioAnalysis dataclass tests** (6 tests)
+   - Field instantiation: speech_segments, beats, pauses (all lists), emotion (string), duration_ms (int)
+   - Type validation for each field
+
+2. **AudioAnalysisProvider ABC contract tests** (4 tests)
+   - Cannot instantiate directly (abstract)
+   - Concrete subclass MUST implement analyze_audio method
+   - Successful instantiation and return type validation for valid subclass
+
+3. **GeminiAudioProvider unit tests** (13 tests, fully mocked)
+   - Mock structure: @patch('skill.audio_analyzer.genai.Client')
+   - All tests use tmp_path fixture for fake audio files (no real I/O)
+   - Returns AudioAnalysis with correct structure
+   - speech_segments contain WordTiming with phoneme_group values
+   - beats contain BeatEvent with time_ms and strength
+   - pauses contain PauseSegment with duration_ms
+   - emotion field from pass 2 response
+   - Malformed JSON retry logic (1 retry, then ValueError)
+   - File upload via client.files.upload() verified
+   - File cleanup via client.files.delete() verified
+   - Empty audio handling (no speech_segments, no crash)
+   - No beats handling (empty beats list)
+
+4. **Phoneme group mapping tests** (4 tests)
+   - Bilabial stops (M/B/P) → "bilabial"
+   - Open vowels (AH/AA) → "open_vowel"
+   - Spread vowels (EE/IH) → "spread_vowel"
+   - Round vowels (OO/OH) → "round_vowel"
+
+5. **Provider factory tests** (2 tests)
+   - get_provider("gemini") returns GeminiAudioProvider
+   - get_provider("unknown_xyz") raises ValueError
+
+**Mock patterns established:**
+```python
+SAMPLE_ANALYSIS_JSON = {
+    "duration_ms": 5000,
+    "speech_segments": [
+        {"word": "hello", "start_ms": 100, "end_ms": 600, "phoneme_group": "open_vowel"},
+        {"word": "pumpkin", "start_ms": 700, "end_ms": 1400, "phoneme_group": "bilabial"},
+    ],
+    "beats": [{"time_ms": 1000, "strength": "strong"}],
+    "pauses": [{"start_ms": 600, "end_ms": 700, "duration_ms": 100}]
+}
+
+def _make_mock_gemini_response(analysis_json, emotion):
+    mock_response = Mock()
+    mock_response.text = json.dumps(analysis_json)
+    mock_emotion_response = Mock()
+    mock_emotion_response.text = emotion
+    return mock_response, mock_emotion_response
+```
+
+**Test conventions observed from existing tests:**
+- test_skill_generator.py pattern: @pytest.mark.skipif for deferred imports
+- Class-based organization (TestHappyPath, TestRepairHeuristics, etc.)
+- conftest.py adds parent directory to sys.path for imports
+- Docstrings on test classes, not individual tests (lean style)
+- unittest.mock.patch for external dependencies (Gemini client)
+- tmp_path pytest fixture for file paths (no actual audio files needed)
+
+**Quality approach:**
+- ✅ Tests define the contract — Vi's implementation will validate against this
+- ✅ Never make real Gemini API calls (all mocked)
+- ✅ Covers happy paths, error handling, retry logic, file cleanup
+- ✅ Phoneme mapping spot-checks ensure correct viseme targeting
+- ✅ All dataclass and ABC contract tests ensure proper abstraction design
+
+**Tests-first workflow reflection:**
+- Writing tests from architecture spec (without seeing implementation) forces clarity on expected API surface
+- Mock structure (_make_mock_gemini_response helper) makes tests readable and maintainable
+- Deferred import pattern (SKILL_AVAILABLE + pytestmark.skipif) allows tests to exist before module does
+- This is the third time using this pattern successfully (test_skill_generator, test_auto_update, now test_audio_analyzer)
