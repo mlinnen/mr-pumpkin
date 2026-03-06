@@ -5,6 +5,29 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.13] - 2026-03-06
+
+### Added
+- Audio lip-sync recording tool (Issue #66) — analyze an audio file with Google Gemini and automatically generate a timeline with mouth viseme commands timed to speech.
+  - `skill/lipsync_cli.py` — CLI entry point: `python -m skill.lipsync_cli audio.mp3 --filename my_recording`
+  - `skill/audio_analyzer.py` — `GeminiAudioProvider` uploads audio to the Gemini File API and returns per-word timing data and emotion analysis
+  - `skill/AudioAnalysis` dataclass — structured result with `word_timings`, `emotion`, `tempo`, and `duration_ms`
+  - Two-pass Gemini analysis: Pass 1 extracts word-level timing; Pass 2 extracts emotional tone and pacing
+  - Auto-generated mouth commands (`mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral`) interleaved with matching expression and animation commands
+  - Audio file uploaded to pumpkin server alongside the timeline recording (`.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.flac`)
+  - `--dry-run` flag for preview without upload
+  - Clear warning when unsupported-for-playback formats (`.m4a`, `.aac`, `.flac`) are used — suggests `ffmpeg` conversion
+
+### Fixed
+- Gemini SDK v1.x breaking changes in `audio_analyzer.py`:
+  - `files.upload(path=...)` → `files.upload(file=..., config={"mime_type": ...})`
+  - `uploaded_file.name` (short resource ID) → `uploaded_file.uri` (full HTTPS URL required by `Part.from_uri()`)
+- Mouth viseme commands (`mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral`) added to generator vocabulary and timeline playback dispatch — they were supported by `command_handler.py` but not wired into `_execute_timeline_command()` or `generator.py`
+- `wiggle_nose` command now dispatches correctly in timeline playback (aliases to `_start_nose_twitch`)
+- `upload_audio` handlers in `pumpkin_face.py` and `FileManager` in `timeline.py` now accept `.m4a`, `.aac`, `.flac` in addition to `.mp3`, `.wav`, `.ogg`
+
+---
+
 ## [0.5.12] - 2026-03-05
 
 ### Added
