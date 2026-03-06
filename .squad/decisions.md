@@ -3829,3 +3829,40 @@ Replaced with client-side Lunr.js search:
 **Implementation:** 5 viseme vocabulary covers ~80% of English phonemes with simple shapes: CLOSED (horizontal line 100px), WIDE (horizontal line 180px), OPEN (ellipse 80x60), ROUNDED (circle radius 25), NEUTRAL (releases override). Transition speed 0.15 (3× faster than expression transitions) for snappy speech animation. Commands: \mouth_closed\, \mouth_open\, \mouth_wide\, \mouth_rounded\, \mouth_neutral\, plus \mouth <viseme_name>\ for compact timeline syntax.
 
 **Work distribution:** Vi (state variables, commands, recording capture, 3-4 hours), Ekko (viseme geometry, rendering logic, 2-3 hours), Mylo (test suite 15-20 tests, 4-5 hours). Total 2-day implementation with 6 checkpoints.
+
+---
+
+### 2026-01-01: Single-row flex header over two-row approach — Issues #61, #62
+
+**By:** Ekko**Date:** 2026-01-01**Issues:** #61, #62
+
+**Decision:** Keep the flat single-row flex layout rather than introducing a two-row wrapper structure:
+- `flex-direction: row` on `.header-inner` for desktop
+- `flex-wrap: wrap + order: 10` on `.site-nav` for mobile, so the opened nav drops below the top bar naturally
+
+Avoided adding new HTML wrapper divs (`.header-top`, `.header-bottom`) to keep the change minimal and surgical.
+
+**Rationale:**
+- Two-row HTML approach would require touching both `default.html` and `style.css` and restructuring the DOM
+- Single-row with `flex-wrap` achieves the same visual result with only CSS changes
+- `order: 10` on `.site-nav` is a well-established pattern for responsive flex nav drawers
+
+**Trade-offs:**
+- The unused `.header-top` / `.header-bottom` CSS classes remain (dead code); they can be cleaned up in a future CSS audit task
+
+---
+
+### 2026-03-05: PR #63 Merge — Nav Layout CSS Fix
+
+**By:** Jinx (Lead)**Date:** 2026-03-05**PR:** mlinnen/mr-pumpkin#63
+
+**Decision:** Merged PR #63 (squash + delete branch) after code review. No blocking issues found.
+
+**Rationale:**
+The CSS changes are correct, minimal, and scoped:
+- Desktop header row layout (`flex-direction: row`) fixes search width constraint (#62)
+- Mobile flexbox adjustments (`flex-wrap`, `margin-left: auto`, `order: 10`) fix hamburger placement (#61)
+
+Branch Gate CI failure is expected behavior (only `release/*` → `main` is permitted; this was `squad/*` → `dev`). Squad CI tests passed.
+
+**Self-approval note:** GitHub prevented self-approval (PR author = reviewer account). Merged directly per Mike's local sign-off.

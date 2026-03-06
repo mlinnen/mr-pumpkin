@@ -8,7 +8,7 @@
 **Owner:** Mike Linnen  
 **Created:** 2026-02-16  
 
-## Team Roster
+## Members
 
 | Name | Role | Charter | Status |
 |------|------|---------|--------|
