@@ -163,6 +163,16 @@ def main(argv=None) -> int:
     if not audio_path.exists():
         print(f"ERROR: Audio file not found: {audio_path}", file=sys.stderr)
         return 1
+
+    _PLAYBACK_UNSUPPORTED = {".m4a", ".aac", ".flac"}
+    if audio_path.suffix.lower() in _PLAYBACK_UNSUPPORTED:
+        print(
+            f"WARNING: {audio_path.suffix} files cannot be played back by Mr. Pumpkin "
+            f"(pygame does not support this format).\n"
+            f"  Please convert to .mp3 or .wav first, e.g.:\n"
+            f"    ffmpeg -i {audio_path.name} {audio_path.stem}.mp3",
+            file=sys.stderr,
+        )
     
     # Determine filename
     filename = args.filename or audio_path.stem
