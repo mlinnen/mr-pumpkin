@@ -527,3 +527,33 @@ This establishes the pattern for temporary feature overrides that don't disturb 
 
 📌 Team update (2026-03-03): Viseme mouth rendering implemented for Issue #59 lip-sync feature
 
+
+## Learnings
+
+### Nav Layout Fix — Issues #61 & #62 (2026-01-01)
+
+**Files changed:**
+- docs/assets/css/style.css — two surgical edits
+
+**Layout structure discovered:**
+The Jekyll site header (docs/_layouts/default.html) uses a flat flex container .header-inner containing three direct children in DOM order:
+1. .nav-toggle (hamburger button, display:none on desktop, visible on mobile)
+2. .site-nav (horizontal nav links, lex:1, collapses to dropdown on mobile)
+3. .header-search (search form with fixed-width input + icon button)
+
+The CSS also defines .header-top and .header-bottom classes that are **not used** in the HTML — they appear to be leftover from an earlier two-row design.
+
+**Root cause of bugs:**
+- .header-inner had lex-direction: column — this stacked all three children vertically, causing the search form to stretch to full page width on desktop (#62) and the hamburger/search to stack vertically instead of side-by-side on mobile (#61).
+
+**Fixes applied:**
+1. Changed .header-inner to lex-direction: row; align-items: center — desktop now shows nav links spanning center with search pinned right (search input has explicit width: 160px; the 🔍 button sits inline at the right of the pill-shaped form).
+2. In @media (max-width: 768px):
+   - Added lex-wrap: wrap to .header-inner so the opened nav can flow to a second row
+   - Added margin-left: auto to .header-search to push it to the right, leaving hamburger at the left
+   - Added order: 10 to .site-nav so when opened (display: flex; width: 100%) it wraps below the hamburger+search top bar
+
+**CSS patterns noted:**
+- All desktop nav is handled without @media — mobile overrides live in @media (max-width: 768px)
+- The .site-nav.open class is toggled by inline JS in default.html
+- Search input has explicit widths: 160px desktop, 120px mobile

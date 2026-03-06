@@ -12,6 +12,23 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.12] - 2026-03-05
+
+### Added
+- Squad v0.8.20 upgrade — 12 new GitHub Actions workflow templates for squad automation (CI gating, label enforcement, branch protection, issue assignment, triage, preview/promotion/release pipelines, and label sync)
+- `squad.config.ts` — project-level Squad configuration covering model tiers, routing rules, casting universe allowlist, and platform settings
+- Blog post: *"Built With Squad: An Entire Creative Coding Project Delivered by an AI Team"* — the full development story of Mr. Pumpkin, including how parallel fan-out, reviewer gates, and persistent agent memory shaped the project. See [blog](/blog) for the full post.
+- `docs/development-story.md` — narrative of how Mr. Pumpkin was built by the AI team, covering architectural milestones and squad collaboration patterns
+- Updated squad identity, casting state, and project-conventions skill with session learnings
+
+### Fixed
+- `mouth_wide` viseme shape refined: increased grin upturn, curved arc distinct from neutral mouth, corrected width
+- Documentation site blog listing broken due to missing `index.html` required by jekyll-paginate
+- CI: added `x86_64-linux` platform to `Gemfile.lock` to resolve Linux build failures
+- Docs site nav layout: corrected search bar width overflow and mobile hamburger menu display (#61, #62)
+
+---
+
 ## [0.5.11] - 2026-03-04
 
 ### Added

@@ -314,3 +314,24 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 **Key architectural insight:** Timeline documentation stays synchronized with command_handler.py vocabulary. The compact `mouth <viseme>` syntax in the schema matches the socket command router pattern and provides alternative to five separate shorthand commands for programmatic generation.
 
 
+
+### PR #63 — Jekyll Nav Layout Fix (2026-06-17)
+- Reviewed 3-change CSS PR fixing desktop search width (#62) and mobile hamburger ordering (#61)
+- \.header-inner\ column→row flip: correct fix; column layout was expanding \.header-top\ full-width, bloating the search form
+- Mobile additions (\lex-wrap:wrap\, \margin-left:auto\ on search, \order:10\ on nav) work together cleanly for hamburger-left-of-search behavior
+- Leftover \order-top\ on \.header-bottom\ is a cosmetic holdover from column layout; renders as a hairline in row context — minor, monitor visually
+- GitHub does not allow approving your own PR; left detailed review as a comment instead
+
+### PR #63 Review — Fix nav layout: search width (#62) and mobile hamburger (#61) (2026-03-05)
+
+**Reviewed:** docs/assets/css/style.css — 7 lines added, 1 changed. Pure CSS layout fixes.
+
+**Changes:**
+- Desktop: .header-inner switched from lex-direction: column to ow + lign-items: center. This naturally constrains search width and aligns items horizontally — clean fix for #62.
+- Mobile (media query): lex-wrap: wrap on .header-inner allows nav to drop below header row; margin-left: auto on .header-search right-justifies the search icon; order: 10 on .site-nav ensures expanded nav wraps below the header row — clean fix for #61.
+
+**CI Note:** Branch Gate check failed (expected — it only allows elease/* branches to target main; this PR targeted dev). Squad CI (tests) passed.
+
+**Verdict:** ✅ Merged. Changes are minimal, targeted, no regression risk.
+
+**Pattern noted:** The Branch Gate workflow fires on all PRs regardless of target branch, creating false-negative noise on squad/* → dev PRs. Not a blocker, but worth documenting as expected behavior.

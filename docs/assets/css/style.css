@@ -118,7 +118,8 @@ pre code {
 
 .header-inner {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 0;
 }
 
@@ -500,9 +501,14 @@ tr:nth-child(even) { background: #141414; }
 
   .nav-toggle { display: flex; }
 
+  .header-inner { flex-wrap: wrap; }
+
+  .header-search { margin-left: auto; }
+
   .site-nav {
     display: none;
     flex-direction: column;
+    order: 10;
     width: 100%;
     background: #111;
     padding: 0.5rem 0;
