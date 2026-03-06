@@ -1045,8 +1045,23 @@ class PumpkinFace:
         elif command == "scrunch_nose":
             magnitude = args.get("magnitude", 50.0)
             self._start_nose_scrunch(magnitude)
+        elif command == "wiggle_nose":
+            magnitude = args.get("magnitude", 50.0)
+            self._start_nose_twitch(magnitude)  # wiggle aliases to twitch (no separate implementation)
         elif command == "reset_nose":
             self._reset_nose()
+        
+        # Mouth viseme commands
+        elif command == "mouth_closed":
+            self.set_mouth_viseme("closed")
+        elif command == "mouth_open":
+            self.set_mouth_viseme("open")
+        elif command == "mouth_wide":
+            self.set_mouth_viseme("wide")
+        elif command == "mouth_rounded":
+            self.set_mouth_viseme("rounded")
+        elif command == "mouth_neutral":
+            self.set_mouth_viseme("neutral")
         
         else:
             raise ValueError(f"Unknown timeline command: {command}")
