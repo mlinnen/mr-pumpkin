@@ -1559,7 +1559,6 @@ class PumpkinFace:
                                 client_socket.sendall(b"READY\n")
                                 
                                 # Read raw bytes until END_UPLOAD
-                                audio_chunks = []
                                 upload_buf = b""
                                 upload_done = False
                                 while True:
@@ -1572,15 +1571,11 @@ class PumpkinFace:
                                     # Check for END_UPLOAD marker (sent as final line after audio bytes)
                                     if b"\nEND_UPLOAD\n" in upload_buf:
                                         audio_data, _ = upload_buf.split(b"\nEND_UPLOAD\n", 1)
-                                        audio_chunks.append(audio_data)
                                         upload_done = True
                                         break
-                                    # Keep collecting chunks
-                                    audio_chunks.append(chunk)
-                                    upload_buf = b""  # reset window after appending
                                 
                                 if upload_done:
-                                    audio_bytes = b"".join(audio_chunks)
+                                    audio_bytes = audio_data
                                     self.file_manager.upload_audio(filename, audio_bytes)
                                     response = f"OK Uploaded {filename}"
                                     client_socket.sendall((response + '\n').encode('utf-8'))
