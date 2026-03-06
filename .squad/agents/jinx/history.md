@@ -16,6 +16,17 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
+### Audio Lip-Sync Blog Post (2026-03-06)
+
+Created `docs/_posts/2026-03-06-audio-lipsync.md` covering the audio lip-sync recording feature (issue #66 / PR #74). Post covers:
+
+- **Feature overview**: Two-pass Gemini pipeline — Pass 1 extracts word timings, phoneme groups, beats, and pauses; Pass 2 choreographs a complete animation timeline
+- **Technical depth**: `GeminiAudioProvider` in `skill/audio_analyzer.py`, `lipsync_cli.py` CLI usage, viseme mapping rules (bilabial/open_vowel/spread_vowel/round_vowel/neutral), `pygame.mixer.music` for synchronized playback
+- **Bugs fixed**: Gemini SDK v1.x `files.upload()` kwarg change + `.uri` → `.name` attribute rename; mouth commands missing from `_execute_timeline_command()` dispatch table; dual-layer audio format validation in `lipsync_cli.py` and `pumpkin_face.py`/`timeline.py`
+- **Architectural framing**: Expression orthogonality (mouth visemes as independent axis) meant audio-driven animation composed cleanly with all existing machinery
+
+Post written in first-person Jinx voice, following Jekyll conventions and style of prior posts. Committed and pushed to `dev`.
+
 ### Squad Announcement Blog Post (2026-03-04)
 
 Created `docs/_posts/2026-03-04-built-with-squad.md` announcing the Mr. Pumpkin project with emphasis on being fully built by Brady Gaster's Squad agentic coding platform. Post covers:
