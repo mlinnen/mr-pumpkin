@@ -361,3 +361,15 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 **Key insight:** The viseme infrastructure from Issue #59 was the critical missing piece that makes this feature buildable without new graphics work. The entire face-motion command vocabulary needed for lip-sync + beat reaction + liveliness is already in place. This feature is largely a new AI analysis pipeline that feeds the existing recording infrastructure.
 
 **Sub-issue assignments:** Vi (audio upload endpoint, pygame.mixer playback, audio_analyzer.py, lipsync_cli.py), Mylo (tests), Jinx (timeline-schema.md doc update after implementation).
+
+### Review PR #74 — Audio Lip-Sync Recording Tool (2026-03-05)
+
+**Scope:** Review implementation of Issue #66 (audio analysis, CLI, timeline extension, upload).
+
+**Findings:**
+- **Architecture Integrity:** ✅ **Approved.** Implementation matches the design proposed in `.squad/decisions/jinx-issue66-architecture.md`. `skill/audio_analyzer.py` correctly uses ABC pattern and two-pass Gemini analysis. `skill/lipsync_cli.py` orchestrates the pipeline effectively.
+- **Code Quality:** 🔄 **Critical Bug Found.** The `pumpkin_face.py` audio upload handler (lines 1566-1581) clears the receive buffer inside the loop, which breaks detection of the `\nEND_UPLOAD\n` marker if it spans across TCP chunks. This will cause uploads to hang or corrupt files.
+- **Timeline:** `timeline.py` and schema docs correctly add the `audio_file` field.
+- **Tests:** Thorough test coverage in `tests/test_lipsync_cli.py` and `tests/test_audio_analyzer.py`.
+
+**Action:** Posted review comment requesting a fix for the buffer handling bug in `pumpkin_face.py`. Architecture otherwise approved.
