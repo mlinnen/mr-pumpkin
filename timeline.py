@@ -722,15 +722,15 @@ class FileManager:
         """Save raw audio bytes to the recordings directory.
         
         Args:
-            filename: Audio filename (must end with .mp3, .wav, or .ogg)
+            filename: Audio filename (must end with .mp3, .wav, .ogg, .m4a, .aac, or .flac)
             audio_bytes: Raw audio file bytes
             
         Raises:
             FileExistsError: If a file with this name already exists
             ValueError: If the filename has an unsupported extension
         """
-        if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg')):
-            raise ValueError(f"Unsupported audio format: {filename}. Use .mp3, .wav, or .ogg")
+        if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
+            raise ValueError(f"Unsupported audio format: {filename}. Use .mp3, .wav, .ogg, .m4a, .aac, or .flac")
         
         filepath = self.recordings_dir / filename
         if filepath.exists():
