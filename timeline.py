@@ -75,9 +75,10 @@ class Timeline:
         duration_ms: Total duration in milliseconds
     """
     
-    def __init__(self, commands: Optional[List[TimelineEntry]] = None, version: str = "1.0"):
+    def __init__(self, commands: Optional[List[TimelineEntry]] = None, version: str = "1.0", audio_file: Optional[str] = None):
         self.version = version
         self.commands = commands or []
+        self.audio_file = audio_file  # optional: paired audio filename (e.g., "my_song.mp3")
         self._update_duration()
     
     def _update_duration(self):
@@ -122,11 +123,14 @@ class Timeline:
     
     def to_dict(self) -> Dict[str, Any]:
         """Serialize timeline to dictionary for JSON encoding."""
-        return {
+        d = {
             "version": self.version,
             "duration_ms": self.duration_ms,
             "commands": [cmd.to_dict() for cmd in self.commands]
         }
+        if self.audio_file is not None:
+            d["audio_file"] = self.audio_file
+        return d
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Timeline':
@@ -141,7 +145,8 @@ class Timeline:
             raise ValueError("Timeline missing 'commands' field")
         
         commands = [TimelineEntry.from_dict(cmd) for cmd in data["commands"]]
-        timeline = cls(commands=commands, version=data["version"])
+        audio_file = data.get("audio_file")  # optional field
+        timeline = cls(commands=commands, version=data["version"], audio_file=audio_file)
         
         # Validate duration matches
         if "duration_ms" in data and timeline.duration_ms != data["duration_ms"]:
@@ -246,6 +251,19 @@ class Playback:
         self.current_position_ms = 0
         self._last_executed_index = -1
         self.state = PlaybackState.PLAYING
+        
+        # Start audio playback if timeline has an audio_file field
+        if self.timeline.audio_file:
+            audio_path = self.recordings_dir / self.timeline.audio_file
+            try:
+                import pygame
+                pygame.mixer.music.load(str(audio_path))
+                pygame.mixer.music.play()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Audio playback failed for %s: %s", self.timeline.audio_file, e
+                )
     
     def stop(self):
         """Stop playback and reset to beginning."""
@@ -253,6 +271,13 @@ class Playback:
         self.current_position_ms = 0
         self._last_executed_index = -1
         self._stack.clear()
+        # Stop audio if playing
+        try:
+            import pygame
+            if pygame.mixer.get_init():
+                pygame.mixer.music.stop()
+        except Exception:
+            pass
     
     def pause(self):
         """Pause playback at current position."""
@@ -692,6 +717,28 @@ class FileManager:
         filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(json_content)
+    
+    def upload_audio(self, filename: str, audio_bytes: bytes) -> None:
+        """Save raw audio bytes to the recordings directory.
+        
+        Args:
+            filename: Audio filename (must end with .mp3, .wav, .ogg, .m4a, .aac, or .flac)
+            audio_bytes: Raw audio file bytes
+            
+        Raises:
+            FileExistsError: If a file with this name already exists
+            ValueError: If the filename has an unsupported extension
+        """
+        if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
+            raise ValueError(f"Unsupported audio format: {filename}. Use .mp3, .wav, .ogg, .m4a, .aac, or .flac")
+        
+        filepath = self.recordings_dir / filename
+        if filepath.exists():
+            raise FileExistsError(f"Audio file already exists: {filename}")
+        
+        self.recordings_dir.mkdir(parents=True, exist_ok=True)
+        filepath.write_bytes(audio_bytes)
+        print(f"Saved audio file: {filepath}")
     
     def delete_timeline(self, filename: str):
         """Delete a timeline file.

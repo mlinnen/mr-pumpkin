@@ -18,6 +18,7 @@
 📌 Team update (2026-03-02): Issue #39 architecture finalized: LLM provider abstraction, JSON validation, upload client, CLI entry point — decided by Jinx, Vi, Mylo, Ekko
 📌 Team update (2026-03-03): Issue #54 resolved: Migrated GeminiProvider from google-generativeai to google-genai SDK. Updated requirements.txt, all 27 tests pass — decided by Vi, Mylo
 📌 Team update (2026-03-03): Issue #57 resolved: Built Jekyll 4.3 static site for GitHub Pages. Custom dark theme (orange #FF6B00 on #0d0d0d), 7 pages + blog, responsive nav, updated squad-docs.yml CI — decided by Vi
+📌 Team update (2026-03-06): Issue #66 foundations completed: Audio analyzer provider (Gemini multimodal two-pass), timeline audio_file extension, pygame playback, upload_audio server endpoint. Mylo wrote 29-test scaffold — decided by Vi, Mylo
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
@@ -754,3 +755,111 @@ Replaced the GitHub-redirect search with a proper client-side search using Lunr.
 
 ## Learnings
 Updated client_example.py to document mouth speech commands (mouth_closed, mouth_open, mouth_wide, mouth_rounded, mouth_neutral) in both module docstring and interactive help text (Issue #59).
+
+### Audio Analysis Provider Implementation (Issue #69)
+
+**What:** Implemented `skill/audio_analyzer.py` — Gemini multimodal audio analysis for lip-sync and beat-driven animation.
+
+**Key patterns:**
+1. **ABC pattern mirrors LLMProvider:** AudioAnalysisProvider abstract base class with single `analyze_audio()` method, following exact same pattern as `skill/generator.py` LLMProvider for consistency
+2. **Two-pass Gemini analysis:** Pass 1 extracts structured timing JSON (speech_segments, beats, pauses), Pass 2 extracts emotion as single word — separation prevents mixed-format responses
+3. **File upload lifecycle:** Upload with `client.files.upload()`, poll `client.files.get()` until state == "ACTIVE" (required by Gemini), clean up with `client.files.delete()` in finally block
+4. **Graceful JSON retry:** First parse attempt with lenient prompt, retry once with strict "JSON only" prompt if JSONDecodeError, then raise descriptive ValueError with both error messages
+5. **MIME type detection:** Map file extensions (.mp3, .wav, .ogg, etc.) to MIME types for upload — critical for Gemini to accept audio files
+6. **Dataclass hierarchy:** WordTiming, BeatEvent, PauseSegment nested in AudioAnalysis — clean structured data for downstream timeline builder
+
+**Gotchas found:**
+- Gemini file upload requires polling `get(name=file.name)` until state=="ACTIVE" before analysis — immediate use fails
+- JSON responses sometimes wrapped in markdown fences even when prompt says "ONLY JSON" — always strip with regex fallback
+- Emotion responses can be verbose (e.g., "The dominant emotion is happy") — need `.strip().lower()` and validation against expected set
+- File cleanup in finally block prevents orphaned files in Gemini storage even if analysis fails
+
+**Implementation decisions:**
+- Used `google.genai` (not `google.generativeai`) to match existing GeminiProvider pattern in generator.py
+- Logged at INFO level for analysis results (segment/beat/pause counts), DEBUG for file operations, WARNING for retries
+- get_provider() factory function allows future providers (Whisper, AssemblyAI, etc.) without client code changes
+
+
+## Learnings
+
+**2025-01-XX: Timeline audio_file field (#68)**
+- Added optional udio_file field to Timeline class for audio playback pairing
+- Implemented lazy pygame imports inside Playback methods (not module-level) to avoid initialization overhead
+- Audio playback is non-fatal: exceptions are caught and logged as warnings, animation continues without audio
+- pygame.mixer.music provides simple single-file audio playback (load → play → stop)
+- Backward compatibility maintained: audio_file is optional in JSON, older timelines continue working
+
+**2025-01-XX: upload_audio endpoint implementation (#67)**
+
+**What:** Added upload_audio server endpoint and client uploader to support audio file uploads for lip-sync/animation workflows.
+
+**Key implementation patterns:**
+1. **Protocol duality (TCP + WebSocket):** Mirrored existing upload_timeline pattern exactly — TCP uses multi-step handshake (command → READY → bytes → END_UPLOAD), WebSocket uses single-message base64 encoding
+2. **Binary upload handling:** TCP handler accumulates raw bytes in chunks (4096), scans for delimiter in buffer, reassembles full audio file from chunk list
+3. **Command routing exclusion:** Both upload_timeline and upload_audio bypass CommandRouter to handle socket-specific multi-step protocols directly in server handlers
+4. **Auto-extension logic:** Server auto-appends .mp3 if filename has no extension, validates against allowed set (.mp3, .wav, .ogg)
+5. **FileManager parallel:** upload_audio() method saves raw bytes with filepath.write_bytes(), validates format, raises FileExistsError if duplicate
+
+**Files modified:**
+- pumpkin_face.py: TCP handler (line 1537+), WebSocket handler (line 1580+)
+- timeline.py: FileManager.upload_audio() method
+- command_handler.py: Help text entry for upload_audio
+- skill/uploader.py: upload_audio() client function with TCP and WS helpers
+
+**Byte boundary handling approach:**
+- Used chunked accumulation with delimiter scanning (similar to upload_timeline line-based approach but for binary data)
+- Buffer reset after each scan to prevent memory bloat on large audio files
+- Kept upload_buf as sliding window for END_UPLOAD detection only
+- Early break on delimiter match prevents reading extra data
+
+**Protocol decision:**
+- TCP: upload_audio <filename> → wait READY → send raw bytes → send END_UPLOAD
+- WebSocket: upload_audio <filename> <base64-encoded-bytes> (single message)
+- Reason: Matches existing upload_timeline conventions for team consistency
+
+**Pattern consistency:**
+- Followed exact error message format from upload_timeline
+- Reused FileExistsError exception pattern from FileManager.upload_timeline
+- Client uploader signature matches upload_timeline (filename, data, host, ports, protocol) for API symmetry
+
+
+**2025-01-XX: skill/lipsync_cli.py — Audio-to-recording orchestrator (Issue #70)**
+
+Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin animations:
+- **Pass 1 (audio analysis):** GeminiAudioProvider.analyze_audio() extracts structured timing data (word segments with phoneme groups, beat events, pause segments, emotion, duration)
+- **Pass 2 (choreography):** build_lipsync_prompt() creates enriched prompt from timing data + user guidance, then generate_timeline() produces final timeline JSON
+
+**Key implementation patterns:**
+
+1. **Prompt enrichment approach:** build_lipsync_prompt() transforms AudioAnalysis dataclass into a detailed choreography brief for the LLM, including:
+   - Word-by-word timing with phoneme→viseme mapping hints (e.g., "100ms-600ms: 'hello' [open_vowel → mouth open]")
+   - Beat events with suggested reactions (strong beat → eyebrow_raise + reset, bar1 → head bob)
+   - Pause segments with blink guidance (≥400ms → blink)
+   - Explicit viseme mapping rules (bilabial → mouth closed, open_vowel → mouth open, etc.)
+   - Artistic instructions (gaze shifts, expression arc, head movements for liveliness)
+
+2. **Metadata injection:** After timeline generation, inject audio_file field into timeline dict before upload — enables server-side audio pairing by convention (my_song.mp3 + my_song.json)
+
+3. **Dual upload pattern:** Upload both audio (via upload_audio()) and timeline (via upload_timeline()) using same host/protocol settings — ensures atomic recording creation from client perspective
+
+4. **CLI mirroring:** Followed exact argument pattern from skill/cli.py (text-only tool) for consistency — shared flags: --filename, --host, --tcp-port, --ws-port, --protocol, --provider, --dry-run
+
+5. **Filename defaulting:** If --filename omitted, derive from audio file stem (my_song.mp3 → "my_song") — reduces CLI friction for simple use cases
+
+**Prompt engineering insights:**
+
+- Separating timing data (AUDIO TIMING section) from mapping rules (VISEME MAPPING RULES section) helps LLM distinguish structural constraints from artistic guidance
+- Including reaction suggestions in beat descriptions (e.g., "→ eyebrow_raise + reset at +200ms") guides LLM toward natural animation patterns without being prescriptive
+- Explicit duration and emotion in preamble primes LLM for appropriate pacing and expression choices
+- Numbered generation instructions at end create clear success criteria for LLM
+
+**Error handling strategy:**
+
+- Validate audio file existence before analysis (fail fast with clear message)
+- Separate try-except blocks for analysis, generation, and upload phases — enables specific error messages per phase
+- FileNotFoundError from audio_path.exists() surfaces immediately before any API calls
+- Dry-run mode executes full pipeline (analysis + generation) but skips uploads — allows testing prompt enrichment logic without server dependency
+
+**Files modified:**
+- skill/lipsync_cli.py (new): CLI orchestrator with build_lipsync_prompt(), main(), CLI argument parser
+- skill/__init__.py: Exported upload_audio to public API (alongside existing generate_timeline and upload_timeline)

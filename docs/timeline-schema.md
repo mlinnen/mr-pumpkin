@@ -17,6 +17,7 @@ A timeline is a JSON file that drives Mr. Pumpkin's animations. It defines a seq
 {
   "version": "1.0",
   "duration_ms": 3500,
+  "audio_file": "my_song.mp3",
   "commands": [...]
 }
 ```
@@ -25,6 +26,7 @@ A timeline is a JSON file that drives Mr. Pumpkin's animations. It defines a seq
 |-------|------|----------|-------------|
 | `version` | string | ✓ | Format version — must be exactly `"1.0"` |
 | `duration_ms` | integer | ✓ | Total animation length in milliseconds; must be ≥ last command's `time_ms` |
+| `audio_file` | string | ✗ | Filename of audio to play in sync with the animation, relative to `~/.mr-pumpkin/recordings/`. When present, the playback engine auto-starts audio at t=0. Audio errors are non-fatal — a warning is logged and animation continues. |
 | `commands` | array | ✓ | Ordered list of command objects; must contain at least one command |
 
 ---

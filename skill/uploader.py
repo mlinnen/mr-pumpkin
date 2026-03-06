@@ -135,3 +135,87 @@ def upload_timeline(
         raise ConnectionError(
             f"Could not connect to Mr. Pumpkin at {host}:{ws_port if use_ws else tcp_port}: {exc}"
         ) from exc
+
+
+def upload_audio(
+    filename: str,
+    audio_bytes: bytes,
+    host: str = "localhost",
+    tcp_port: int = 5000,
+    ws_port: int = 5001,
+    protocol: str = "tcp",
+) -> None:
+    """Upload an audio file to the Mr. Pumpkin server.
+
+    Args:
+        filename: Name to store the audio as on the server (with extension, e.g., 'my_song.mp3')
+        audio_bytes: Raw audio file bytes to upload.
+        host: Hostname or IP address of the Mr. Pumpkin server.
+        tcp_port: TCP server port (default 5000).
+        ws_port: WebSocket server port (default 5001).
+        protocol: 'tcp' or 'ws'/'websocket'.
+
+    Raises:
+        ValueError: If the server returns an error response.
+        ConnectionError: If the connection cannot be established.
+    """
+    use_ws = protocol.lower() in ("ws", "websocket")
+    
+    if use_ws and importlib.util.find_spec("websockets") is None:
+        warnings.warn(
+            "websockets package not installed; falling back to TCP protocol.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        use_ws = False
+    
+    try:
+        if use_ws:
+            _upload_audio_ws(filename, audio_bytes, host, ws_port)
+        else:
+            _upload_audio_tcp(filename, audio_bytes, host, tcp_port)
+    except ValueError:
+        raise
+    except OSError as exc:
+        raise ConnectionError(
+            f"Could not connect to Mr. Pumpkin at {host}:{ws_port if use_ws else tcp_port}: {exc}"
+        ) from exc
+
+
+def _upload_audio_tcp(filename: str, audio_bytes: bytes, host: str, port: int) -> None:
+    """Upload audio via TCP multi-step handshake."""
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.settimeout(_TIMEOUT)
+    try:
+        client.connect((host, port))
+        client.sendall(f"upload_audio {filename}\n".encode("utf-8"))
+        ready = _recv_line(client)
+        if ready != "READY":
+            raise ValueError(f"Expected READY from server, got: {ready!r}")
+        client.sendall(audio_bytes)
+        client.sendall(b"\nEND_UPLOAD\n")
+        response = _recv_line(client)
+    finally:
+        client.close()
+    if response.startswith("ERROR"):
+        raise ValueError(response)
+
+
+async def _upload_audio_ws_async(filename: str, audio_bytes: bytes, host: str, port: int) -> None:
+    """Async WebSocket audio upload (base64-encoded)."""
+    import base64
+    import websockets
+    uri = f"ws://{host}:{port}"
+    async with websockets.connect(uri, open_timeout=_TIMEOUT) as ws:
+        encoded = base64.b64encode(audio_bytes).decode("ascii")
+        await ws.send(f"upload_audio {filename} {encoded}")
+        response = await ws.recv()
+    response = response.strip() if isinstance(response, str) else response.decode().strip()
+    if response.startswith("ERROR"):
+        raise ValueError(response)
+
+
+def _upload_audio_ws(filename: str, audio_bytes: bytes, host: str, port: int) -> None:
+    import asyncio
+    asyncio.run(_upload_audio_ws_async(filename, audio_bytes, host, port))
+

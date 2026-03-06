@@ -12,6 +12,25 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.13] - 2026-03-06
+
+### Added
+- Audio lip-sync recording tool (Issue #66) — analyze an audio file with Google Gemini and automatically generate a timeline with mouth viseme commands timed to speech.
+  - `skill/lipsync_cli.py` — new CLI: `python -m skill.lipsync_cli audio.mp3 --filename my_recording`
+  - `skill/audio_analyzer.py` — `GeminiAudioProvider` uploads audio to the Gemini File API, extracts per-word timing and emotion in two passes
+  - Auto-generated timeline contains expression commands (from detected emotion) and mouth viseme commands (`mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_closed`, `mouth_neutral`) timed to individual words
+  - Audio file is uploaded to the pumpkin server alongside the timeline — playback is fully synchronized
+  - Supports `.mp3`, `.wav`, `.ogg`, `.m4a`, `.aac`, `.flac` for analysis; warns with `ffmpeg` hint for formats pygame cannot play back
+  - `--dry-run` mode for preview without upload
+
+### Fixed
+- Gemini SDK v1.x API changes: `files.upload()` kwarg and `.uri` vs `.name` for `Part.from_uri()` calls in `audio_analyzer.py`
+- Mouth viseme commands wired into `_execute_timeline_command()` in `pumpkin_face.py` (were in vocabulary but not dispatched during timeline playback)
+- `wiggle_nose` timeline playback dispatch fixed (now aliases to `_start_nose_twitch`)
+- `upload_audio` handlers in `pumpkin_face.py` and `timeline.py` now accept `.m4a`, `.aac`, `.flac`
+
+---
+
 ## [0.5.12] - 2026-03-05
 
 ### Added
