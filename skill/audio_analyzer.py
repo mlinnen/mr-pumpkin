@@ -345,11 +345,12 @@ Return ONLY one word from: happy, sad, excited, neutral, solemn"""
         return emotion
 
 
-def get_provider(name: str = "gemini") -> AudioAnalysisProvider:
+def get_provider(name: str = "gemini", **kwargs) -> AudioAnalysisProvider:
     """Factory function to create an audio analysis provider.
 
     Args:
         name: Provider name. Currently only "gemini" is supported.
+        **kwargs: Additional keyword arguments passed to the provider constructor.
 
     Returns:
         AudioAnalysisProvider instance
@@ -358,5 +359,5 @@ def get_provider(name: str = "gemini") -> AudioAnalysisProvider:
         ValueError: If provider name is unknown
     """
     if name == "gemini":
-        return GeminiAudioProvider()
+        return GeminiAudioProvider(**kwargs)
     raise ValueError(f"Unknown audio analysis provider: {name}")

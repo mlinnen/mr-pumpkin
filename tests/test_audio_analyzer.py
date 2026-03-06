@@ -89,7 +89,8 @@ class TestAudioAnalysisDataclass:
             beats=[],
             pauses=[],
             emotion="happy",
-            duration_ms=5000
+            duration_ms=5000,
+            audio_path="test.mp3"
         )
         
         assert isinstance(analysis.speech_segments, list)
@@ -105,7 +106,8 @@ class TestAudioAnalysisDataclass:
             beats=[],
             pauses=[],
             emotion="neutral",
-            duration_ms=1000
+            duration_ms=1000,
+            audio_path="test.mp3"
         )
         
         assert isinstance(analysis.speech_segments, list)
@@ -118,7 +120,8 @@ class TestAudioAnalysisDataclass:
             beats=[BeatEvent(1000, "strong")],
             pauses=[],
             emotion="neutral",
-            duration_ms=2000
+            duration_ms=2000,
+            audio_path="test.mp3"
         )
         
         assert isinstance(analysis.beats, list)
@@ -131,7 +134,8 @@ class TestAudioAnalysisDataclass:
             beats=[],
             pauses=[PauseSegment(500, 700, 200)],
             emotion="neutral",
-            duration_ms=1000
+            duration_ms=1000,
+            audio_path="test.mp3"
         )
         
         assert isinstance(analysis.pauses, list)
@@ -144,7 +148,8 @@ class TestAudioAnalysisDataclass:
             beats=[],
             pauses=[],
             emotion="excited",
-            duration_ms=1000
+            duration_ms=1000,
+            audio_path="test.mp3"
         )
         
         assert isinstance(analysis.emotion, str)
@@ -156,7 +161,8 @@ class TestAudioAnalysisDataclass:
             beats=[],
             pauses=[],
             emotion="neutral",
-            duration_ms=5000
+            duration_ms=5000,
+            audio_path="test.mp3"
         )
         
         assert isinstance(analysis.duration_ms, int)
@@ -187,7 +193,7 @@ class TestAudioAnalysisProviderABC:
         """Concrete subclass with analyze_audio implemented can be instantiated."""
         class ValidProvider(AudioAnalysisProvider):
             def analyze_audio(self, audio_path: str, prompt: str) -> AudioAnalysis:
-                return AudioAnalysis([], [], [], "neutral", 1000)
+                return AudioAnalysis([], [], [], "neutral", 1000, "test.mp3")
         
         provider = ValidProvider()
         assert isinstance(provider, AudioAnalysisProvider)
@@ -196,7 +202,7 @@ class TestAudioAnalysisProviderABC:
         """analyze_audio method returns an AudioAnalysis instance."""
         class ValidProvider(AudioAnalysisProvider):
             def analyze_audio(self, audio_path: str, prompt: str) -> AudioAnalysis:
-                return AudioAnalysis([], [], [], "neutral", 1000)
+                return AudioAnalysis([], [], [], "neutral", 1000, "test.mp3")
         
         provider = ValidProvider()
         result = provider.analyze_audio("test.mp3", "test prompt")
@@ -211,7 +217,7 @@ class TestAudioAnalysisProviderABC:
 class TestGeminiAudioProvider:
     """GeminiAudioProvider unit tests with mocked Gemini client."""
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_returns_audio_analysis(self, mock_client_class, tmp_path):
         """Mock returns valid JSON → analyze_audio returns AudioAnalysis instance."""
         # Create a fake audio file
@@ -225,6 +231,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         mock_response, mock_emotion_response = _make_mock_gemini_response(
             SAMPLE_ANALYSIS_JSON, SAMPLE_EMOTION
@@ -239,7 +246,7 @@ class TestGeminiAudioProvider:
         assert result.duration_ms == 5000
         assert result.emotion == "happy"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_speech_segments(self, mock_client_class, tmp_path):
         """speech_segments contain WordTiming objects with correct phoneme_group values."""
         audio_file = tmp_path / "test.mp3"
@@ -251,6 +258,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         mock_response, mock_emotion_response = _make_mock_gemini_response(
             SAMPLE_ANALYSIS_JSON, SAMPLE_EMOTION
@@ -267,7 +275,7 @@ class TestGeminiAudioProvider:
         assert result.speech_segments[0].phoneme_group == "open_vowel"
         assert result.speech_segments[1].phoneme_group == "bilabial"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_beats(self, mock_client_class, tmp_path):
         """beats contain BeatEvent with time_ms and strength."""
         audio_file = tmp_path / "test.mp3"
@@ -279,6 +287,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         mock_response, mock_emotion_response = _make_mock_gemini_response(
             SAMPLE_ANALYSIS_JSON, SAMPLE_EMOTION
@@ -294,7 +303,7 @@ class TestGeminiAudioProvider:
         assert result.beats[1].time_ms == 2000
         assert result.beats[1].strength == "bar1"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_pauses(self, mock_client_class, tmp_path):
         """pauses contain PauseSegment with duration_ms calculated correctly."""
         audio_file = tmp_path / "test.mp3"
@@ -306,6 +315,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         mock_response, mock_emotion_response = _make_mock_gemini_response(
             SAMPLE_ANALYSIS_JSON, SAMPLE_EMOTION
@@ -320,7 +330,7 @@ class TestGeminiAudioProvider:
         assert result.pauses[0].end_ms == 700
         assert result.pauses[0].duration_ms == 100
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_emotion(self, mock_client_class, tmp_path):
         """emotion field comes from pass 2 response."""
         audio_file = tmp_path / "test.mp3"
@@ -332,6 +342,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         mock_response, mock_emotion_response = _make_mock_gemini_response(
             SAMPLE_ANALYSIS_JSON, "excited"
@@ -343,7 +354,7 @@ class TestGeminiAudioProvider:
         
         assert result.emotion == "excited"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_malformed_json_retries(self, mock_client_class, tmp_path):
         """When Gemini returns bad JSON, provider retries once."""
         audio_file = tmp_path / "test.mp3"
@@ -355,6 +366,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         # First call returns bad JSON, second call returns valid JSON
         bad_response = Mock()
@@ -377,7 +389,7 @@ class TestGeminiAudioProvider:
         assert isinstance(result, AudioAnalysis)
         assert mock_client.models.generate_content.call_count == 3  # 2 for structure + 1 for emotion
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_malformed_json_raises_after_retry(self, mock_client_class, tmp_path):
         """When retry also fails, raises ValueError."""
         audio_file = tmp_path / "test.mp3"
@@ -389,6 +401,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         # Both attempts return bad JSON
         bad_response = Mock()
@@ -401,7 +414,7 @@ class TestGeminiAudioProvider:
         with pytest.raises(ValueError):
             provider.analyze_audio(str(audio_file), "test prompt")
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_uploads_file(self, mock_client_class, tmp_path):
         """client.files.upload() is called with the audio path."""
         audio_file = tmp_path / "test.mp3"
@@ -413,6 +426,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         mock_response, mock_emotion_response = _make_mock_gemini_response(
             SAMPLE_ANALYSIS_JSON, SAMPLE_EMOTION
@@ -424,9 +438,9 @@ class TestGeminiAudioProvider:
         
         mock_client.files.upload.assert_called_once()
         call_args = mock_client.files.upload.call_args
-        assert str(audio_file) in str(call_args)
+        assert call_args.kwargs.get("path") == str(audio_file) or str(audio_file) in str(call_args).replace("\\\\", "\\")
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_deletes_file_after(self, mock_client_class, tmp_path):
         """client.files.delete() is called after analysis."""
         audio_file = tmp_path / "test.mp3"
@@ -438,6 +452,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         mock_response, mock_emotion_response = _make_mock_gemini_response(
             SAMPLE_ANALYSIS_JSON, SAMPLE_EMOTION
@@ -449,7 +464,7 @@ class TestGeminiAudioProvider:
         
         mock_client.files.delete.assert_called_once_with(name=mock_file.name)
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_empty_audio(self, mock_client_class, tmp_path):
         """Handles audio with no speech gracefully (empty speech_segments list)."""
         audio_file = tmp_path / "silent.mp3"
@@ -461,6 +476,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         empty_analysis = {
             "duration_ms": 2000,
@@ -481,7 +497,7 @@ class TestGeminiAudioProvider:
         assert len(result.speech_segments) == 0
         assert result.emotion == "neutral"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_analyze_audio_no_beats(self, mock_client_class, tmp_path):
         """Handles audio with no musical content (empty beats list)."""
         audio_file = tmp_path / "speech_only.mp3"
@@ -493,6 +509,7 @@ class TestGeminiAudioProvider:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         speech_only_analysis = {
             "duration_ms": 3000,
@@ -543,7 +560,7 @@ class TestGetProvider:
 class TestPhonemeGroupMapping:
     """Phoneme group mapping spot-checks (pure logic tests)."""
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_bilabial_stops_mapping(self, mock_client_class, tmp_path):
         """Words with M/B/P → 'bilabial' phoneme group."""
         audio_file = tmp_path / "test.mp3"
@@ -555,6 +572,7 @@ class TestPhonemeGroupMapping:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         bilabial_analysis = {
             "duration_ms": 2000,
@@ -578,7 +596,7 @@ class TestPhonemeGroupMapping:
         for segment in result.speech_segments:
             assert segment.phoneme_group == "bilabial"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_open_vowels_mapping(self, mock_client_class, tmp_path):
         """Words with AH/AA → 'open_vowel' phoneme group."""
         audio_file = tmp_path / "test.mp3"
@@ -590,6 +608,7 @@ class TestPhonemeGroupMapping:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         open_vowel_analysis = {
             "duration_ms": 2000,
@@ -612,7 +631,7 @@ class TestPhonemeGroupMapping:
         for segment in result.speech_segments:
             assert segment.phoneme_group == "open_vowel"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_spread_vowels_mapping(self, mock_client_class, tmp_path):
         """Words with EE/IH → 'spread_vowel' phoneme group."""
         audio_file = tmp_path / "test.mp3"
@@ -624,6 +643,7 @@ class TestPhonemeGroupMapping:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         spread_vowel_analysis = {
             "duration_ms": 2000,
@@ -646,7 +666,7 @@ class TestPhonemeGroupMapping:
         for segment in result.speech_segments:
             assert segment.phoneme_group == "spread_vowel"
 
-    @patch('skill.audio_analyzer.genai.Client')
+    @patch('google.genai.Client')
     def test_round_vowels_mapping(self, mock_client_class, tmp_path):
         """Words with OO/OH → 'round_vowel' phoneme group."""
         audio_file = tmp_path / "test.mp3"
@@ -658,6 +678,7 @@ class TestPhonemeGroupMapping:
         mock_file = Mock()
         mock_file.name = "uploaded_file"
         mock_client.files.upload.return_value = mock_file
+        mock_client.files.get.return_value.state = "ACTIVE"
         
         round_vowel_analysis = {
             "duration_ms": 2000,
