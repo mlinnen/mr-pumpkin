@@ -75,6 +75,11 @@ Respond with ONLY a valid JSON object matching this exact schema — no prose, n
 | wiggle_nose             | {"magnitude": float}                                     | Nose wiggle; default 50.0                |
 | scrunch_nose            | {"magnitude": float}                                     | Nose scrunch; default 50.0               |
 | reset_nose              | (none)                                                   | Return nose to neutral                   |
+| mouth_closed            | (none)                                                   | Lips together (M, B, P sounds)           |
+| mouth_open              | (none)                                                   | Mouth open wide (AH, AA sounds)          |
+| mouth_wide              | (none)                                                   | Mouth wide/spread (EE, IH sounds)        |
+| mouth_rounded           | (none)                                                   | Mouth rounded (OO, OH sounds)            |
+| mouth_neutral           | (none)                                                   | Release mouth to expression-driven control |
 | projection_reset        | (none)                                                   | Reset projection offset                  |
 | jog_offset              | {"dx": int, "dy": int}                                   | Nudge projection by dx/dy pixels         |
 | set_offset              | {"x": int, "y": int}                                     | Absolute projection offset               |
@@ -138,6 +143,7 @@ _VALID_COMMANDS = {
     "eyebrow_raise_right", "eyebrow_lower_right", "eyebrow_reset", "eyebrow",
     "turn_left", "turn_right", "turn_up", "turn_down", "center_head",
     "twitch_nose", "wiggle_nose", "scrunch_nose", "reset_nose",
+    "mouth_closed", "mouth_open", "mouth_wide", "mouth_rounded", "mouth_neutral",
     "projection_reset", "jog_offset", "set_offset",
     "play_recording",
 }
