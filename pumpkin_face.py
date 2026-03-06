@@ -1551,8 +1551,8 @@ class PumpkinFace:
                                     client_socket.sendall((response + '\n').encode('utf-8'))
                                     continue
                                 
-                                # Ensure audio extension (accept .mp3, .wav, .ogg)
-                                if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg')):
+                                # Ensure audio extension (accept .mp3, .wav, .ogg, .m4a, .aac, .flac)
+                                if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
                                     filename = filename + '.mp3'
                                 
                                 # Signal ready for binary data
@@ -1641,7 +1641,7 @@ class PumpkinFace:
                         if '/' in filename or '\\' in filename:
                             await websocket.send("ERROR Invalid filename: path separators not allowed")
                             continue
-                        if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg')):
+                        if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
                             filename = filename + '.mp3'
                         import base64
                         audio_bytes = base64.b64decode(parts[2])
