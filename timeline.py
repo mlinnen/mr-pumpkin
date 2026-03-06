@@ -718,6 +718,28 @@ class FileManager:
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(json_content)
     
+    def upload_audio(self, filename: str, audio_bytes: bytes) -> None:
+        """Save raw audio bytes to the recordings directory.
+        
+        Args:
+            filename: Audio filename (must end with .mp3, .wav, or .ogg)
+            audio_bytes: Raw audio file bytes
+            
+        Raises:
+            FileExistsError: If a file with this name already exists
+            ValueError: If the filename has an unsupported extension
+        """
+        if not any(filename.lower().endswith(ext) for ext in ('.mp3', '.wav', '.ogg')):
+            raise ValueError(f"Unsupported audio format: {filename}. Use .mp3, .wav, or .ogg")
+        
+        filepath = self.recordings_dir / filename
+        if filepath.exists():
+            raise FileExistsError(f"Audio file already exists: {filename}")
+        
+        self.recordings_dir.mkdir(parents=True, exist_ok=True)
+        filepath.write_bytes(audio_bytes)
+        print(f"Saved audio file: {filepath}")
+    
     def delete_timeline(self, filename: str):
         """Delete a timeline file.
         

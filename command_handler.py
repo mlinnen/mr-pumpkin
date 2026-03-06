@@ -565,6 +565,7 @@ class CommandRouter:
                 "  rename_recording <old> <new>       - Rename a saved timeline file\n"
                 "  download_timeline <filename>       - Download timeline file as JSON content\n"
                 "  upload_timeline <filename>         - Upload a timeline file (enters upload mode)\n"
+                "  upload_audio <filename>            - Upload an audio file (enters upload mode)\n"
                 "  neutral                            - Set expression to neutral\n"
                 "  happy                              - Set expression to happy\n"
                 "  sad                                - Set expression to sad\n"
