@@ -87,7 +87,7 @@ class GeminiAudioProvider(AudioAnalysisProvider):
         ImportError: If the google-genai package is not installed.
     """
 
-    MODEL = "gemini-1.5-pro"
+    MODEL = "gemini-pro-latest"
     
     # MIME type mappings for audio file extensions
     _MIME_TYPES = {
@@ -181,17 +181,18 @@ class GeminiAudioProvider(AudioAnalysisProvider):
         )
         
         file_name = uploaded_file.name
-        logger.debug(f"Uploaded as {file_name}, waiting for ACTIVE state...")
+        file_uri = uploaded_file.uri
+        logger.debug(f"Uploaded as {file_name} ({file_uri}), waiting for ACTIVE state...")
 
         try:
             # Wait for file to be processed
             self._wait_for_file_active(file_name)
 
             # Pass 1: Extract structured timing data
-            timing_data = self._extract_timing_data(file_name)
+            timing_data = self._extract_timing_data(file_uri, mime_type)
 
             # Pass 2: Extract emotion using the same uploaded file
-            emotion = self._extract_emotion(file_name)
+            emotion = self._extract_emotion(file_uri, mime_type)
 
             # Build AudioAnalysis from results
             analysis = AudioAnalysis(
@@ -225,11 +226,12 @@ class GeminiAudioProvider(AudioAnalysisProvider):
             except Exception as e:
                 logger.warning(f"Failed to delete uploaded file {file_name}: {e}")
 
-    def _extract_timing_data(self, file_name: str) -> dict:
+    def _extract_timing_data(self, file_uri: str, mime_type: str) -> dict:
         """Pass 1: Extract structured timing data from audio.
         
         Args:
-            file_name: Gemini file reference (e.g., "files/abc123")
+            file_uri: Full Gemini file URI (e.g., "https://generativelanguage.googleapis.com/v1beta/files/abc123")
+            mime_type: MIME type of the audio file
             
         Returns:
             Dict with duration_ms, speech_segments, beats, pauses
@@ -264,7 +266,7 @@ Pauses: include gaps between words >= 300ms."""
         response = self._client.models.generate_content(
             model=self.MODEL,
             contents=[
-                self._types.Part.from_uri(file_uri=file_name, mime_type="audio/mpeg"),
+                self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                 timing_prompt,
             ],
         )
@@ -294,7 +296,7 @@ Analyze the audio and populate the arrays."""
             retry_response = self._client.models.generate_content(
                 model=self.MODEL,
                 contents=[
-                    self._types.Part.from_uri(file_uri=file_name, mime_type="audio/mpeg"),
+                    self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                     strict_prompt,
                 ],
             )
@@ -316,11 +318,12 @@ Analyze the audio and populate the arrays."""
                     f"Response:\n{retry_text}"
                 ) from retry_e
 
-    def _extract_emotion(self, file_name: str) -> str:
+    def _extract_emotion(self, file_uri: str, mime_type: str) -> str:
         """Pass 2: Extract dominant emotion from audio.
         
         Args:
-            file_name: Gemini file reference (e.g., "files/abc123")
+            file_uri: Full Gemini file URI (e.g., "https://generativelanguage.googleapis.com/v1beta/files/abc123")
+            mime_type: MIME type of the audio file
             
         Returns:
             Emotion string: "happy", "sad", "excited", "neutral", or "solemn"
@@ -331,7 +334,7 @@ Return ONLY one word from: happy, sad, excited, neutral, solemn"""
         response = self._client.models.generate_content(
             model=self.MODEL,
             contents=[
-                self._types.Part.from_uri(file_uri=file_name, mime_type="audio/mpeg"),
+                self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                 emotion_prompt,
             ],
         )

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test suite for skill/audio_analyzer.py — Audio Analysis Provider (Issue #72)
 
 Tests the AudioAnalysisProvider ABC and GeminiAudioProvider implementation.
@@ -230,6 +230,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -257,6 +258,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -286,6 +288,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -314,6 +317,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -341,6 +345,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -365,6 +370,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -400,6 +406,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -425,6 +432,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -451,6 +459,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -475,6 +484,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -508,6 +518,7 @@ class TestGeminiAudioProvider:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -571,6 +582,7 @@ class TestPhonemeGroupMapping:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -607,6 +619,7 @@ class TestPhonemeGroupMapping:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -642,6 +655,7 @@ class TestPhonemeGroupMapping:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
@@ -677,6 +691,7 @@ class TestPhonemeGroupMapping:
         
         mock_file = Mock()
         mock_file.name = "uploaded_file"
+        mock_file.uri = "https://generativelanguage.googleapis.com/v1beta/files/test123"
         mock_client.files.upload.return_value = mock_file
         mock_client.files.get.return_value.state = "ACTIVE"
         
