@@ -23,7 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `sync-squad-labels.yml` — syncs squad member roster labels to GitHub
 - `squad.config.ts` — project-level Squad configuration (model tiers, routing rules, casting universe allowlist, platform settings)
 - Blog post: "Built With Squad: An Entire Creative Coding Project Delivered by an AI Team" — covers the full development story: parallel fan-out, reviewer gates, persistent memory, and the complete Mr. Pumpkin feature set built by the AI team
+- `docs/development-story.md` — narrative of how Mr. Pumpkin was built by the Arcane-cast AI team, covering key architectural milestones and squad collaboration patterns; linked from README and docs index
 - Updated squad identity, casting state, and project-conventions skill with session learnings
+
+### Fixed
+- `mouth_wide` viseme shape refined: increased grin upturn to 50px for clear visibility, curved grin arc distinct from the flat neutral mouth, and corrected width to be wider than neutral expression
+- Documentation site blog listing broken due to missing `index.html` required by jekyll-paginate
+- CI: added `x86_64-linux` platform to `Gemfile.lock` to resolve Linux build failures
+- Docs site nav layout: corrected search bar width overflow and mobile hamburger menu display (#61, #62)
 
 ---
 
