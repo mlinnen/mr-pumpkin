@@ -821,3 +821,45 @@ Updated client_example.py to document mouth speech commands (mouth_closed, mouth
 - Followed exact error message format from upload_timeline
 - Reused FileExistsError exception pattern from FileManager.upload_timeline
 - Client uploader signature matches upload_timeline (filename, data, host, ports, protocol) for API symmetry
+
+
+**2025-01-XX: skill/lipsync_cli.py — Audio-to-recording orchestrator (Issue #70)**
+
+Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin animations:
+- **Pass 1 (audio analysis):** GeminiAudioProvider.analyze_audio() extracts structured timing data (word segments with phoneme groups, beat events, pause segments, emotion, duration)
+- **Pass 2 (choreography):** build_lipsync_prompt() creates enriched prompt from timing data + user guidance, then generate_timeline() produces final timeline JSON
+
+**Key implementation patterns:**
+
+1. **Prompt enrichment approach:** build_lipsync_prompt() transforms AudioAnalysis dataclass into a detailed choreography brief for the LLM, including:
+   - Word-by-word timing with phoneme→viseme mapping hints (e.g., "100ms-600ms: 'hello' [open_vowel → mouth open]")
+   - Beat events with suggested reactions (strong beat → eyebrow_raise + reset, bar1 → head bob)
+   - Pause segments with blink guidance (≥400ms → blink)
+   - Explicit viseme mapping rules (bilabial → mouth closed, open_vowel → mouth open, etc.)
+   - Artistic instructions (gaze shifts, expression arc, head movements for liveliness)
+
+2. **Metadata injection:** After timeline generation, inject audio_file field into timeline dict before upload — enables server-side audio pairing by convention (my_song.mp3 + my_song.json)
+
+3. **Dual upload pattern:** Upload both audio (via upload_audio()) and timeline (via upload_timeline()) using same host/protocol settings — ensures atomic recording creation from client perspective
+
+4. **CLI mirroring:** Followed exact argument pattern from skill/cli.py (text-only tool) for consistency — shared flags: --filename, --host, --tcp-port, --ws-port, --protocol, --provider, --dry-run
+
+5. **Filename defaulting:** If --filename omitted, derive from audio file stem (my_song.mp3 → "my_song") — reduces CLI friction for simple use cases
+
+**Prompt engineering insights:**
+
+- Separating timing data (AUDIO TIMING section) from mapping rules (VISEME MAPPING RULES section) helps LLM distinguish structural constraints from artistic guidance
+- Including reaction suggestions in beat descriptions (e.g., "→ eyebrow_raise + reset at +200ms") guides LLM toward natural animation patterns without being prescriptive
+- Explicit duration and emotion in preamble primes LLM for appropriate pacing and expression choices
+- Numbered generation instructions at end create clear success criteria for LLM
+
+**Error handling strategy:**
+
+- Validate audio file existence before analysis (fail fast with clear message)
+- Separate try-except blocks for analysis, generation, and upload phases — enables specific error messages per phase
+- FileNotFoundError from audio_path.exists() surfaces immediately before any API calls
+- Dry-run mode executes full pipeline (analysis + generation) but skips uploads — allows testing prompt enrichment logic without server dependency
+
+**Files modified:**
+- skill/lipsync_cli.py (new): CLI orchestrator with build_lipsync_prompt(), main(), CLI argument parser
+- skill/__init__.py: Exported upload_audio to public API (alongside existing generate_timeline and upload_timeline)
