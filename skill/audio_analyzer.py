@@ -117,7 +117,7 @@ class GeminiAudioProvider(AudioAnalysisProvider):
         ImportError: If the google-genai package is not installed.
     """
 
-    MODEL = "gemini-2.5-flash"
+    DEFAULT_MODEL = "gemini-2.5-flash"
     
     # MIME type mappings for audio file extensions
     _MIME_TYPES = {
@@ -148,7 +148,7 @@ class GeminiAudioProvider(AudioAnalysisProvider):
 
         self._client = genai.Client(api_key=api_key)
         self._types = types
-        self._model = model or self.MODEL
+        self.model = model or self.DEFAULT_MODEL
 
     def _get_mime_type(self, audio_path: str) -> str:
         """Determine MIME type from file extension."""
@@ -312,7 +312,7 @@ Beat detection: only include beats if audio has musical rhythm. Bar 1 beats are 
 Pauses: include gaps between words >= 300ms."""
 
         response = self._client.models.generate_content(
-            model=self._model,
+            model=self.model,
             contents=[
                 self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                 timing_prompt,
@@ -342,7 +342,7 @@ The JSON must match this exact structure:
 Analyze the audio and populate the arrays."""
 
             retry_response = self._client.models.generate_content(
-                model=self._model,
+                model=self.model,
                 contents=[
                     self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                     strict_prompt,
@@ -380,7 +380,7 @@ Analyze the audio and populate the arrays."""
 Return ONLY one word from: happy, sad, excited, neutral, solemn"""
 
         response = self._client.models.generate_content(
-            model=self._model,
+            model=self.model,
             contents=[
                 self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                 emotion_prompt,

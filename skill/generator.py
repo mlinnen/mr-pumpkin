@@ -191,7 +191,7 @@ class GeminiProvider(LLMProvider):
         ImportError: If the ``google-genai`` package is not installed.
     """
 
-    MODEL = "gemini-flash-latest"
+    DEFAULT_MODEL = "gemini-flash-latest"
 
     def __init__(self, api_key: str = None, model: str = None):
         try:
@@ -213,7 +213,7 @@ class GeminiProvider(LLMProvider):
 
         self._client = genai.Client(api_key=api_key)
         self._types = types
-        self._model = model or self.MODEL
+        self.model = model or self.DEFAULT_MODEL
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate a response using Gemini.
@@ -226,7 +226,7 @@ class GeminiProvider(LLMProvider):
             Generated text response.
         """
         response = self._client.models.generate_content(
-            model=self._model,
+            model=self.model,
             contents=user_prompt,
             config=self._types.GenerateContentConfig(
                 system_instruction=system_prompt,

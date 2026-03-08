@@ -2,13 +2,30 @@
 Mr. Pumpkin Audio Lip-Sync Recording Tool — Command-line interface.
 
 Two-pass audio-to-animation pipeline:
-  1. Gemini multimodal audio analysis → structured timing data
-  2. LLM choreography generation → timeline JSON
+  1. Audio analysis via Gemini multimodal (or another provider) → structured timing data
+  2. LLM choreography generation (Gemini or OpenAI) → timeline JSON
 
 Usage:
     python -m skill.lipsync_cli audio.mp3 --filename my_song
     python -m skill.lipsync_cli speech.wav -f story --prompt "pumpkin tells this with joy"
     python -m skill.lipsync_cli song.ogg -f dance --dry-run
+    python -m skill.lipsync_cli song.mp3 -f dance --provider openai --model gpt-4o
+    python -m skill.lipsync_cli song.mp3 -f dance --audio-model gemini-1.5-pro --api-key YOUR_KEY
+
+Arguments:
+    audio_file              Path to audio file (.mp3, .wav, .ogg)
+    -f / --filename         Recording name on server (default: audio file stem)
+    --prompt                Artistic guidance for animation style
+    --host                  Mr. Pumpkin server hostname (default: localhost)
+    --tcp-port              TCP port (default: 5000)
+    --ws-port               WebSocket port (default: 5001)
+    --protocol              Upload protocol: tcp (default) or ws
+    --audio-provider        Provider for audio analysis (default: gemini)
+    --provider              LLM provider for timeline generation (default: gemini; also: openai)
+    --model                 Override default LLM model (e.g., gpt-4o, gemini-1.5-pro)
+    --audio-model           Override default model for audio analysis
+    --api-key               API key override (overrides GEMINI_API_KEY / OPENAI_API_KEY env vars)
+    --dry-run               Analyze and generate, print JSON, do NOT upload
 
 Exit codes:
     0 — success
@@ -171,7 +188,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--api-key",
-        help="Override API key for the selected provider (reads from env var if not specified).",
+        help="API key for providers. Overrides environment variables (GEMINI_API_KEY, OPENAI_API_KEY).",
     )
     p.add_argument(
         "--dry-run", action="store_true",
@@ -210,9 +227,9 @@ def main(argv=None) -> int:
     try:
         audio_provider_kwargs = {}
         if args.api_key:
-            audio_provider_kwargs['api_key'] = args.api_key
+            audio_provider_kwargs["api_key"] = args.api_key
         if args.audio_model:
-            audio_provider_kwargs['model'] = args.audio_model
+            audio_provider_kwargs["model"] = args.audio_model
         audio_provider = get_audio_provider(args.audio_provider, **audio_provider_kwargs)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -243,9 +260,9 @@ def main(argv=None) -> int:
     try:
         llm_provider_kwargs = {}
         if args.api_key:
-            llm_provider_kwargs['api_key'] = args.api_key
+            llm_provider_kwargs["api_key"] = args.api_key
         if args.model:
-            llm_provider_kwargs['model'] = args.model
+            llm_provider_kwargs["model"] = args.model
         
         if args.provider.lower() == "gemini":
             llm_provider = GeminiProvider(**llm_provider_kwargs)
