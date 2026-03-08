@@ -459,6 +459,110 @@ The application can run in headless mode (without a display) for automation and 
 - **requirements.txt**: Production dependencies (pygame only)
 - **requirements-dev.txt**: Development dependencies (includes pytest for testing)
 
+## Skill CLI Tools
+
+The `skill/` package provides two command-line tools that generate Mr. Pumpkin animation timelines and upload them to a running server. Both tools require a `GEMINI_API_KEY` environment variable (and optionally `OPENAI_API_KEY` when using the OpenAI provider).
+
+### mr-pumpkin-record
+
+Translates a **natural language prompt** into a timeline animation and uploads it to the Mr. Pumpkin server.
+
+```
+usage: mr-pumpkin-record prompt -f FILENAME [--host HOST] [--tcp-port N]
+                                [--ws-port N] [--protocol {tcp,ws}]
+                                [--dry-run] [--provider PROVIDER]
+```
+
+**Arguments**
+
+| Argument | Default | Description |
+|---|---|---|
+| `prompt` | *(required)* | Natural language description of the desired animation |
+| `-f` / `--filename` | *(required)* | Name to store the timeline as on the server (no `.json` extension) |
+| `--host` | `localhost` | Mr. Pumpkin server hostname |
+| `--tcp-port` | `5000` | TCP port |
+| `--ws-port` | `5001` | WebSocket port |
+| `--protocol` | `tcp` | Upload protocol: `tcp` or `ws` (WebSocket) |
+| `--provider` | `gemini` | LLM provider (currently only `gemini` is supported) |
+| `--dry-run` | — | Generate and print the timeline without uploading |
+
+**Environment variables**
+
+- `GEMINI_API_KEY` — required when using the default Gemini provider
+
+**Exit codes:** `0` success · `1` generation/upload error · `2` argument error
+
+**Examples**
+
+```bash
+# Generate and upload a surprised/blinking animation
+python -m skill.cli "make the pumpkin look surprised then blink" -f my_show
+
+# Generate and upload via WebSocket to a remote host
+python -m skill.cli "wave hello" -f wave --host 192.168.1.10 --protocol ws
+
+# Preview the generated timeline without uploading
+python -m skill.cli "pumpkin laughs heartily" -f laugh --dry-run
+```
+
+---
+
+### mr-pumpkin-lipsync
+
+Generates a **lip-synced** Mr. Pumpkin animation from an audio file using a two-pass pipeline: audio analysis (Gemini multimodal) followed by LLM choreography generation.
+
+```
+usage: mr-pumpkin-lipsync audio_file [-f FILENAME] [--prompt PROMPT]
+                                     [--host HOST] [--tcp-port N] [--ws-port N]
+                                     [--protocol {tcp,ws}]
+                                     [--audio-provider PROVIDER]
+                                     [--provider PROVIDER] [--model MODEL]
+                                     [--audio-model AUDIO_MODEL]
+                                     [--api-key KEY] [--dry-run]
+```
+
+**Arguments**
+
+| Argument | Default | Description |
+|---|---|---|
+| `audio_file` | *(required)* | Path to audio file (`.mp3`, `.wav`, `.ogg`) |
+| `-f` / `--filename` | audio file stem | Name to store the recording as on the server |
+| `--prompt` | — | Artistic guidance for the animation (e.g., `"pumpkin sings this joyfully"`) |
+| `--host` | `localhost` | Mr. Pumpkin server hostname |
+| `--tcp-port` | `5000` | TCP port |
+| `--ws-port` | `5001` | WebSocket port |
+| `--protocol` | `tcp` | Upload protocol: `tcp` or `ws` (WebSocket) |
+| `--audio-provider` | `gemini` | Provider for audio analysis |
+| `--provider` | `gemini` | LLM provider for timeline generation (`gemini` or `openai`) |
+| `--model` | — | Override the default LLM model (e.g., `gpt-4o`, `gemini-1.5-pro`) |
+| `--audio-model` | — | Override the default audio analysis model |
+| `--api-key` | — | API key override (supersedes `GEMINI_API_KEY` / `OPENAI_API_KEY` env vars) |
+| `--dry-run` | — | Analyze and generate, print JSON, do NOT upload |
+
+**Environment variables**
+
+- `GEMINI_API_KEY` — required for Gemini provider (default)
+- `OPENAI_API_KEY` — required when using `--provider openai`
+
+**Exit codes:** `0` success · `1` generation/analysis/upload error · `2` argument error
+
+**Examples**
+
+```bash
+# Basic lip-sync from an MP3 file
+python -m skill.lipsync_cli song.mp3 -f my_song
+
+# Add artistic direction and test without uploading
+python -m skill.lipsync_cli speech.wav -f story \
+  --prompt "pumpkin tells this story with wide-eyed wonder" --dry-run
+
+# Use OpenAI for timeline generation with a specific model
+python -m skill.lipsync_cli song.mp3 -f dance \
+  --provider openai --model gpt-4o
+```
+
+---
+
 ## Testing
 
 Run the test suite to validate projection mapping and other features:

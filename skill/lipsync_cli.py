@@ -2,13 +2,30 @@
 Mr. Pumpkin Audio Lip-Sync Recording Tool — Command-line interface.
 
 Two-pass audio-to-animation pipeline:
-  1. Gemini multimodal audio analysis → structured timing data
-  2. LLM choreography generation → timeline JSON
+  1. Audio analysis via Gemini multimodal (or another provider) → structured timing data
+  2. LLM choreography generation (Gemini or OpenAI) → timeline JSON
 
 Usage:
     python -m skill.lipsync_cli audio.mp3 --filename my_song
     python -m skill.lipsync_cli speech.wav -f story --prompt "pumpkin tells this with joy"
     python -m skill.lipsync_cli song.ogg -f dance --dry-run
+    python -m skill.lipsync_cli song.mp3 -f dance --provider openai --model gpt-4o
+    python -m skill.lipsync_cli song.mp3 -f dance --audio-model gemini-1.5-pro --api-key YOUR_KEY
+
+Arguments:
+    audio_file              Path to audio file (.mp3, .wav, .ogg)
+    -f / --filename         Recording name on server (default: audio file stem)
+    --prompt                Artistic guidance for animation style
+    --host                  Mr. Pumpkin server hostname (default: localhost)
+    --tcp-port              TCP port (default: 5000)
+    --ws-port               WebSocket port (default: 5001)
+    --protocol              Upload protocol: tcp (default) or ws
+    --audio-provider        Provider for audio analysis (default: gemini)
+    --provider              LLM provider for timeline generation (default: gemini; also: openai)
+    --model                 Override default LLM model (e.g., gpt-4o, gemini-1.5-pro)
+    --audio-model           Override default model for audio analysis
+    --api-key               API key override (overrides GEMINI_API_KEY / OPENAI_API_KEY env vars)
+    --dry-run               Analyze and generate, print JSON, do NOT upload
 
 Exit codes:
     0 — success
@@ -23,7 +40,7 @@ import sys
 from pathlib import Path
 
 from skill.audio_analyzer import get_provider as get_audio_provider, AudioAnalysis
-from skill.generator import generate_timeline, GeminiProvider
+from skill.generator import generate_timeline, GeminiProvider, OpenAIProvider
 from skill.uploader import upload_timeline, upload_audio
 
 logger = logging.getLogger(__name__)
@@ -59,8 +76,9 @@ def build_lipsync_prompt(analysis: AudioAnalysis, user_prompt: str) -> str:
     if analysis.speech_segments:
         lines.append("AUDIO TIMING (word-by-word):")
         for seg in analysis.speech_segments:
-            phoneme_hint = _phoneme_to_viseme_hint(seg.phoneme_group)
-            lines.append(f"  - {seg.start_ms}ms-{seg.end_ms}ms: \"{seg.word}\" [{seg.phoneme_group} → {phoneme_hint}]")
+            viseme_cmd = _phoneme_to_viseme_cmd(seg.phoneme_group)
+            lines.append(f"  - {seg.start_ms}ms: {viseme_cmd} → \"{seg.word}\" ({seg.phoneme_group})")
+            lines.append(f"  - {seg.end_ms}ms: mouth_closed  ← word ends, return to closed")
         lines.append("")
     
     # Beat events section
@@ -98,10 +116,24 @@ def build_lipsync_prompt(analysis: AudioAnalysis, user_prompt: str) -> str:
     lines.append("  4. Adds natural gaze shifts at sentence boundaries or between long phrases")
     lines.append(f"  5. Sets expression to match the overall emotion ({analysis.emotion} → set_expression {analysis.emotion})")
     lines.append("  6. Includes natural head movements for liveliness (subtle turns, return to center)")
+    lines.append("  7. After EVERY word's end_ms, immediately emits mouth_closed to prevent the mouth hanging open between words")
+    lines.append("  8. After the final word ends, emits mouth_neutral to return mouth to expression-driven control")
     lines.append("")
     lines.append("Make Mr. Pumpkin look engaged, alive, and synchronized to the audio.")
     
     return "\n".join(lines)
+
+
+def _phoneme_to_viseme_cmd(phoneme_group: str) -> str:
+    """Map phoneme group to the exact viseme command name."""
+    mapping = {
+        "bilabial": "mouth_closed",
+        "open_vowel": "mouth_open",
+        "spread_vowel": "mouth_wide",
+        "round_vowel": "mouth_rounded",
+        "neutral": "mouth_neutral",
+    }
+    return mapping.get(phoneme_group, "mouth_neutral")
 
 
 def _phoneme_to_viseme_hint(phoneme_group: str) -> str:
@@ -147,6 +179,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="LLM provider for timeline generation (default: gemini).",
     )
     p.add_argument(
+        "--model",
+        help="Override default LLM model for timeline generation (e.g., gpt-4o, gemini-1.5-pro).",
+    )
+    p.add_argument(
+        "--audio-model",
+        help="Override default model for audio analysis (e.g., gpt-4o-audio-preview).",
+    )
+    p.add_argument(
+        "--api-key",
+        help="API key for providers. Overrides environment variables (GEMINI_API_KEY, OPENAI_API_KEY).",
+    )
+    p.add_argument(
         "--dry-run", action="store_true",
         help="Analyze and generate timeline, print JSON, but do NOT upload.",
     )
@@ -181,7 +225,12 @@ def main(argv=None) -> int:
     # Pass 1: Audio analysis
     print(f"Analyzing audio: {audio_path.name}...")
     try:
-        audio_provider = get_audio_provider(args.audio_provider)
+        audio_provider_kwargs = {}
+        if args.api_key:
+            audio_provider_kwargs["api_key"] = args.api_key
+        if args.audio_model:
+            audio_provider_kwargs["model"] = args.audio_model
+        audio_provider = get_audio_provider(args.audio_provider, **audio_provider_kwargs)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -200,15 +249,27 @@ def main(argv=None) -> int:
     
     print(f"  Duration: {analysis.duration_ms}ms, Emotion: {analysis.emotion}")
     print(f"  Words: {len(analysis.speech_segments)}, Beats: {len(analysis.beats)}, Pauses: {len(analysis.pauses)}")
+    if analysis.speech_segments:
+        print("  Word timings from audio analysis:")
+        for seg in analysis.speech_segments:
+            print(f"    {seg.start_ms:>6}ms – {seg.end_ms:>6}ms  \"{seg.word}\" ({seg.phoneme_group})")
     
     # Pass 2: Generate timeline
     print("Generating choreography...")
     
     try:
+        llm_provider_kwargs = {}
+        if args.api_key:
+            llm_provider_kwargs["api_key"] = args.api_key
+        if args.model:
+            llm_provider_kwargs["model"] = args.model
+        
         if args.provider.lower() == "gemini":
-            llm_provider = GeminiProvider()
+            llm_provider = GeminiProvider(**llm_provider_kwargs)
+        elif args.provider.lower() == "openai":
+            llm_provider = OpenAIProvider(**llm_provider_kwargs)
         else:
-            print(f"ERROR: Unknown provider '{args.provider}'. Supported: gemini", file=sys.stderr)
+            print(f"ERROR: Unknown provider '{args.provider}'. Supported: gemini, openai", file=sys.stderr)
             return 2
     except (EnvironmentError, ImportError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

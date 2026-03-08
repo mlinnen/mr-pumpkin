@@ -563,6 +563,18 @@ class TestGetProvider:
         with pytest.raises(ValueError):
             get_provider("unknown_xyz", api_key="test_key")
 
+    def test_get_provider_openai(self):
+        """get_provider('openai') returns OpenAIAudioProvider."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        provider = get_provider("openai", api_key="test_key")
+        
+        assert isinstance(provider, OpenAIAudioProvider)
+        assert isinstance(provider, AudioAnalysisProvider)
+
 
 # ============================================================================
 # PHONEME GROUP MAPPING TESTS
@@ -715,3 +727,241 @@ class TestPhonemeGroupMapping:
         
         for segment in result.speech_segments:
             assert segment.phoneme_group == "round_vowel"
+
+
+# ============================================================================
+# OPENAI AUDIO PROVIDER TESTS
+# ============================================================================
+
+class TestOpenAIAudioProvider:
+    """OpenAIAudioProvider unit tests with mocked OpenAI client."""
+
+    @patch('openai.OpenAI')
+    def test_analyze_audio_returns_audio_analysis(self, mock_openai_class, tmp_path):
+        """Mock returns valid JSON → analyze_audio returns AudioAnalysis instance."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        # Create a fake audio file
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+        
+        # Mock the client and responses
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(SAMPLE_ANALYSIS_JSON)
+        
+        mock_emotion_response = Mock()
+        mock_emotion_response.choices = [Mock()]
+        mock_emotion_response.choices[0].message.content = SAMPLE_EMOTION
+        
+        mock_client.chat.completions.create.side_effect = [mock_response, mock_emotion_response]
+        
+        # Create provider and analyze
+        provider = OpenAIAudioProvider(api_key="test_key")
+        result = provider.analyze_audio(str(audio_file), "test prompt")
+        
+        assert isinstance(result, AudioAnalysis)
+        assert result.duration_ms == 5000
+        assert result.emotion == "happy"
+
+    @patch('openai.OpenAI')
+    def test_analyze_audio_uses_base64_encoding(self, mock_openai_class, tmp_path):
+        """Audio is base64-encoded in the API call."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+        
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(SAMPLE_ANALYSIS_JSON)
+        
+        mock_emotion_response = Mock()
+        mock_emotion_response.choices = [Mock()]
+        mock_emotion_response.choices[0].message.content = SAMPLE_EMOTION
+        
+        mock_client.chat.completions.create.side_effect = [mock_response, mock_emotion_response]
+        
+        provider = OpenAIAudioProvider(api_key="test_key")
+        provider.analyze_audio(str(audio_file), "test prompt")
+        
+        # Check first call (timing data)
+        first_call = mock_client.chat.completions.create.call_args_list[0]
+        messages = first_call.kwargs.get("messages")
+        
+        assert messages is not None
+        assert len(messages) == 1
+        assert "content" in messages[0]
+        
+        # Find the audio content part
+        audio_part = None
+        for part in messages[0]["content"]:
+            if part.get("type") == "input_audio":
+                audio_part = part
+                break
+        
+        assert audio_part is not None
+        assert "input_audio" in audio_part
+        assert "data" in audio_part["input_audio"]
+        assert "format" in audio_part["input_audio"]
+
+    @patch('openai.OpenAI')
+    def test_analyze_audio_uses_gpt_4o_audio_preview(self, mock_openai_class, tmp_path):
+        """OpenAI audio provider uses gpt-4o-audio-preview model."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+        
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(SAMPLE_ANALYSIS_JSON)
+        
+        mock_emotion_response = Mock()
+        mock_emotion_response.choices = [Mock()]
+        mock_emotion_response.choices[0].message.content = SAMPLE_EMOTION
+        
+        mock_client.chat.completions.create.side_effect = [mock_response, mock_emotion_response]
+        
+        provider = OpenAIAudioProvider(api_key="test_key")
+        provider.analyze_audio(str(audio_file), "test prompt")
+        
+        # Both calls should use the audio preview model
+        for call in mock_client.chat.completions.create.call_args_list:
+            assert call.kwargs.get("model") == "gpt-4o-audio-preview"
+
+    @patch('openai.OpenAI')
+    def test_analyze_audio_speech_segments(self, mock_openai_class, tmp_path):
+        """speech_segments contain WordTiming objects with correct phoneme_group values."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+        
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(SAMPLE_ANALYSIS_JSON)
+        
+        mock_emotion_response = Mock()
+        mock_emotion_response.choices = [Mock()]
+        mock_emotion_response.choices[0].message.content = SAMPLE_EMOTION
+        
+        mock_client.chat.completions.create.side_effect = [mock_response, mock_emotion_response]
+        
+        provider = OpenAIAudioProvider(api_key="test_key")
+        result = provider.analyze_audio(str(audio_file), "test prompt")
+        
+        assert len(result.speech_segments) == 2
+        assert result.speech_segments[0].word == "hello"
+        assert result.speech_segments[0].start_ms == 100
+        assert result.speech_segments[0].end_ms == 600
+        assert result.speech_segments[0].phoneme_group == "open_vowel"
+        assert result.speech_segments[1].phoneme_group == "bilabial"
+
+    @patch('openai.OpenAI')
+    def test_analyze_audio_malformed_json_retries(self, mock_openai_class, tmp_path):
+        """When OpenAI returns bad JSON, provider retries once."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+        
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        # First call returns bad JSON
+        bad_response = Mock()
+        bad_response.choices = [Mock()]
+        bad_response.choices[0].message.content = "not valid json {{"
+        
+        # Second call returns valid JSON
+        good_response = Mock()
+        good_response.choices = [Mock()]
+        good_response.choices[0].message.content = json.dumps(SAMPLE_ANALYSIS_JSON)
+        
+        # Emotion call
+        emotion_response = Mock()
+        emotion_response.choices = [Mock()]
+        emotion_response.choices[0].message.content = SAMPLE_EMOTION
+        
+        mock_client.chat.completions.create.side_effect = [
+            bad_response,  # First attempt fails
+            good_response,  # Retry succeeds
+            emotion_response  # Emotion pass
+        ]
+        
+        provider = OpenAIAudioProvider(api_key="test_key")
+        result = provider.analyze_audio(str(audio_file), "test prompt")
+        
+        # Should succeed after retry
+        assert isinstance(result, AudioAnalysis)
+        assert mock_client.chat.completions.create.call_count == 3  # 2 for structure + 1 for emotion
+
+    @patch('openai.OpenAI')
+    def test_analyze_audio_missing_api_key_raises(self, mock_openai_class):
+        """OpenAI provider raises EnvironmentError when API key is missing."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(EnvironmentError, match="OPENAI_API_KEY"):
+                OpenAIAudioProvider()
+
+    @patch('openai.OpenAI')
+    def test_analyze_audio_emotion(self, mock_openai_class, tmp_path):
+        """emotion field comes from pass 2 response."""
+        try:
+            from skill.audio_analyzer import OpenAIAudioProvider
+        except ImportError:
+            pytest.skip("OpenAIAudioProvider not yet implemented")
+        
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+        
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(SAMPLE_ANALYSIS_JSON)
+        
+        mock_emotion_response = Mock()
+        mock_emotion_response.choices = [Mock()]
+        mock_emotion_response.choices[0].message.content = "excited"
+        
+        mock_client.chat.completions.create.side_effect = [mock_response, mock_emotion_response]
+        
+        provider = OpenAIAudioProvider(api_key="test_key")
+        result = provider.analyze_audio(str(audio_file), "test prompt")
+        
+        assert result.emotion == "excited"

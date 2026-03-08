@@ -248,11 +248,10 @@ class Playback:
         filepath = self.recordings_dir / filename
         self.timeline = Timeline.load(filepath)
         self.filename = filename
-        self.current_position_ms = 0
         self._last_executed_index = -1
-        self.state = PlaybackState.PLAYING
         
-        # Start audio playback if timeline has an audio_file field
+        # Start audio BEFORE marking state as PLAYING so get_pos() is already
+        # ticking when the first update() call arrives.
         if self.timeline.audio_file:
             audio_path = self.recordings_dir / self.timeline.audio_file
             try:
@@ -264,6 +263,9 @@ class Playback:
                 logging.getLogger(__name__).warning(
                     "Audio playback failed for %s: %s", self.timeline.audio_file, e
                 )
+        
+        self.current_position_ms = 0
+        self.state = PlaybackState.PLAYING
     
     def stop(self):
         """Stop playback and reset to beginning."""
@@ -320,8 +322,23 @@ class Playback:
         if self.state != PlaybackState.PLAYING or self.timeline is None:
             return []
         
-        # Advance position
-        self.current_position_ms += dt_ms
+        # Advance position — lock to audio clock when audio is playing so
+        # animation stays frame-perfectly in sync with the mp3/wav.
+        if self.timeline.audio_file:
+            try:
+                import pygame
+                if pygame.mixer.get_init():
+                    audio_pos = pygame.mixer.music.get_pos()
+                    if audio_pos >= 0:
+                        self.current_position_ms = float(audio_pos)
+                    else:
+                        self.current_position_ms += dt_ms  # audio ended or not started
+                else:
+                    self.current_position_ms += dt_ms
+            except Exception:
+                self.current_position_ms += dt_ms
+        else:
+            self.current_position_ms += dt_ms
         
         # Execute commands in current time window
         errors = []
