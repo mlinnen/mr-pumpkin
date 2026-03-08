@@ -33,7 +33,7 @@ def create_release_package():
     ]
     
     # Directories to include
-    include_dirs = ["docs"]
+    include_dirs = ["docs", "skill"]
     
     repo_root = Path(__file__).parent.parent
     

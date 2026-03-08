@@ -26,7 +26,24 @@ try {
     exit 1
 }
 
-Write-Host ""
+# Install skill dependencies if present
+if (Test-Path "skill\requirements.txt") {
+    Write-Host "🧠 Installing skill dependencies..." -ForegroundColor Cyan
+    try {
+        if (Get-Command pip -ErrorAction SilentlyContinue) {
+            pip install -r skill\requirements.txt
+            Write-Host "  ✓ Skill dependencies installed" -ForegroundColor Green
+        } elseif (Get-Command pip3 -ErrorAction SilentlyContinue) {
+            pip3 install -r skill\requirements.txt
+            Write-Host "  ✓ Skill dependencies installed" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "  ❌ Failed to install skill dependencies: $_" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host ""
+}
+
 Write-Host "✅ Installation complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Usage:" -ForegroundColor Cyan
