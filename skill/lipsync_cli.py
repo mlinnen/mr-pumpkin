@@ -171,7 +171,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--api-key",
-        help="Override API key for the selected provider (reads from env var if not specified).",
+        help="API key for providers. Overrides environment variables (GEMINI_API_KEY, OPENAI_API_KEY).",
     )
     p.add_argument(
         "--dry-run", action="store_true",
@@ -210,9 +210,9 @@ def main(argv=None) -> int:
     try:
         audio_provider_kwargs = {}
         if args.api_key:
-            audio_provider_kwargs['api_key'] = args.api_key
+            audio_provider_kwargs["api_key"] = args.api_key
         if args.audio_model:
-            audio_provider_kwargs['model'] = args.audio_model
+            audio_provider_kwargs["model"] = args.audio_model
         audio_provider = get_audio_provider(args.audio_provider, **audio_provider_kwargs)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -243,9 +243,9 @@ def main(argv=None) -> int:
     try:
         llm_provider_kwargs = {}
         if args.api_key:
-            llm_provider_kwargs['api_key'] = args.api_key
+            llm_provider_kwargs["api_key"] = args.api_key
         if args.model:
-            llm_provider_kwargs['model'] = args.model
+            llm_provider_kwargs["model"] = args.model
         
         if args.provider.lower() == "gemini":
             llm_provider = GeminiProvider(**llm_provider_kwargs)
