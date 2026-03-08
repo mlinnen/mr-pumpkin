@@ -31,6 +31,8 @@ This pattern enables users to experiment with different model versions (e.g., `g
 
 **Implementation merged with issue #81** — both OpenAI provider work and model/key CLI params shipped together in PR #82 on branch `squad/81-openai-provider`.
 
+✅ **Merged to main via PR #82** (2026-03-08 02:45) — Coordinator pushed commit and closed issues #77, #81.
+
 ### v0.5.13 Release (2026-03-06)
 
 Successfully executed full release cycle:
