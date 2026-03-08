@@ -162,6 +162,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="LLM provider for timeline generation (default: gemini).",
     )
     p.add_argument(
+        "--model",
+        help="Override default LLM model for timeline generation (e.g., gpt-4o, gemini-1.5-pro).",
+    )
+    p.add_argument(
+        "--audio-model",
+        help="Override default model for audio analysis (e.g., gpt-4o-audio-preview).",
+    )
+    p.add_argument(
+        "--api-key",
+        help="Override API key for the selected provider (reads from env var if not specified).",
+    )
+    p.add_argument(
         "--dry-run", action="store_true",
         help="Analyze and generate timeline, print JSON, but do NOT upload.",
     )
@@ -196,7 +208,12 @@ def main(argv=None) -> int:
     # Pass 1: Audio analysis
     print(f"Analyzing audio: {audio_path.name}...")
     try:
-        audio_provider = get_audio_provider(args.audio_provider)
+        audio_provider_kwargs = {}
+        if args.api_key:
+            audio_provider_kwargs['api_key'] = args.api_key
+        if args.audio_model:
+            audio_provider_kwargs['model'] = args.audio_model
+        audio_provider = get_audio_provider(args.audio_provider, **audio_provider_kwargs)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
@@ -224,10 +241,16 @@ def main(argv=None) -> int:
     print("Generating choreography...")
     
     try:
+        llm_provider_kwargs = {}
+        if args.api_key:
+            llm_provider_kwargs['api_key'] = args.api_key
+        if args.model:
+            llm_provider_kwargs['model'] = args.model
+        
         if args.provider.lower() == "gemini":
-            llm_provider = GeminiProvider()
+            llm_provider = GeminiProvider(**llm_provider_kwargs)
         elif args.provider.lower() == "openai":
-            llm_provider = OpenAIProvider()
+            llm_provider = OpenAIProvider(**llm_provider_kwargs)
         else:
             print(f"ERROR: Unknown provider '{args.provider}'. Supported: gemini, openai", file=sys.stderr)
             return 2

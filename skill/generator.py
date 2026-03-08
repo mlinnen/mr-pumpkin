@@ -193,7 +193,7 @@ class GeminiProvider(LLMProvider):
 
     MODEL = "gemini-flash-latest"
 
-    def __init__(self):
+    def __init__(self, api_key: str = None, model: str = None):
         try:
             from google import genai
             from google.genai import types
@@ -203,7 +203,9 @@ class GeminiProvider(LLMProvider):
                 "Install it with: pip install google-genai"
             ) from exc
 
-        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if api_key is None:
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        
         if not api_key:
             raise EnvironmentError(
                 "No Gemini API key found. Set the GEMINI_API_KEY environment variable."
@@ -211,6 +213,7 @@ class GeminiProvider(LLMProvider):
 
         self._client = genai.Client(api_key=api_key)
         self._types = types
+        self._model = model or self.MODEL
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate a response using Gemini.
@@ -223,7 +226,7 @@ class GeminiProvider(LLMProvider):
             Generated text response.
         """
         response = self._client.models.generate_content(
-            model=self.MODEL,
+            model=self._model,
             contents=user_prompt,
             config=self._types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -245,7 +248,7 @@ class OpenAIProvider(LLMProvider):
 
     MODEL = "gpt-4o"
 
-    def __init__(self, api_key: str = None, base_url: str = "https://api.openai.com/v1"):
+    def __init__(self, api_key: str = None, model: str = None, base_url: str = "https://api.openai.com/v1"):
         try:
             from openai import OpenAI
         except ImportError as exc:
@@ -263,6 +266,7 @@ class OpenAIProvider(LLMProvider):
             )
 
         self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self._model = model or self.MODEL
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate a response using OpenAI.
@@ -275,7 +279,7 @@ class OpenAIProvider(LLMProvider):
             Generated text response.
         """
         response = self._client.chat.completions.create(
-            model=self.MODEL,
+            model=self._model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}

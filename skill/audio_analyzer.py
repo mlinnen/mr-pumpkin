@@ -128,7 +128,7 @@ class GeminiAudioProvider(AudioAnalysisProvider):
         ".flac": "audio/flac",
     }
 
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, model: str = None):
         try:
             from google import genai
             from google.genai import types
@@ -148,6 +148,7 @@ class GeminiAudioProvider(AudioAnalysisProvider):
 
         self._client = genai.Client(api_key=api_key)
         self._types = types
+        self._model = model or self.MODEL
 
     def _get_mime_type(self, audio_path: str) -> str:
         """Determine MIME type from file extension."""
@@ -311,7 +312,7 @@ Beat detection: only include beats if audio has musical rhythm. Bar 1 beats are 
 Pauses: include gaps between words >= 300ms."""
 
         response = self._client.models.generate_content(
-            model=self.MODEL,
+            model=self._model,
             contents=[
                 self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                 timing_prompt,
@@ -341,7 +342,7 @@ The JSON must match this exact structure:
 Analyze the audio and populate the arrays."""
 
             retry_response = self._client.models.generate_content(
-                model=self.MODEL,
+                model=self._model,
                 contents=[
                     self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                     strict_prompt,
@@ -379,7 +380,7 @@ Analyze the audio and populate the arrays."""
 Return ONLY one word from: happy, sad, excited, neutral, solemn"""
 
         response = self._client.models.generate_content(
-            model=self.MODEL,
+            model=self._model,
             contents=[
                 self._types.Part.from_uri(file_uri=file_uri, mime_type=mime_type),
                 emotion_prompt,
@@ -421,7 +422,7 @@ class OpenAIAudioProvider(AudioAnalysisProvider):
         ".flac": "audio/flac",
     }
 
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, model: str = None):
         try:
             from openai import OpenAI
         except ImportError as exc:
@@ -439,6 +440,7 @@ class OpenAIAudioProvider(AudioAnalysisProvider):
             )
 
         self._client = OpenAI(api_key=api_key)
+        self._model = model or self.MODEL
 
     def _get_audio_format(self, audio_path: str) -> str:
         """Determine audio format from file extension."""
@@ -569,7 +571,7 @@ Beat detection: only include beats if audio has musical rhythm. Bar 1 beats are 
 Pauses: include gaps between words >= 300ms."""
 
         response = self._client.chat.completions.create(
-            model=self.MODEL,
+            model=self._model,
             modalities=["text"],
             messages=[
                 {
@@ -614,7 +616,7 @@ The JSON must match this exact structure:
 Analyze the audio and populate the arrays."""
 
             retry_response = self._client.chat.completions.create(
-                model=self.MODEL,
+                model=self._model,
                 modalities=["text"],
                 messages=[
                     {
@@ -667,7 +669,7 @@ Analyze the audio and populate the arrays."""
 Return ONLY one word from: happy, sad, excited, neutral, solemn"""
 
         response = self._client.chat.completions.create(
-            model=self.MODEL,
+            model=self._model,
             modalities=["text"],
             messages=[
                 {
