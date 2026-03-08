@@ -2,13 +2,30 @@
 Mr. Pumpkin Audio Lip-Sync Recording Tool — Command-line interface.
 
 Two-pass audio-to-animation pipeline:
-  1. Gemini multimodal audio analysis → structured timing data
-  2. LLM choreography generation → timeline JSON
+  1. Audio analysis via Gemini multimodal (or another provider) → structured timing data
+  2. LLM choreography generation (Gemini or OpenAI) → timeline JSON
 
 Usage:
     python -m skill.lipsync_cli audio.mp3 --filename my_song
     python -m skill.lipsync_cli speech.wav -f story --prompt "pumpkin tells this with joy"
     python -m skill.lipsync_cli song.ogg -f dance --dry-run
+    python -m skill.lipsync_cli song.mp3 -f dance --provider openai --model gpt-4o
+    python -m skill.lipsync_cli song.mp3 -f dance --audio-model gemini-1.5-pro --api-key YOUR_KEY
+
+Arguments:
+    audio_file              Path to audio file (.mp3, .wav, .ogg)
+    -f / --filename         Recording name on server (default: audio file stem)
+    --prompt                Artistic guidance for animation style
+    --host                  Mr. Pumpkin server hostname (default: localhost)
+    --tcp-port              TCP port (default: 5000)
+    --ws-port               WebSocket port (default: 5001)
+    --protocol              Upload protocol: tcp (default) or ws
+    --audio-provider        Provider for audio analysis (default: gemini)
+    --provider              LLM provider for timeline generation (default: gemini; also: openai)
+    --model                 Override default LLM model (e.g., gpt-4o, gemini-1.5-pro)
+    --audio-model           Override default model for audio analysis
+    --api-key               API key override (overrides GEMINI_API_KEY / OPENAI_API_KEY env vars)
+    --dry-run               Analyze and generate, print JSON, do NOT upload
 
 Exit codes:
     0 — success
