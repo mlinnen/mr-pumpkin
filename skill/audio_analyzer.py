@@ -18,6 +18,36 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+
+def _measure_audio_duration_ms(audio_path: str) -> int | None:
+    """Measure audio file duration in milliseconds using mutagen, wave, or file-size fallback.
+
+    Returns None if duration cannot be determined.
+    """
+    try:
+        from mutagen import File as MutagenFile
+        audio = MutagenFile(audio_path)
+        if audio is not None and audio.info is not None:
+            return int(audio.info.length * 1000)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"mutagen failed for {audio_path}: {e}")
+
+    # Fallback: wave module for .wav files
+    if audio_path.lower().endswith(".wav"):
+        try:
+            import wave
+            with wave.open(audio_path, "rb") as wf:
+                frames = wf.getnframes()
+                rate = wf.getframerate()
+                if rate > 0:
+                    return int(frames / rate * 1000)
+        except Exception as e:
+            logger.debug(f"wave fallback failed for {audio_path}: {e}")
+
+    return None
+
 logger = logging.getLogger(__name__)
 
 
@@ -87,7 +117,7 @@ class GeminiAudioProvider(AudioAnalysisProvider):
         ImportError: If the google-genai package is not installed.
     """
 
-    MODEL = "gemini-pro-latest"
+    MODEL = "gemini-2.5-flash"
     
     # MIME type mappings for audio file extensions
     _MIME_TYPES = {
@@ -194,6 +224,23 @@ class GeminiAudioProvider(AudioAnalysisProvider):
             # Pass 2: Extract emotion using the same uploaded file
             emotion = self._extract_emotion(file_uri, mime_type)
 
+            # Measure real duration independently — Gemini can underreport this.
+            measured_ms = _measure_audio_duration_ms(audio_path)
+            gemini_ms = timing_data.get("duration_ms", 0)
+
+            if measured_ms is not None:
+                if gemini_ms > 0:
+                    ratio = abs(measured_ms - gemini_ms) / gemini_ms
+                    if ratio > 0.10:
+                        logger.warning(
+                            f"Gemini reported duration {gemini_ms}ms but measured {measured_ms}ms "
+                            f"({ratio:.0%} discrepancy). Using measured value."
+                        )
+                duration_ms = measured_ms
+            else:
+                logger.warning("Could not measure audio duration; falling back to Gemini's reported value.")
+                duration_ms = gemini_ms
+
             # Build AudioAnalysis from results
             analysis = AudioAnalysis(
                 speech_segments=[
@@ -206,7 +253,7 @@ class GeminiAudioProvider(AudioAnalysisProvider):
                     PauseSegment(**pause) for pause in timing_data.get("pauses", [])
                 ],
                 emotion=emotion,
-                duration_ms=timing_data.get("duration_ms", 0),
+                duration_ms=duration_ms,
                 audio_path=audio_path,
             )
 
@@ -253,12 +300,12 @@ class GeminiAudioProvider(AudioAnalysisProvider):
   ]
 }
 
-Phoneme group rules:
-- bilabial: words starting/ending with M, B, P sounds
-- open_vowel: prominent AH, AA, AW vowels
-- spread_vowel: prominent EE, IH vowels  
-- round_vowel: prominent OO, OH vowels
-- neutral: all others
+Phoneme group rules — classify by the DOMINANT VOWEL sound in the word, not the starting consonant:
+- round_vowel: words whose most prominent sound is OO or OH (e.g., "boo", "moon", "ghost", "spooky", "no", "oh", "go")
+- open_vowel: words whose most prominent sound is AH, AA, or AW (e.g., "ahh", "ha", "bat", "father", "scary")
+- spread_vowel: words whose most prominent sound is EE or IH (e.g., "eek", "see", "think", "it", "teeth")
+- bilabial: ONLY words where lip-closure is the dominant feature — sustained humming or pure consonant sounds (e.g., "mmm", "bam", "pop"). Do NOT classify vowel-dominant words like "boo" as bilabial just because they start with B or M.
+- neutral: all others (consonant clusters, unstressed syllables, unclear vowels)
 
 Beat detection: only include beats if audio has musical rhythm. Bar 1 beats are the strongest downbeats (one per musical bar).
 Pauses: include gaps between words >= 300ms."""

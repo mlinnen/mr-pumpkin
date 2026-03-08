@@ -59,8 +59,9 @@ def build_lipsync_prompt(analysis: AudioAnalysis, user_prompt: str) -> str:
     if analysis.speech_segments:
         lines.append("AUDIO TIMING (word-by-word):")
         for seg in analysis.speech_segments:
-            phoneme_hint = _phoneme_to_viseme_hint(seg.phoneme_group)
-            lines.append(f"  - {seg.start_ms}ms-{seg.end_ms}ms: \"{seg.word}\" [{seg.phoneme_group} → {phoneme_hint}]")
+            viseme_cmd = _phoneme_to_viseme_cmd(seg.phoneme_group)
+            lines.append(f"  - {seg.start_ms}ms: {viseme_cmd} → \"{seg.word}\" ({seg.phoneme_group})")
+            lines.append(f"  - {seg.end_ms}ms: mouth_closed  ← word ends, return to closed")
         lines.append("")
     
     # Beat events section
@@ -98,10 +99,24 @@ def build_lipsync_prompt(analysis: AudioAnalysis, user_prompt: str) -> str:
     lines.append("  4. Adds natural gaze shifts at sentence boundaries or between long phrases")
     lines.append(f"  5. Sets expression to match the overall emotion ({analysis.emotion} → set_expression {analysis.emotion})")
     lines.append("  6. Includes natural head movements for liveliness (subtle turns, return to center)")
+    lines.append("  7. After EVERY word's end_ms, immediately emits mouth_closed to prevent the mouth hanging open between words")
+    lines.append("  8. After the final word ends, emits mouth_neutral to return mouth to expression-driven control")
     lines.append("")
     lines.append("Make Mr. Pumpkin look engaged, alive, and synchronized to the audio.")
     
     return "\n".join(lines)
+
+
+def _phoneme_to_viseme_cmd(phoneme_group: str) -> str:
+    """Map phoneme group to the exact viseme command name."""
+    mapping = {
+        "bilabial": "mouth_closed",
+        "open_vowel": "mouth_open",
+        "spread_vowel": "mouth_wide",
+        "round_vowel": "mouth_rounded",
+        "neutral": "mouth_neutral",
+    }
+    return mapping.get(phoneme_group, "mouth_neutral")
 
 
 def _phoneme_to_viseme_hint(phoneme_group: str) -> str:
@@ -200,6 +215,10 @@ def main(argv=None) -> int:
     
     print(f"  Duration: {analysis.duration_ms}ms, Emotion: {analysis.emotion}")
     print(f"  Words: {len(analysis.speech_segments)}, Beats: {len(analysis.beats)}, Pauses: {len(analysis.pauses)}")
+    if analysis.speech_segments:
+        print("  Word timings from audio analysis:")
+        for seg in analysis.speech_segments:
+            print(f"    {seg.start_ms:>6}ms – {seg.end_ms:>6}ms  \"{seg.word}\" ({seg.phoneme_group})")
     
     # Pass 2: Generate timeline
     print("Generating choreography...")

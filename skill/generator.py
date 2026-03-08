@@ -133,6 +133,21 @@ Respond with ONLY a valid JSON object matching this exact schema — no prose, n
   ]
 }
 
+## Example 3 — lip-synced words with gaps
+
+{
+  "version": "1.0",
+  "duration_ms": 2700,
+  "commands": [
+    {"time_ms": 0,    "command": "set_expression", "args": {"expression": "happy"}},
+    {"time_ms": 100,  "command": "mouth_rounded"},
+    {"time_ms": 450,  "command": "mouth_closed"},
+    {"time_ms": 1200, "command": "mouth_rounded"},
+    {"time_ms": 1550, "command": "mouth_closed"},
+    {"time_ms": 2400, "command": "mouth_neutral"}
+  ]
+}
+
 Now generate a timeline for the user's animation description. Reply with ONLY the JSON object.
 """
 

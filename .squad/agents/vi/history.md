@@ -863,3 +863,19 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 **Files modified:**
 - skill/lipsync_cli.py (new): CLI orchestrator with build_lipsync_prompt(), main(), CLI argument parser
 - skill/__init__.py: Exported upload_audio to public API (alongside existing generate_timeline and upload_timeline)
+
+## Learnings
+
+### Audio duration override fix (Gemini underreporting bug)
+**Date:** 2025-07-27
+**Bug:** GeminiAudioProvider.analyze_audio() used 	iming_data.get("duration_ms", 0) directly from Gemini's JSON response. gemini-flash-latest underreported a 152 s file as ~35 s, capping the entire generated animation at that incorrect length.
+**Fix:** Added _measure_audio_duration_ms() helper (top of skill/audio_analyzer.py) that measures real duration via mutagen (preferred), falling back to the wave stdlib module for .wav files. In nalyze_audio(), the measured value always wins over Gemini's self-reported value; if the discrepancy is >10% a WARNING is logged. mutagen>=1.45.0 was added to equirements.txt.
+**Lesson:** Never trust an AI API to accurately self-report metadata about media it processed. Always measure independently using a dedicated library and treat the API value as a cross-check only.
+
+
+### Lip-sync mouth-close timing fix
+**Date:** 2025-07-28
+**Bug:** Pumpkin's mouth stayed open between repeated sung words (e.g., "Spooks, Spooks, Spooks, Spooks") because the LLM had no example of the open-close-open pattern and the prompt never explicitly told it to emit mouth_closed at word end.
+**Fix 1 (skill/generator.py):** Added ## Example 3 — lip-synced words with gaps to _SYSTEM_PROMPT. The example shows two round-vowel words with a gap: mouth_rounded at word start → mouth_closed at word end → silence → repeat → mouth_neutral at the end.
+**Fix 2 (skill/lipsync_cli.py):** Rewrote uild_lipsync_prompt word-timing lines from the old start_ms-end_ms: "word" [phoneme → hint] format to an explicit two-line format: start_ms: mouth_XXX → "word" / nd_ms: mouth_closed ← word ends. Added new instruction 7 ("After EVERY word's end_ms, immediately emit mouth_closed") and instruction 8 ("After final word, emit mouth_neutral"). Added _phoneme_to_viseme_cmd() helper returning the exact command name (vs the existing _phoneme_to_viseme_hint() returning a prose hint).
+**Lesson:** LLMs reliably follow by-example patterns far more than by-instruction rules alone. Providing a concrete JSON example with the exact open→close→gap→open structure, combined with explicit per-word timestamps in the prompt, removes ambiguity about when to close the mouth between words.
