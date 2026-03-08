@@ -51,7 +51,19 @@ else
     exit 1
 fi
 
-echo ""
+# Install skill dependencies if present
+if [ -f "skill/requirements.txt" ]; then
+    echo "🧠 Installing skill dependencies..."
+    if command -v pip &> /dev/null; then
+        pip install -r skill/requirements.txt
+        echo "  ✓ Skill dependencies installed"
+    elif command -v pip3 &> /dev/null; then
+        pip3 install -r skill/requirements.txt
+        echo "  ✓ Skill dependencies installed"
+    fi
+    echo ""
+fi
+
 echo "✅ Installation complete!"
 echo ""
 echo "Usage:"

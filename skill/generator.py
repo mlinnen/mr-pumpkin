@@ -133,6 +133,21 @@ Respond with ONLY a valid JSON object matching this exact schema — no prose, n
   ]
 }
 
+## Example 3 — lip-synced words with gaps
+
+{
+  "version": "1.0",
+  "duration_ms": 2700,
+  "commands": [
+    {"time_ms": 0,    "command": "set_expression", "args": {"expression": "happy"}},
+    {"time_ms": 100,  "command": "mouth_rounded"},
+    {"time_ms": 450,  "command": "mouth_closed"},
+    {"time_ms": 1200, "command": "mouth_rounded"},
+    {"time_ms": 1550, "command": "mouth_closed"},
+    {"time_ms": 2400, "command": "mouth_neutral"}
+  ]
+}
+
 Now generate a timeline for the user's animation description. Reply with ONLY the JSON object.
 """
 
@@ -176,9 +191,9 @@ class GeminiProvider(LLMProvider):
         ImportError: If the ``google-genai`` package is not installed.
     """
 
-    MODEL = "gemini-flash-latest"
+    DEFAULT_MODEL = "gemini-flash-latest"
 
-    def __init__(self):
+    def __init__(self, api_key: str = None, model: str = None):
         try:
             from google import genai
             from google.genai import types
@@ -188,7 +203,9 @@ class GeminiProvider(LLMProvider):
                 "Install it with: pip install google-genai"
             ) from exc
 
-        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if api_key is None:
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        
         if not api_key:
             raise EnvironmentError(
                 "No Gemini API key found. Set the GEMINI_API_KEY environment variable."
@@ -196,6 +213,7 @@ class GeminiProvider(LLMProvider):
 
         self._client = genai.Client(api_key=api_key)
         self._types = types
+        self.model = model or self.DEFAULT_MODEL
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         """Generate a response using Gemini.
@@ -208,13 +226,66 @@ class GeminiProvider(LLMProvider):
             Generated text response.
         """
         response = self._client.models.generate_content(
-            model=self.MODEL,
+            model=self.model,
             contents=user_prompt,
             config=self._types.GenerateContentConfig(
                 system_instruction=system_prompt,
             )
         )
         return response.text
+
+
+class OpenAIProvider(LLMProvider):
+    """LLM provider backed by OpenAI (gpt-4o).
+
+    API key is read from the ``OPENAI_API_KEY`` environment variable.
+    Base URL defaults to ``https://api.openai.com/v1``.
+
+    Raises:
+        EnvironmentError: If no API key is found in the environment.
+        ImportError: If the ``openai`` package is not installed.
+    """
+
+    MODEL = "gpt-4o"
+
+    def __init__(self, api_key: str = None, model: str = None, base_url: str = "https://api.openai.com/v1"):
+        try:
+            from openai import OpenAI
+        except ImportError as exc:
+            raise ImportError(
+                "openai is required for OpenAIProvider. "
+                "Install it with: pip install openai"
+            ) from exc
+
+        if api_key is None:
+            api_key = os.environ.get("OPENAI_API_KEY")
+        
+        if not api_key:
+            raise EnvironmentError(
+                "No OpenAI API key found. Set the OPENAI_API_KEY environment variable."
+            )
+
+        self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self._model = model or self.MODEL
+
+    def generate(self, system_prompt: str, user_prompt: str) -> str:
+        """Generate a response using OpenAI.
+
+        Args:
+            system_prompt: System instruction for the model.
+            user_prompt: User message to generate a response for.
+
+        Returns:
+            Generated text response.
+        """
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+        return response.choices[0].message.content
 
 
 def _validate_extra(data: dict) -> None:

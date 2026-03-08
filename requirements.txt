@@ -1,3 +1,5 @@
 pygame>=2.0.0,<3.0.0
 websockets>=13.0,<15.1
 google-genai>=1.0.0
+mutagen>=1.45.0
+openai>=1.0.0
