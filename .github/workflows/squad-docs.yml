@@ -3,7 +3,7 @@ name: Squad Docs — Build & Deploy
 on:
   workflow_dispatch:
   push:
-    branches: [preview]
+    branches: [main]
     paths:
       - 'docs/**'
       - '.github/workflows/squad-docs.yml'
