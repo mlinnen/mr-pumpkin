@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 from skill.audio_analyzer import get_provider as get_audio_provider, AudioAnalysis
-from skill.generator import generate_timeline, GeminiProvider
+from skill.generator import generate_timeline, GeminiProvider, OpenAIProvider
 from skill.uploader import upload_timeline, upload_audio
 
 logger = logging.getLogger(__name__)
@@ -226,8 +226,10 @@ def main(argv=None) -> int:
     try:
         if args.provider.lower() == "gemini":
             llm_provider = GeminiProvider()
+        elif args.provider.lower() == "openai":
+            llm_provider = OpenAIProvider()
         else:
-            print(f"ERROR: Unknown provider '{args.provider}'. Supported: gemini", file=sys.stderr)
+            print(f"ERROR: Unknown provider '{args.provider}'. Supported: gemini, openai", file=sys.stderr)
             return 2
     except (EnvironmentError, ImportError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
