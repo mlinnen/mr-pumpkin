@@ -2782,6 +2782,140 @@ Four directives guide the recording skill implementation:
 **What:** Use Gemini as the initial LLM provider for the mr-pumpkin recording skill (issue #39). Design the provider layer to be pluggable so other providers (OpenAI, Anthropic, local models) can be swapped in later without rearchitecting.
 **Why:** User decision — captured for team memory and to guide Vi's implementation of the generator module.
 
+---
+
+### 2026-03-08: OpenAI Provider for Audio Analysis and Timeline Generation
+
+**By:** Vi (Backend Dev)  
+**Issue:** #81  
+**PR:** #82
+
+**What:** Added OpenAI as an alternative provider for both audio analysis (Pass 1) and timeline generation (Pass 2) in the lipsync pipeline. Implemented two new provider classes alongside existing Gemini providers:
+- **OpenAIProvider**: Timeline generation using `gpt-4o` model
+- **OpenAIAudioProvider**: Audio analysis using `gpt-4o-audio-preview` model
+
+Added CLI flags `--provider openai` and `--audio-provider openai` to allow users to mix providers.
+
+**Why:** 
+1. **Quota exhaustion resilience** — When Gemini hits quota limits, users can switch to OpenAI without code changes
+2. **Interface consistency** — Both OpenAI providers implement existing ABC interfaces (`LLMProvider`, `AudioAnalysisProvider`)
+3. **Simpler audio handling** — OpenAI's inline base64 approach avoids Gemini's upload-poll-delete lifecycle complexity
+4. **Model quality** — `gpt-4o` has strong JSON instruction-following; `gpt-4o-audio-preview` supports multimodal audio analysis
+5. **Future extensibility** — Factory pattern allows adding more providers with minimal changes
+
+**Key Technical Decision: Base64 Inline vs File Upload**
+- **Gemini approach:** Upload file → poll until ACTIVE → use file URI → delete file in finally block
+- **OpenAI approach:** Read file bytes → base64 encode → send inline in single API call
+- **Chosen:** OpenAI's inline approach (simpler, no async state management, no file cleanup, no polling loop)
+
+**Implementation:**
+- `OpenAIProvider` uses OpenAI chat completions API (`gpt-4o`), auth via `OPENAI_API_KEY`
+- `OpenAIAudioProvider` uses `gpt-4o-audio-preview` with two-pass approach (timing JSON + emotion extraction)
+- Both implement same error patterns as Gemini providers (env key check, ImportError handling, JSON retry logic)
+- Added `openai>=1.0.0` to requirements.txt
+
+**Test Coverage:** 13 tests (6 for OpenAIProvider, 7 for OpenAIAudioProvider) — all passing
+
+---
+
+### 2025-07-27: Always Measure Audio Duration Independently
+
+**By:** Vi (Backend Dev)  
+**Status:** Accepted
+
+**What:** Audio file duration must always be measured independently using a dedicated library (mutagen, falling back to wave stdlib for .wav files). The measured value always overrides whatever the AI API reports. If discrepancy > 10%, log WARNING.
+
+**Why:** AI models can hallucinate or truncate metadata fields like `duration_ms`. Direct measurement from file bytes is deterministic, free, and takes <1 ms — no reason to trust AI's self-report.
+
+**Implementation:**
+- `_measure_audio_duration_ms(audio_path)` added to `skill/audio_analyzer.py`
+- Called immediately after Gemini passes complete
+- `mutagen>=1.45.0` added to requirements.txt
+
+**Scope:** Applies to all current and future `AudioAnalysisProvider` implementations.
+
+---
+
+### 2025-07-28: Lip-sync Mouth-Close Timing Fix
+
+**By:** Vi (Backend Dev)  
+**Status:** Implemented
+
+**What:** Fixed mouth-open-between-words bug in repeated-word sequences (e.g., "Spooks, Spooks, Spooks, Spooks"). Two-part fix:
+
+**Fix 1 — System Prompt:** Added Example 3 to `_SYSTEM_PROMPT` in `skill/generator.py` demonstrating open→close→silence→open pattern.
+
+**Fix 2 — Prompt Format:** Rewrote word-timing lines in `build_lipsync_prompt` (`skill/lipsync_cli.py`) from single-line format to explicit two-line format:
+```
+  - 0ms: mouth_rounded → "Spooks" (round_vowel)
+  - 500ms: mouth_closed  ← word ends, return to closed
+```
+
+Added two new numbered instructions:
+- **7.** After EVERY word's end_ms, immediately emit `mouth_closed`
+- **8.** After final word ends, emit `mouth_neutral` to return to expression-driven control
+
+Added `_phoneme_to_viseme_cmd()` helper for command name mapping.
+
+**Why:** LLMs follow concrete examples more reliably than abstract instructions; explicit close events prevent mouth hanging open.
+
+**Verification:** All 60 existing tests pass with no regressions.
+
+---
+
+### 2026-03-06: TCP Upload Buffer Accumulation Pattern
+
+**By:** Mylo (Tester)  
+**Context:** PR #74 review — `upload_audio` TCP handler bug fix
+
+**What:** TCP upload loops reading until a marker (e.g., `\nEND_UPLOAD\n`) must accumulate all bytes in a single persistent buffer across every `recv()` call. Never reset the buffer after non-matching chunks.
+
+**Why:** TCP is a stream protocol. A fixed marker can be split arbitrarily across recv() boundaries. Resetting the buffer after each chunk discards the tail (which may be the marker start), causing the loop to hang indefinitely or corrupt the file.
+
+**Correct Pattern (binary):**
+```python
+upload_buf = b""
+while True:
+    chunk = client_socket.recv(4096)
+    if not chunk:
+        break
+    upload_buf += chunk  # always accumulate, never reset
+    if b"\nEND_UPLOAD\n" in upload_buf:
+        audio_data, _ = upload_buf.split(b"\nEND_UPLOAD\n", 1)
+        break
+```
+
+**Applied To:**
+- `upload_audio` TCP handler in `pumpkin_face.py` — removed buffer reset after non-matching chunks
+
+---
+
+### 2026-03-08: Grok as Alternative LLM Provider (Research)
+
+**By:** Jinx (Lead)  
+**Issue:** #80
+
+**What:** Research findings on xAI Grok as alternative LLM provider. Summary:
+
+**Feasibility:**
+- **Timeline generation** (`generator.py`): ✅ **Highly feasible** — Grok's OpenAI-compatible endpoint maps cleanly; can add `GrokProvider(LLMProvider)` class using `grok-3` model
+- **Audio analysis** (`audio_analyzer.py`): ❌ **Not feasible** — Grok has no batch audio file analysis API; xAI's Voice Agent API is real-time WebSocket conversation only
+
+**Why:** Timeline generation is text-in/JSON-out pattern; Grok's `/v1/chat/completions` endpoint works via openai SDK with `base_url="https://api.x.ai/v1"`. Audio analysis requires batch file upload + analysis, which Grok doesn't support.
+
+**Implementation Approach (if approved):**
+1. Add `GrokProvider` class to `skill/generator.py` (init with `XAI_API_KEY`, call openai SDK with custom base_url)
+2. Wire `--provider grok` into `lipsync_cli.py` provider-selection block
+3. Add `openai>=1.0.0` to requirements.txt (already present for OpenAI providers)
+4. Keep audio analysis on Gemini (or use OpenAI `gpt-4o-audio-preview` if Gemini quota exhausted)
+
+**Model Selection:** `grok-3` (non-reasoning) recommended over `grok-4` (reasoning-only) for predictable JSON output.
+
+**Open Questions:**
+1. Grok 4 JSON reliability with preamble text before JSON
+2. Rate limits on Grok (xAI console doesn't publish RPM/TPM publicly)
+3. Long-term audio solution if Gemini quota exhausted (recommendation: OpenAI GPT-4o)
+
 **By:** Mike Linnen (via Copilot)
 **What:** The recording skill must be AI-agnostic (not tied to Copilot MCP or any single platform). It is a user-facing skill for the mr-pumpkin application — end users invoke it to generate and upload animations. It is NOT a squad developer tool.
 **Why:** User decision — defines the packaging and audience for the skill. Influences how the CLI entry point is structured (standalone Python tool, invokable by any AI assistant or human user directly).
