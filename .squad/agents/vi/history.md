@@ -19,6 +19,7 @@
 📌 Team update (2026-03-03): Issue #54 resolved: Migrated GeminiProvider from google-generativeai to google-genai SDK. Updated requirements.txt, all 27 tests pass — decided by Vi, Mylo
 📌 Team update (2026-03-03): Issue #57 resolved: Built Jekyll 4.3 static site for GitHub Pages. Custom dark theme (orange #FF6B00 on #0d0d0d), 7 pages + blog, responsive nav, updated squad-docs.yml CI — decided by Vi
 📌 Team update (2026-03-06): Issue #66 foundations completed: Audio analyzer provider (Gemini multimodal two-pass), timeline audio_file extension, pygame playback, upload_audio server endpoint. Mylo wrote 29-test scaffold — decided by Vi, Mylo
+📌 Team update (2026-03-08): Issue #81 completed: Added OpenAI provider for audio analysis and timeline generation. OpenAIProvider (gpt-4o) and OpenAIAudioProvider (gpt-4o-audio-preview) serve as fallbacks when Gemini quota exhausted. 13 tests added — decided by Vi
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
@@ -879,3 +880,65 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 **Fix 1 (skill/generator.py):** Added ## Example 3 — lip-synced words with gaps to _SYSTEM_PROMPT. The example shows two round-vowel words with a gap: mouth_rounded at word start → mouth_closed at word end → silence → repeat → mouth_neutral at the end.
 **Fix 2 (skill/lipsync_cli.py):** Rewrote uild_lipsync_prompt word-timing lines from the old start_ms-end_ms: "word" [phoneme → hint] format to an explicit two-line format: start_ms: mouth_XXX → "word" / nd_ms: mouth_closed ← word ends. Added new instruction 7 ("After EVERY word's end_ms, immediately emit mouth_closed") and instruction 8 ("After final word, emit mouth_neutral"). Added _phoneme_to_viseme_cmd() helper returning the exact command name (vs the existing _phoneme_to_viseme_hint() returning a prose hint).
 **Lesson:** LLMs reliably follow by-example patterns far more than by-instruction rules alone. Providing a concrete JSON example with the exact open→close→gap→open structure, combined with explicit per-word timestamps in the prompt, removes ambiguity about when to close the mouth between words.
+
+
+### OpenAI Provider Implementation (Issue #81)
+
+**Date:** 2026-03-08  
+**What:** Added OpenAI as a fallback LLM provider for both audio analysis and timeline generation to serve when Gemini quota is exhausted.
+
+**Files modified:**
+- skill/generator.py — Added OpenAIProvider class
+- skill/audio_analyzer.py — Added OpenAIAudioProvider class
+- skill/lipsync_cli.py — Updated provider args to accept "openai"
+- requirements.txt — Added openai>=1.0.0
+- tests/test_skill_generator.py — Added 6 OpenAIProvider tests
+- tests/test_audio_analyzer.py — Added 7 OpenAIAudioProvider tests
+
+**Key implementation patterns:**
+
+1. **OpenAIProvider (timeline generation):**
+   - Uses gpt-4o model via OpenAI chat completions API
+   - Auth via OPENAI_API_KEY environment variable
+   - Base URL defaults to https://api.openai.com/v1 (configurable)
+   - Messages format: [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+   - Returns response.choices[0].message.content directly
+
+2. **OpenAIAudioProvider (audio analysis):**
+   - Uses gpt-4o-audio-preview model with audio preview API
+   - Base64-encoded inline audio (NO file upload needed — key difference from Gemini)
+   - Two-pass approach matches GeminiAudioProvider: Pass 1 extracts timing JSON, Pass 2 extracts emotion
+   - Audio content part format: {"type": "input_audio", "input_audio": {"data": base64_str, "format": "mp3"}}
+   - modalities=["text"] ensures text-only responses
+   - Messages array includes both audio part and text prompt in same user message
+
+3. **Interface consistency:**
+   - Both providers implement same ABC pattern as Gemini equivalents (LLMProvider, AudioAnalysisProvider)
+   - Same method signatures: generate(system_prompt, user_prompt), analyze_audio(audio_path, prompt)
+   - Same error patterns: EnvironmentError for missing API key, ImportError if openai package not installed
+   - Same JSON retry logic: attempt parse, strip markdown fences, retry with strict prompt, then raise ValueError
+
+4. **CLI integration:**
+   - lipsync_cli.py --provider openai triggers OpenAIProvider for timeline generation
+   - lipsync_cli.py --audio-provider openai triggers OpenAIAudioProvider for audio analysis
+   - Both args can be mixed: --audio-provider gemini --provider openai is valid
+
+**Gotchas and design decisions:**
+
+- OpenAI audio API uses format names ("mp3", "wav") not MIME types ("audio/mpeg", "audio/wav") — need separate _get_audio_format() vs Gemini's _get_mime_type()
+- Base64 encoding must happen in-memory — no file handle leaking to API, unlike Gemini's upload flow
+- OpenAI's audio preview model does NOT support .ogg format in base64 mode (unlike Gemini) — runtime error if attempted
+- Retry logic needed even for OpenAI — still returns markdown fences or prose despite "ONLY JSON" prompt
+- Emotion validation critical — both providers can return unexpected values, always validate against fixed set {"happy", "sad", "excited", "neutral", "solemn"}
+
+**Test coverage:**
+- 6 tests for OpenAIProvider covering text generation, chat completion format, model name, env key reading, missing key error, custom base URL
+- 7 tests for OpenAIAudioProvider covering AudioAnalysis return, base64 encoding, model name, speech segments, JSON retry, missing key error, emotion extraction
+
+**Why this pattern:**
+- Mirrors existing Gemini providers exactly — zero learning curve for team
+- Factory pattern in get_provider() and implicit in lipsync_cli allows future providers (Whisper, Claude, etc.) with single-line additions
+- Inline base64 approach simpler than Gemini's upload-poll-delete lifecycle — no async state to manage
+- Dual-provider support enables quota exhaustion workarounds: try Gemini first, fall back to OpenAI on rate limit
+
+**PR:** #82

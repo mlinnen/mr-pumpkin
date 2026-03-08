@@ -16,6 +16,23 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
+### Issue #77 - Model and API Key CLI Parameters (2026-03-08)
+
+Implemented CLI parameter support for model names and API keys on existing branch `squad/81-openai-provider` (included in PR #82):
+
+- **Added CLI arguments**: `--model`, `--audio-model`, `--api-key` to override defaults without environment variables
+- **Provider updates**: All providers (`GeminiProvider`, `OpenAIProvider`, `GeminiAudioProvider`, `OpenAIAudioProvider`) now accept optional `model` and `api_key` constructor params
+- **Pattern established**: Store model as instance attribute `self._model = model or self.MODEL`, use in API calls
+- **Backward compatibility**: Environment variables remain primary source; CLI args provide explicit override mechanism
+- **Design decision**: Keep provider constructors simple - accept optional params, fall back to env vars, fall back to class constant defaults
+- **Testing**: All 68 skill module tests pass (generator + audio_analyzer); implementation maintains existing behavior when no CLI args provided
+
+This pattern enables users to experiment with different model versions (e.g., `gpt-4o` vs `gpt-4o-mini`, `gemini-2.0-flash` vs `gemini-1.5-pro`) or use multiple API keys without modifying code or global environment variables. Particularly useful for testing new model releases or using organization-specific keys.
+
+**Implementation merged with issue #81** — both OpenAI provider work and model/key CLI params shipped together in PR #82 on branch `squad/81-openai-provider`.
+
+✅ **Merged to main via PR #82** (2026-03-08 02:45) — Coordinator pushed commit and closed issues #77, #81.
+
 ### v0.5.13 Release (2026-03-06)
 
 Successfully executed full release cycle:

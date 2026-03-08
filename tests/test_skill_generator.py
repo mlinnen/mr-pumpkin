@@ -473,3 +473,138 @@ class TestApiKeyMissing:
                 or "api_key" in error_str.lower()
                 or "google-genai" in error_str
             )
+
+
+# ============================================================================
+# OPENAI PROVIDER TESTS
+# ============================================================================
+
+class TestOpenAIProvider:
+    """OpenAIProvider unit tests with mocked OpenAI client."""
+
+    @patch('openai.OpenAI')
+    def test_openai_provider_returns_text(self, mock_openai_class, valid_timeline_dict):
+        """Mock OpenAI client returns valid JSON → provider returns text."""
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(valid_timeline_dict)
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        try:
+            from skill.generator import OpenAIProvider
+        except ImportError:
+            pytest.skip("OpenAIProvider not yet implemented")
+        
+        provider = OpenAIProvider(api_key="test_key")
+        result = provider.generate("system prompt", "user prompt")
+        
+        assert isinstance(result, str)
+        assert "version" in result
+        
+    @patch('openai.OpenAI')
+    def test_openai_provider_calls_chat_completion(self, mock_openai_class, valid_timeline_dict):
+        """OpenAI provider calls chat.completions.create with correct format."""
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(valid_timeline_dict)
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        try:
+            from skill.generator import OpenAIProvider
+        except ImportError:
+            pytest.skip("OpenAIProvider not yet implemented")
+        
+        provider = OpenAIProvider(api_key="test_key")
+        provider.generate("system instruction", "user message")
+        
+        mock_client.chat.completions.create.assert_called_once()
+        call_args = mock_client.chat.completions.create.call_args
+        
+        # Check messages format
+        messages = call_args.kwargs.get("messages")
+        assert messages is not None
+        assert len(messages) == 2
+        assert messages[0]["role"] == "system"
+        assert messages[0]["content"] == "system instruction"
+        assert messages[1]["role"] == "user"
+        assert messages[1]["content"] == "user message"
+
+    @patch('openai.OpenAI')
+    def test_openai_provider_uses_gpt_4o_model(self, mock_openai_class, valid_timeline_dict):
+        """OpenAI provider uses gpt-4o model."""
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(valid_timeline_dict)
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        try:
+            from skill.generator import OpenAIProvider
+        except ImportError:
+            pytest.skip("OpenAIProvider not yet implemented")
+        
+        provider = OpenAIProvider(api_key="test_key")
+        provider.generate("system", "user")
+        
+        call_args = mock_client.chat.completions.create.call_args
+        assert call_args.kwargs.get("model") == "gpt-4o"
+
+    @patch('openai.OpenAI')
+    def test_openai_provider_reads_api_key_from_env(self, mock_openai_class):
+        """OpenAI provider reads OPENAI_API_KEY from environment."""
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        try:
+            from skill.generator import OpenAIProvider
+        except ImportError:
+            pytest.skip("OpenAIProvider not yet implemented")
+        
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "env-test-key"}):
+            provider = OpenAIProvider()
+        
+        # Verify OpenAI client was instantiated with the env key
+        call_args = mock_openai_class.call_args
+        assert call_args.kwargs.get("api_key") == "env-test-key"
+
+    @patch('openai.OpenAI')
+    def test_openai_provider_missing_api_key_raises(self, mock_openai_class):
+        """OpenAI provider raises EnvironmentError when API key is missing."""
+        try:
+            from skill.generator import OpenAIProvider
+        except ImportError:
+            pytest.skip("OpenAIProvider not yet implemented")
+        
+        env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(EnvironmentError, match="OPENAI_API_KEY"):
+                OpenAIProvider()
+
+    @patch('openai.OpenAI')
+    def test_openai_provider_custom_base_url(self, mock_openai_class, valid_timeline_dict):
+        """OpenAI provider accepts custom base_url parameter."""
+        mock_client = Mock()
+        mock_openai_class.return_value = mock_client
+        
+        mock_response = Mock()
+        mock_response.choices = [Mock()]
+        mock_response.choices[0].message.content = json.dumps(valid_timeline_dict)
+        mock_client.chat.completions.create.return_value = mock_response
+        
+        try:
+            from skill.generator import OpenAIProvider
+        except ImportError:
+            pytest.skip("OpenAIProvider not yet implemented")
+        
+        provider = OpenAIProvider(api_key="test_key", base_url="https://custom.api.com/v1")
+        
+        call_args = mock_openai_class.call_args
+        assert call_args.kwargs.get("base_url") == "https://custom.api.com/v1"
