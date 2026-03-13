@@ -2,11 +2,11 @@
 
 ### Project Learnings (from import)
 
-**Project:** Animated 2D Graphics Pumpkin Face (Python)  
-**Owner:** Mike Linnen  
-**Stack:** Python, 2D graphics, animation  
-**Key domains:** Graphics/animation rendering, command parsing & state management, expression logic  
-**Team composition:** Jinx (Lead), Ekko (Graphics), Vi (Backend), Mylo (Tester), Scribe, Ralph  
+**Project:** Animated 2D Graphics Pumpkin Face (Python)
+**Owner:** Mike Linnen
+**Stack:** Python, 2D graphics, animation
+**Key domains:** Graphics/animation rendering, command parsing & state management, expression logic
+**Team composition:** Jinx (Lead), Ekko (Graphics), Vi (Backend), Mylo (Tester), Scribe, Ralph
 
 ---
 
@@ -15,6 +15,12 @@
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen
 
 *Patterns, conventions, and decisions discovered during work.*
+
+### Issue #92 Finalization (2026-03-13)
+
+- `update.sh` is intentionally non-root and cron-safe on Raspberry Pi by default: apt-managed packages stay out of the unattended update path unless `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` is explicitly set.
+- The user-facing docs for Raspberry Pi updates need to explain the split clearly: `install.sh` owns the apt-managed packages by default, while `update.sh` only refreshes the pip-managed subset unless opted in.
+- Unix lifecycle scripts must be kept LF-terminated in git; `bash -n update.sh` caught a CRLF regression that made the updater invalid even though the logic itself was correct.
 
 ### GitHub Triage Follow-Through (2026-03-13)
 
@@ -322,12 +328,12 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 
 **Viseme vocabulary:** 5 shapes covering ~80% of English phonemes:
 - CLOSED (M, B, P): horizontal line 100px width, thickness 8px
-- WIDE (EE, IH): horizontal line 180px width, thickness 6px  
+- WIDE (EE, IH): horizontal line 180px width, thickness 6px
 - OPEN (AH, AA): ellipse 80×60px
 - ROUNDED (OO, OH): circle radius 25px
 - NEUTRAL: clears override, returns to expression-driven mouth
 
-**Command API:** 
+**Command API:**
 - Socket commands: `mouth_closed`, `mouth_open`, `mouth_wide`, `mouth_rounded`, `mouth_neutral`
 - Compact timeline syntax: `mouth <viseme_name>` with args `{"viseme": "open"}`
 - Recording capture: all commands captured via `_capture_command_for_recording()` pattern
@@ -371,7 +377,8 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 ### PR #63 — Jekyll Nav Layout Fix (2026-06-17)
 - Reviewed 3-change CSS PR fixing desktop search width (#62) and mobile hamburger ordering (#61)
 - \.header-inner\ column→row flip: correct fix; column layout was expanding \.header-top\ full-width, bloating the search form
-- Mobile additions (\lex-wrap:wrap\, \margin-left:auto\ on search, \order:10\ on nav) work together cleanly for hamburger-left-of-search behavior
+- Mobile additions (\
+lex-wrap:wrap\, \margin-left:auto\ on search, \order:10\ on nav) work together cleanly for hamburger-left-of-search behavior
 - Leftover \order-top\ on \.header-bottom\ is a cosmetic holdover from column layout; renders as a hairline in row context — minor, monitor visually
 - GitHub does not allow approving your own PR; left detailed review as a comment instead
 
@@ -380,10 +387,14 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 **Reviewed:** docs/assets/css/style.css — 7 lines added, 1 changed. Pure CSS layout fixes.
 
 **Changes:**
-- Desktop: .header-inner switched from lex-direction: column to ow + lign-items: center. This naturally constrains search width and aligns items horizontally — clean fix for #62.
-- Mobile (media query): lex-wrap: wrap on .header-inner allows nav to drop below header row; margin-left: auto on .header-search right-justifies the search icon; order: 10 on .site-nav ensures expanded nav wraps below the header row — clean fix for #61.
+- Desktop: .header-inner switched from
+lex-direction: column to
+ow + lign-items: center. This naturally constrains search width and aligns items horizontally — clean fix for #62.
+- Mobile (media query):
+lex-wrap: wrap on .header-inner allows nav to drop below header row; margin-left: auto on .header-search right-justifies the search icon; order: 10 on .site-nav ensures expanded nav wraps below the header row — clean fix for #61.
 
-**CI Note:** Branch Gate check failed (expected — it only allows elease/* branches to target main; this PR targeted dev). Squad CI (tests) passed.
+**CI Note:** Branch Gate check failed (expected — it only allows
+elease/* branches to target main; this PR targeted dev). Squad CI (tests) passed.
 
 **Verdict:** ✅ Merged. Changes are minimal, targeted, no regression risk.
 
@@ -465,3 +476,36 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 - **Release contract tightened:** The generated GitHub release ZIP must ship both install entrypoints and both update entrypoints (`install.sh`, `install.ps1`, `update.sh`, `update.ps1`) so deployment and in-place upgrades remain symmetrical across platforms.
 - **Validation pattern:** Packaging regressions are best caught by an automated test that imports `scripts/package_release.py`, builds the archive from repo root, and asserts exact archive members instead of only checking helper-level ZIP validity.
 - **Scope discipline:** This fix stayed in the packaging layer; the updater scripts themselves did not need behavioral changes, only guaranteed inclusion in the distributable artifact.
+
+### Issue #92 — Raspberry Pi Dependency Strategy (2026-03-13)
+
+- **Raspberry Pi dependency policy:** Treat Raspberry Pi as a hybrid package-management target: use `apt` for platform-native/runtime-sensitive dependencies that are known to be distributed by the OS, and reserve `pip` for PyPI-only packages.
+- **Install vs update boundary:** `install.sh` may invoke `sudo apt-get` on Raspberry Pi because first-time setup already owns system dependency bootstrapping, but `update.sh` should preserve the existing least-privilege contract and avoid requiring root for unattended cron-based updates.
+- **Updater behavior on Pi:** If Raspberry Pi needs special handling during updates, it should be limited to avoiding pip reinstalls of apt-managed packages and continuing to pip-install only the PyPI-managed subset, rather than turning the updater into a system package upgrader.
+
+### PR #93 review outcome (2026-03-13)
+
+- Rejected Vi's first pass for Issue #92 even though the shared dependency planner is sound and `install.sh` now follows the intended hybrid apt/pip strategy on Raspberry Pi.
+- Blocking issue: `update.sh` now attempts `apt-get` automatically whenever it detects root or passwordless sudo, which violates the prior architectural boundary that the updater remains non-root by default and only refreshes the pip-managed subset on Raspberry Pi.
+- Supporting evidence: `docs/auto-update.md` was updated to recommend running Raspberry Pi auto-update as root/passwordless sudo, confirming the implementation drifted into system-package maintenance instead of preserving the cron-friendly least-privilege updater contract.
+
+## Team Sync — 2026-03-13 Completion
+
+**Issue #92 orchestration summary:**
+- **Jinx:** Triaged platform constraints and established hybrid apt/pip dependency strategy, preserving `update.sh` non-root contract. Decision documented in decisions.md.
+- **Vi:** Implemented `scripts/unix_dependency_plan.py` shared helper to classify dependencies; integrated Raspberry Pi detection in `install.sh` and `update.sh`. PR #93 opened but requires architectural revision per Jinx review feedback.
+- **Mylo:** Added shell-script contract test suite (`tests/test_pi_install_scripts.py`) with xfail guards for pending behavior. Updated tests to validate implemented design.
+
+**Orchestration logs created:** `.squad/orchestration-log/2026-03-13T20-52-13Z-{jinx,vi,mylo}.md`
+**Session log created:** `.squad/log/2026-03-13T20-52-13Z-issue-92.md`
+**Decisions merged:** All inbox decisions consolidated into `.squad/decisions.md`
+
+**User directive compliance:** ✓ Work completed on `squad/92-raspberry-pi-install-update` branch created from `dev`
+
+**Next steps for Issue #92:** Vi revision should remove default apt activity from `update.sh` unless behind explicit opt-in flag; Mylo will validate revised implementation.
+
+### Issue #92 revision shipped (2026-03-13)
+
+- Preserved the shared Raspberry Pi dependency planner and the hybrid first-install contract in `install.sh`: apt remains the right place for the Pi OS packages that were failing under pip, while pip still owns the PyPI-only remainder.
+- Reworked `update.sh` so the default Raspberry Pi path is non-root and cron-safe again: it logs and skips apt-managed packages, refreshes only the pip-managed subset, and leaves apt refresh behind an explicit `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` opt-in.
+- Locked the contract with regression coverage in `tests/test_pi_install_scripts.py` and aligned `README.md` plus `docs/auto-update.md` so the docs now match the least-privilege updater behavior instead of normalizing root/passwordless-sudo updates.

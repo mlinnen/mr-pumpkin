@@ -464,6 +464,76 @@ class TestReleasePackaging:
 
             assert f"{folder_name}/update.sh" in file_names
             assert f"{folder_name}/update.ps1" in file_names
+            assert f"{folder_name}/scripts/unix_dependency_plan.py" in file_names
         finally:
             if archive_path.exists():
                 archive_path.unlink()
+
+
+class TestUnixDependencyPlan:
+    """Test the Raspberry Pi dependency planning helper used by shell scripts."""
+
+    @staticmethod
+    def load_dependency_plan_module():
+        repo_root = Path(__file__).resolve().parent.parent
+        module_path = repo_root / "scripts" / "unix_dependency_plan.py"
+        spec = importlib.util.spec_from_file_location("unix_dependency_plan", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    def test_raspberry_pi_plan_prefers_supported_apt_packages(self, tmp_path):
+        module = self.load_dependency_plan_module()
+        requirements = tmp_path / "requirements.txt"
+        requirements.write_text(
+            "\n".join(
+                [
+                    "pygame>=2.0.0,<3.0.0",
+                    "websockets>=13.0,<15.1",
+                    "google-genai>=1.0.0",
+                    "mutagen>=1.45.0",
+                    "openai>=1.0.0",
+                ]
+            )
+        )
+
+        plan = module.build_install_plan([requirements], raspberry_pi=True)
+
+        assert plan.apt_packages == [
+            "python3-mutagen",
+            "python3-pygame",
+            "python3-websockets",
+        ]
+        assert plan.pip_requirements == [
+            "google-genai>=1.0.0",
+            "openai>=1.0.0",
+        ]
+
+    def test_non_pi_plan_leaves_requirements_with_pip(self, tmp_path):
+        module = self.load_dependency_plan_module()
+        requirements = tmp_path / "requirements.txt"
+        requirements.write_text("pygame>=2.0.0,<3.0.0\nwebsockets>=13.0,<15.1\n")
+
+        plan = module.build_install_plan([requirements], raspberry_pi=False)
+
+        assert plan.apt_packages == []
+        assert plan.pip_requirements == [
+            "pygame>=2.0.0,<3.0.0",
+            "websockets>=13.0,<15.1",
+        ]
+
+    def test_nested_requirement_files_are_expanded_once(self, tmp_path):
+        module = self.load_dependency_plan_module()
+        child = tmp_path / "child.txt"
+        child.write_text("websockets>=13.0,<15.1\n")
+        parent = tmp_path / "requirements.txt"
+        parent.write_text("-r child.txt\n-r child.txt\npygame>=2.0.0,<3.0.0\n")
+
+        plan = module.build_install_plan([parent], raspberry_pi=True)
+
+        assert plan.apt_packages == [
+            "python3-pygame",
+            "python3-websockets",
+        ]
+        assert plan.pip_requirements == []

@@ -31,6 +31,9 @@ Prefer an automated test that imports `scripts/package_release.py`, builds the Z
 
 Release ZIPs are build artifacts. Create them for validation, inspect them, then delete them so generated binaries do not enter source control.
 
+### Package script-side helpers explicitly
+
+If an install/update entrypoint depends on an extra runtime helper outside the default included directories, add that helper path to `scripts/package_release.py` and cover it with the real-archive packaging test. Otherwise the installer can pass in-repo tests but fail in the shipped ZIP because the helper never makes it into the release artifact.
 ## Examples
 
 ```python
@@ -46,3 +49,4 @@ with zipfile.ZipFile(archive_path, "r") as zf:
 
 - **Checking only helper logic** — A basename-only ZIP validator can miss omissions in `scripts/package_release.py`.
 - **Committing release ZIPs** — Generated artifacts create noisy diffs and should remain untracked.
+

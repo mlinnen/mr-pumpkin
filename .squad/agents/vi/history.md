@@ -1010,3 +1010,7 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 **Decision documented:** See `.squad/decisions/inbox/vi-issue-89.md` for full rationale and alternatives considered.
 
 📌 Team update (2026-03-13): Issue #89 completed — CLI host/port configuration for socket server. Manual argument parser preserves existing simple pattern. Tests ready for activation (12 provisional tests marked skip, pending removal). Documentation complete. Cleanup tasks: remove test skips (Mylo), delete test_connection.py artifact (Vi) — decided by Vi, Mylo, Jinx
+
+## Learnings
+
+- 2026-03-13: Issue #92 Raspberry Pi install/update flow now uses `scripts/unix_dependency_plan.py` to split Pi-friendly apt packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) from PyPI-only dependencies. `install.sh` prefers apt on Pi, `update.sh` attempts apt only when non-interactive privilege is available and otherwise falls back to pip with `--break-system-packages` when supported. Release packaging test now asserts the helper ships inside the ZIP, and Pi dependency planning is covered in `tests/test_auto_update.py`.
