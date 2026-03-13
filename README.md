@@ -44,6 +44,7 @@ A standalone Python program that renders an animated pumpkin face on fullscreen 
 The install script will:
 - Install SDL2 system dependencies (Linux/Raspberry Pi only)
 - Install Python dependencies via pip
+- On Raspberry Pi, prefer apt-managed Python packages for dependencies that ship with Raspberry Pi OS and fall back to pip only for packages not available via apt
 - Provide usage instructions
 
 ### Option 2: Install from Source
@@ -60,6 +61,8 @@ pip install -r requirements.txt
 sudo apt-get update
 sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 ```
+
+**Raspberry Pi note:** Raspberry Pi OS may reject global `pip install` calls for some system-managed packages. `install.sh` and `update.sh` now install the Raspberry Pi-packaged versions of `pygame`, `websockets`, and `mutagen` with `apt`, then use pip only for the remaining PyPI-only dependencies.
 
 ### Development Setup
 

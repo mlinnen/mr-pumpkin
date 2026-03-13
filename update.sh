@@ -11,9 +11,20 @@ REPO="mlinnen/mr-pumpkin"
 INSTALL_DIR="${INSTALL_DIR:-$(pwd)}"
 LOG_FILE="$INSTALL_DIR/mr-pumpkin-update.log"
 TEMP_DIR=$(mktemp -d /tmp/mr-pumpkin-update.XXXXXX)
+DEPENDENCY_HELPER="$INSTALL_DIR/scripts/unix_dependency_plan.py"
 
 # Set PATH for cron job compatibility
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+
+# Platform detection
+OS="unknown"
+if [ -f /proc/device-tree/model ] && grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
+    OS="raspberry-pi"
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    OS="linux"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    OS="macos"
+fi
 
 # Cleanup on exit
 cleanup() {
@@ -26,6 +37,118 @@ log() {
     local message="$1"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo "$timestamp | $message" | tee -a "$LOG_FILE"
+}
+
+find_python_command() {
+    if command -v python3 &> /dev/null; then
+        echo "python3"
+    elif command -v python &> /dev/null; then
+        echo "python"
+    fi
+}
+
+find_pip_command() {
+    if command -v pip3 &> /dev/null; then
+        echo "pip3"
+    elif command -v pip &> /dev/null; then
+        echo "pip"
+    fi
+}
+
+pip_supports_break_system_packages() {
+    local pip_cmd="$1"
+    "$pip_cmd" help install 2>&1 | grep -q -- "--break-system-packages"
+}
+
+can_install_with_apt() {
+    if ! command -v apt-get &> /dev/null; then
+        return 1
+    fi
+
+    if [ "$(id -u)" -eq 0 ]; then
+        return 0
+    fi
+
+    command -v sudo &> /dev/null && sudo -n true >/dev/null 2>&1
+}
+
+install_apt_packages() {
+    local packages=("$@")
+    if [ ${#packages[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    if ! can_install_with_apt; then
+        return 1
+    fi
+
+    if [ "$(id -u)" -eq 0 ]; then
+        apt-get update >> "$LOG_FILE" 2>&1
+        apt-get install -y "${packages[@]}" >> "$LOG_FILE" 2>&1
+    else
+        sudo -n apt-get update >> "$LOG_FILE" 2>&1
+        sudo -n apt-get install -y "${packages[@]}" >> "$LOG_FILE" 2>&1
+    fi
+}
+
+install_python_dependencies() {
+    local python_cmd
+    python_cmd=$(find_python_command)
+    local pip_cmd
+    pip_cmd=$(find_pip_command)
+
+    if [ "$OS" != "raspberry-pi" ]; then
+        if [ -n "$pip_cmd" ]; then
+            "$pip_cmd" install -r requirements.txt >> "$LOG_FILE" 2>&1
+        else
+            log "WARNING: pip not found, skipping dependency install"
+        fi
+        return 0
+    fi
+
+    if [ -z "$python_cmd" ]; then
+        log "WARNING: Python not found, skipping dependency install"
+        return 0
+    fi
+
+    local plan_files=("requirements.txt")
+    if [ -f "skill/requirements.txt" ]; then
+        plan_files+=("skill/requirements.txt")
+    fi
+
+    eval "$("$python_cmd" "$DEPENDENCY_HELPER" --raspberry-pi --emit-shell "${plan_files[@]}")"
+
+    if [ ${#PIP_REQUIREMENTS[@]} -gt 0 ] && [ -z "$pip_cmd" ] && can_install_with_apt; then
+        APT_PACKAGES+=("python3-pip")
+    fi
+
+    local pip_fallback_requirements=()
+    if [ ${#APT_PACKAGES[@]} -gt 0 ]; then
+        if install_apt_packages "${APT_PACKAGES[@]}"; then
+            log "Installed Raspberry Pi apt-managed Python packages: ${APT_PACKAGES[*]}"
+        else
+            log "WARNING: Could not install Raspberry Pi apt-managed Python packages automatically; falling back to pip"
+            pip_fallback_requirements=("mutagen>=1.45.0" "pygame>=2.0.0,<3.0.0" "websockets>=13.0,<15.1")
+        fi
+    fi
+
+    if [ ${#pip_fallback_requirements[@]} -gt 0 ]; then
+        PIP_REQUIREMENTS+=("${pip_fallback_requirements[@]}")
+    fi
+
+    pip_cmd=$(find_pip_command)
+    if [ ${#PIP_REQUIREMENTS[@]} -gt 0 ]; then
+        if [ -z "$pip_cmd" ]; then
+            log "WARNING: pip not found, skipping remaining Python dependency install"
+            return 0
+        fi
+
+        local pip_args=("install")
+        if pip_supports_break_system_packages "$pip_cmd"; then
+            pip_args+=("--break-system-packages")
+        fi
+        "$pip_cmd" "${pip_args[@]}" "${PIP_REQUIREMENTS[@]}" >> "$LOG_FILE" 2>&1
+    fi
 }
 
 # Get local version
@@ -206,14 +329,8 @@ deploy_release() {
     
     log "Installing Python dependencies..."
     cd "$INSTALL_DIR"
-    
-    if command -v pip &> /dev/null; then
-        pip install -r requirements.txt >> "$LOG_FILE" 2>&1
-    elif command -v pip3 &> /dev/null; then
-        pip3 install -r requirements.txt >> "$LOG_FILE" 2>&1
-    else
-        log "WARNING: pip not found, skipping dependency install"
-    fi
+
+    install_python_dependencies
     
     log "Deployment complete"
     return 0

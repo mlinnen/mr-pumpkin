@@ -61,7 +61,8 @@ The script will:
 - Stop process with SIGTERM (5-second timeout, then SIGKILL if needed)
 - Extract release ZIP and validate structure
 - Copy files to installation directory
-- Run `pip install -r requirements.txt` to update dependencies
+- On Raspberry Pi, install apt-managed Python packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) when possible, then use pip only for the remaining PyPI-only dependencies
+- On other Unix-like hosts, run `pip install -r requirements.txt` to update dependencies
 - Restart with original arguments: `nohup python pumpkin_face.py [args] > /dev/null 2>&1 &`
 
 #### Cron Job Setup
@@ -290,13 +291,15 @@ YYYY-MM-DD HH:MM:SS | PHASE | Message
 **Possible causes:**
 - Python not in PATH (cron job environment)
 - Missing dependencies
+- Raspberry Pi auto-update lacks non-interactive sudo access for apt-managed packages
 - Port 5000/5001 already in use
 
 **Solutions:**
 1. Check log file for specific error
 2. Manually start: `python pumpkin_face.py [args]`
 3. Verify Python and pip are in system PATH
-4. For cron jobs, set PATH explicitly in script or crontab
+4. On Raspberry Pi, either run the update as root/passwordless sudo or install the apt-managed Python packages manually
+5. For cron jobs, set PATH explicitly in script or crontab
 
 ### Permission Denied
 
