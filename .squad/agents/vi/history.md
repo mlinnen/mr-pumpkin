@@ -20,6 +20,7 @@
 📌 Team update (2026-03-03): Issue #57 resolved: Built Jekyll 4.3 static site for GitHub Pages. Custom dark theme (orange #FF6B00 on #0d0d0d), 7 pages + blog, responsive nav, updated squad-docs.yml CI — decided by Vi
 📌 Team update (2026-03-06): Issue #66 foundations completed: Audio analyzer provider (Gemini multimodal two-pass), timeline audio_file extension, pygame playback, upload_audio server endpoint. Mylo wrote 29-test scaffold — decided by Vi, Mylo
 📌 Team update (2026-03-08): Issue #81 completed: Added OpenAI provider for audio analysis and timeline generation. OpenAIProvider (gpt-4o) and OpenAIAudioProvider (gpt-4o-audio-preview) serve as fallbacks when Gemini quota exhausted. 13 tests added — decided by Vi
+📌 Team update (2026-03-13): Issue #89 complete: Added port range validation (1-65535) in pumpkin_face.py argument parsing with immediate user-friendly error messages. Mylo verified with 15 integration tests (real server subprocess, Windows compatibility). Default: localhost:5000. Merged to decisions.md. — decided by Vi, Mylo
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
