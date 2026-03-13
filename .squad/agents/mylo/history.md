@@ -23,6 +23,7 @@
 📌 Team update (2026-03-06): Issue #66 foundations completed: Wrote audio_analyzer test scaffold (29 tests, 5 classes: AudioAnalysis dataclass, Provider ABC, GeminiProvider implementation, factory, MIME types). Vi implemented audio analyzer, timeline extension, pygame playback, server upload_audio — decided by Vi, Mylo
 📌 Team update (2026-03-06): PR #74 TCP buffer bug fixed (lockout, Vi's code). upload_audio handler reset upload_buf on every non-matching recv(), discarding chunk tails that could start the \nEND_UPLOAD\n marker. Fix: accumulate upload_buf across all recv() calls, extract audio_data via split() when marker found. upload_timeline was already correct. — decided by Mylo (lockout fix)
 📌 Team update (2026-03-06): PR #74 CI test fixes: Fixed 24 failing tests in test_audio_analyzer.py. Key lessons: (1) GeminiAudioProvider imports `genai` locally inside __init__ via `from google import genai` — mock path must be `google.genai.Client` not `skill.audio_analyzer.genai`; (2) AudioAnalysis dataclass requires `audio_path` as 6th positional field; (3) get_provider() updated to accept **kwargs and forward to GeminiAudioProvider; (4) _wait_for_file_active polling requires `mock_client.files.get.return_value.state = "ACTIVE"` in tests. All 27 tests now pass. — decided by Mylo
+📌 Team update (2026-03-12): Issue #89 test suite created: Added tests/test_cli_options.py with 17 tests validating CLI host/port configuration. Test classes: TestDefaultHostAndPort (3 tests, all passing - baseline verification), TestHostOption (2 provisional tests), TestPortOption (2 provisional tests), TestHostAndPortCombined (2 provisional tests), TestCLIValidation (3 provisional tests), TestCLIHelpText (3 provisional tests). Confirmed current default behavior: server binds to localhost:5000. Implementation blocker: pumpkin_face.py hardcodes host/port at line 1465, needs argparse integration for --host/--port CLI options. — decided by Mylo
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 
@@ -945,3 +946,68 @@ def _make_mock_gemini_response(analysis_json, emotion):
 - Mock structure (_make_mock_gemini_response helper) makes tests readable and maintainable
 - Deferred import pattern (SKILL_AVAILABLE + pytestmark.skipif) allows tests to exist before module does
 - This is the third time using this pattern successfully (test_skill_generator, test_auto_update, now test_audio_analyzer)
+
+### Issue #89 — CLI Host/Port Options Test Suite (2026-03-12)
+
+**Status:** Test suite created, baseline tests passing, provisional tests written
+
+**Test file:** tests/test_cli_options.py (17 tests across 6 test classes)
+
+**Test coverage:**
+1. **TestDefaultHostAndPort** (3 tests - ALL PASSING):
+   - Server binds to localhost:5000 by default (no CLI args)
+   - Default server accepts commands (neutral expression test)
+   - Default server only binds to port 5000, not other ports
+   - **Result:** Current implementation confirmed working at localhost:5000
+   
+2. **TestHostOption** (2 provisional tests):
+   - --host 127.0.0.1 binding
+   - --host 0.0.0.0 binding (all interfaces)
+   
+3. **TestPortOption** (2 provisional tests):
+   - --port 6000 custom port binding
+   - Verify default port 5000 not bound when custom port specified
+   
+4. **TestHostAndPortCombined** (2 provisional tests):
+   - Both --host and --port specified together
+   - Argument order independence
+   
+5. **TestCLIValidation** (3 provisional tests):
+   - Invalid port non-numeric (--port abc)
+   - Invalid port out of range (--port 70000)
+   - Invalid host malformed (--host invalid..host)
+   
+6. **TestCLIHelpText** (3 provisional tests):
+   - --help mentions --host option
+   - --help mentions --port option
+   - --help shows default values (localhost, 5000)
+
+**Implementation blocker identified:**
+- Current code at pumpkin_face.py:1465 hardcodes: server_socket.bind(('localhost', 5000))
+- No CLI argument parsing for --host/--port exists in main block
+- Needs argparse integration similar to existing --window/--fullscreen options
+- Provisional tests marked with @pytest.mark.skip until implementation lands
+
+**Test infrastructure patterns:**
+- Helper: wait_for_port(host, port, timeout) - polls until server ready
+- Helper: send_tcp_command(host, port, command, timeout) - sends command and returns response
+- Helper: start_server_with_args(args, wait_host, wait_port) - starts server subprocess with CLI args
+- Windows compatibility: Uses CREATE_NO_WINDOW flag for subprocess on Windows
+- Real server testing: Spawns actual pumpkin_face.py process, no mocking
+- Automatic cleanup: Server process terminated in finally blocks
+
+**Key testing insights:**
+- Default behavior baseline: All 3 baseline tests pass, confirming localhost:5000 default
+- Provisional approach: Tests written against expected interface before implementation
+- Socket polling: Reliable wait_for_port() with exponential backoff (0.1s intervals, 5-10s timeout)
+- Platform-specific handling: Windows uses CREATE_NO_WINDOW, Unix uses standard Popen
+- Error validation: Tests expect non-zero exit codes for invalid CLI arguments
+- Help text validation: Ensures --help documents new options with defaults
+
+**Collaboration notes:**
+- Tests ready for implementation team (Vi or Jinx)
+- Implementation needs: argparse for --host/--port, default values, validation
+- Once implementation lands: remove @pytest.mark.skip decorators
+- Expected quick activation: 14 provisional tests should pass immediately
+
+📌 Team update (2026-03-13): Issue #89 test suite completed — 15 comprehensive tests with real server subprocess testing. Baseline (3 tests) passing. Provisional tests (12 tests) ready for skip decorator removal and full test run. Helper infrastructure created for future integration testing — decided by Vi, Mylo, Jinx

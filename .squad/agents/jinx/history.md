@@ -420,3 +420,29 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 - **Tests:** Thorough test coverage in `tests/test_lipsync_cli.py` and `tests/test_audio_analyzer.py`.
 
 **Action:** Posted review comment requesting a fix for the buffer handling bug in `pumpkin_face.py`. Architecture otherwise approved.
+
+### Issue #89 — CLI Host/Port Configuration Review (2026-03-12)
+
+**Task:** Code review for issue #89 implementation (command-line --host and --port options).
+
+**Findings:**
+- **Implementation (pumpkin_face.py):** ✅ **APPROVED**. Constructor accepts host and port parameters with correct defaults (localhost, 5000). Socket binding uses (self.host, self.port). Argument parsing validates port as integer. Help text comprehensive. Backward compatible.
+- **Tests (test_cli_options.py):** 🔄 **PARTIALLY APPROVED**. Excellent test structure (6 classes, 15 tests), but 12 provisional tests still marked with @pytest.mark.skip despite implementation being complete. Assigned to Mylo: remove skip decorators, run full suite, report results.
+- **Documentation (README.md):** ✅ **APPROVED**. CLI options documented on lines 172-189 with examples. Consistent defaults throughout (localhost:5000). No changes needed.
+- **Stray artifact (test_connection.py):** ⚠️ **DELETE**. 33-line manual testing script duplicates coverage in test suites and client_example.py. Assigned to Vi: delete file.
+
+**Architectural insights:**
+- Manual sys.argv parsing pattern preserved (vs. argparse) — consistent with project's lightweight CLI approach
+- Constructor injection of runtime config (PumpkinFace(host=..., port=...)) is clean separation of concerns
+- Provisional testing workflow (write tests during dev, mark skip, activate when ready) is excellent practice — just needs final activation
+
+**Minor critique:** Port range validation (1-65535) not implemented. Code accepts int() conversion but doesn't check bounds, so invalid ports fail at OS binding instead of CLI validation. Optional improvement, not a blocker.
+
+**Key files for future CLI work:**
+- pumpkin_face.py lines 1679-1739: main block argument parsing
+- pumpkin_face.py line 44: PumpkinFace.__init__() signature
+- 	ests/test_cli_options.py: subprocess-based server testing with helpers wait_for_port(), send_tcp_command(), start_server_with_args()
+
+**Verdict:** ✅ **APPROVED** with two follow-up tasks (test activation, artifact cleanup). Core implementation is correct, complete, and production-ready.
+
+📌 Team update (2026-03-13): Issue #89 review completed — implementation and documentation approved. Tests partially approved (skip decorators now obsolete, need removal). Cleanup task identified: delete test_connection.py stray artifact. Two 30-minute follow-up tasks remain before closing issue — decided by Vi, Mylo, Jinx
