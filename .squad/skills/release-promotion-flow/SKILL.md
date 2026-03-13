@@ -15,6 +15,7 @@ Use this skill when coordinating a versioned release for Mr. Pumpkin. The reposi
 - Promote in order: merge `dev` into `preview`, validate, then merge `preview` into `main`.
 - Keep the release version string aligned everywhere: `VERSION`, `CHANGELOG.md`, `docs/what-is-new.md`, and any summary docs that mention new user-facing capabilities.
 - Include release-packaging fixes in the same release cut when they affect what ships to end users.
+- Do not assume `Closes #...` in a PR description will close the linked issue when the PR merges into `dev`; verify the issue state after merge and close it manually if needed.
 
 ## Examples
 - `squad-promote.yml` promotes `dev → preview` and then `preview → main`, reading the current `VERSION` for merge messages.
@@ -24,3 +25,4 @@ Use this skill when coordinating a versioned release for Mr. Pumpkin. The reposi
 - Promoting `preview` or `main` before the release version exists in `CHANGELOG.md`.
 - Leaving new CLI features undocumented in `README.md` while still cutting a release.
 - Assuming local-only `dev` commits are safe to promote without first pushing or otherwise synchronizing them.
+- Assuming GitHub issue auto-close behavior applies the same way to non-default-branch merges as it does to merges into the default release branch.

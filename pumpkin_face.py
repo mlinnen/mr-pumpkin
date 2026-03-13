@@ -1326,14 +1326,27 @@ class PumpkinFace:
         
         # Start network servers FIRST (before display initialization)
         # This ensures socket servers are ready even if display fails
-        server_thread = threading.Thread(target=self._run_socket_server, daemon=True)
-        server_thread.start()
+        try:
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server_socket.bind((self.host, self.port))
+            server_socket.listen()
+        except OSError as e:
+            print(f"Failed to start socket server: {e}")
+            pygame.quit()
+            raise SystemExit(1)
+
         print(f"Socket server listening on {self.host}:{self.port}")
+        server_thread = threading.Thread(
+            target=self._run_socket_server,
+            args=(server_socket,),
+            daemon=True,
+        )
+        server_thread.start()
         
         if websockets is not None:
             ws_thread = threading.Thread(target=self._run_ws_server, daemon=True)
             ws_thread.start()
-            print("WebSocket server listening on port 5001")
         else:
             print("Warning: websockets library not available (WebSocket server disabled)")
         
@@ -1461,13 +1474,7 @@ class PumpkinFace:
         elif key == pygame.K_0:
             self.reset_projection_offset()
     
-    def _run_socket_server(self):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind((self.host, self.port))
-        server_socket.listen(1)
-        print(f"Socket server listening on {self.host}:{self.port}")
-        
+    def _run_socket_server(self, server_socket):
         try:
             while self.running:
                 try:
@@ -1623,6 +1630,7 @@ class PumpkinFace:
         """Main WebSocket server coroutine."""
         try:
             async with websockets.serve(self._ws_handler, 'localhost', 5001):
+                print("WebSocket server listening on port 5001")
                 await asyncio.Future()  # Run forever
         except Exception as e:
             print(f"Failed to start WebSocket server: {e}")

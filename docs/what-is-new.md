@@ -12,6 +12,15 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.16] - 2026-03-13
+
+### Fixed
+- **Release ZIP auto-update coverage** — `scripts/package_release.py` now ships `update.sh` and `update.ps1`, so packaged installs keep the documented update entrypoints on Linux/macOS and Windows.
+- **Socket startup validation** — `pumpkin_face.py` now fails fast when the TCP listener cannot bind and uses the platform default TCP listen backlog instead of limiting the server to a single pending connection.
+- **CLI startup validation stability** — The subprocess startup tests now wait for the spawned pumpkin server process itself to own the requested port, preventing false positives from stale listeners during release validation.
+
+---
+
 ## [0.5.15] - 2026-03-13
 
 ### Added
