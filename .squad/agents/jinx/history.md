@@ -495,6 +495,12 @@ elease/* branches to target main; this PR targeted dev). Squad CI (tests) passed
 - The release path for this repo is `dev` metadata first, then `squad-promote.yml` for `dev → preview → main`, with `squad-release.yml` on `main` owning the test/tag/package/publication phase.
 - Key release files for this flow are `VERSION`, `CHANGELOG.md`, `docs/what-is-new.md`, `.github/workflows/squad-promote.yml`, and `.github/workflows/squad-release.yml`.
 
+### v0.5.17 manual publication recovery (2026-03-13)
+
+- If `squad-promote.yml` advances `main` with `GITHUB_TOKEN`, the downstream `push` trigger for `squad-release.yml` may be suppressed; the safest recovery is to publish from an exact `origin/main` worktree instead of editing workflows or manufacturing another `main` push.
+- For manual recovery, mirror the release workflow's critical steps from that detached `main` checkout: derive notes from the current `CHANGELOG.md` section for `VERSION`, build `mr-pumpkin-v<version>.zip` with `scripts/package_release.py`, verify the archive contents, then tag and publish the GitHub Release from the promoted commit.
+- When promotion validation has already passed and the only break is release automation not firing, packaging-specific verification on the exact promoted tree is the highest-value manual safety check before publishing.
+
 ## Team Sync — 2026-03-13 Completion
 
 **Issue #92 orchestration summary:**

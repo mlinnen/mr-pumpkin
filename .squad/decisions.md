@@ -4746,3 +4746,44 @@ Approve PR #93 for issue #92.
 - The Raspberry Pi updater contract still holds: `update.sh` is non-root and cron-safe by default, and apt refresh remains opt-in via `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`.
 - README, `docs/auto-update.md`, and the focused shell-script regression tests all describe and enforce the same behavior.
 - PR #93 is correctly based on `dev`, and the later branch commits only add `.squad/` documentation/history notes rather than changing runtime behavior.
+
+### 2026-03-13: Release v0.5.17 — Scope of Release Notes
+
+**By:** Jinx (Lead)
+
+**Date:** 2026-03-13
+
+**What:** For v0.5.17, release metadata describes shipped Raspberry Pi install/update/package behavior and excludes .squad/ coordination churn from changelog summary.
+
+**Why:** The \dev\ branch delta includes substantial team-history and orchestration updates, but the product-facing change being promoted is the Raspberry Pi dependency-management fix. Release notes should track what end users and maintainers receive in the build, not internal coordination noise that happened alongside it.
+
+**Affected files:**
+- \VERSION\
+- \CHANGELOG.md\
+- \docs/what-is-new.md\
+
+**Outcome:** Release v0.5.17 published with product-focused notes; https://github.com/mlinnen/mr-pumpkin/releases/tag/v0.5.17
+
+---
+
+### 2026-03-13: Manual v0.5.17 Publication Recovery
+
+**By:** Jinx (Lead)
+
+**Date:** 2026-03-13
+
+**What:** Recovered v0.5.17 by publishing directly from the exact promoted main content in a temporary detached worktree, reusing existing squad-release.yml packaging and release-note logic, instead of changing workflow files or forcing another main push.
+
+**Why:** The promoted branch state was already correct: VERSION, CHANGELOG.md, and docs/what-is-new.md matched  .5.17. The release gap came from automation trigger behavior rather than missing product changes. Publishing from exact origin/main checkout keeps the release artifact aligned with shipped code while avoiding extra workflow churn and risk to branch history.
+
+**Implementation:** Coordinator (Mike Linnen) manually executed release publication workflow on temporary main worktree, created and pushed tag v0.5.17, and published GitHub Release with artifact.
+
+**Affected files:**
+- \.github/workflows/squad-release.yml\ (trigger investigation pending)
+- \VERSION\
+- \CHANGELOG.md\
+- \docs/what-is-new.md\
+
+**Outcome:** v0.5.17 successfully published; https://github.com/mlinnen/mr-pumpkin/releases/tag/v0.5.17
+
+---
