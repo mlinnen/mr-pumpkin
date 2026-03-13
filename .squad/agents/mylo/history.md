@@ -1013,3 +1013,20 @@ def _make_mock_gemini_response(analysis_json, emotion):
 - Expected quick activation: 14 provisional tests should pass immediately
 
 📌 Team update (2026-03-13): Issue #89 test suite completed — 15 comprehensive tests with real server subprocess testing. Baseline (3 tests) passing. Provisional tests (12 tests) ready for skip decorator removal and full test run. Helper infrastructure created for future integration testing — decided by Vi, Mylo, Jinx
+
+### Issue #92 Final Reviewer Gate (2026-03-13)
+
+**Verdict:** Approve
+
+**What I verified:**
+- `bash -n install.sh`
+- `bash -n update.sh`
+- `python -m pytest tests/test_pi_install_scripts.py tests/test_auto_update.py -q` → 43 passed
+- `install.sh` and `update.sh` are LF-only, matching the new `.gitattributes` guard for shipped Bash scripts
+- PR #93 is based on `dev` (merge-base matches `origin/dev`)
+
+**Release-gate conclusion:**
+- Raspberry Pi install path still prefers apt-managed packages when available, with pip covering only the remaining dependencies
+- Raspberry Pi update path still stays non-root and cron-safe by default, with apt refresh only behind `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`
+- README and `docs/auto-update.md` describe the same updater contract that the shell-script tests enforce
+- Post-rescue PR commits after the validated updater change only added `.squad/` coordination notes, so they do not alter the ship decision

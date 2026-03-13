@@ -33,6 +33,7 @@ def create_release_package():
         "install.ps1",
         "update.sh",
         "update.ps1",
+        "scripts/unix_dependency_plan.py",
     ]
     
     # Directories to include
