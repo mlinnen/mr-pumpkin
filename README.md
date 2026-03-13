@@ -169,9 +169,23 @@ python pumpkin_face.py --window           # Windowed on monitor 0
 python pumpkin_face.py 1 --window         # Windowed on monitor 1
 ```
 
+**Custom host and port:**
+```bash
+python pumpkin_face.py --host 0.0.0.0     # Listen on all network interfaces
+python pumpkin_face.py --port 8080        # Listen on port 8080
+python pumpkin_face.py --host 0.0.0.0 --port 8080  # Custom host and port
+```
+
 **Usage:**
 ```
-python pumpkin_face.py [monitor_number] [--window|--fullscreen]
+python pumpkin_face.py [OPTIONS] [monitor_number]
+
+Options:
+  --window              Run in windowed mode (default: fullscreen)
+  --fullscreen          Run in fullscreen mode
+  --host HOST           IP address or hostname to bind to (default: localhost)
+  --port PORT           Port number to listen on (default: 5000)
+  -h, --help            Show this help message
 ```
 
 The program will list available monitors and run on your selected output. Press ESC to exit.

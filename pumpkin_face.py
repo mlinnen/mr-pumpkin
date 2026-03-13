@@ -41,11 +41,13 @@ EYEBROW_BASELINES = {
 }
 
 class PumpkinFace:
-    def __init__(self, width: int = 1920, height: int = 1080, monitor: int = 0, fullscreen: bool = True):
+    def __init__(self, width: int = 1920, height: int = 1080, monitor: int = 0, fullscreen: bool = True, host: str = 'localhost', port: int = 5000):
         self.width = width
         self.height = height
         self.monitor = monitor
         self.fullscreen = fullscreen
+        self.host = host
+        self.port = port
         self.clock = pygame.time.Clock()
         self.running = True
         self.current_expression = Expression.NEUTRAL
@@ -1326,7 +1328,7 @@ class PumpkinFace:
         # This ensures socket servers are ready even if display fails
         server_thread = threading.Thread(target=self._run_socket_server, daemon=True)
         server_thread.start()
-        print("Socket server listening on port 5000")
+        print(f"Socket server listening on {self.host}:{self.port}")
         
         if websockets is not None:
             ws_thread = threading.Thread(target=self._run_ws_server, daemon=True)
@@ -1387,7 +1389,7 @@ class PumpkinFace:
                 print(f"Running WINDOWED on monitor {self.monitor} - {self.width}x{self.height}")
             
             pygame.display.set_caption("Mr. Pumpkin")
-            print("Press ESC to exit or send socket commands to port 5000")
+            print(f"Press ESC to exit or send socket commands to {self.host}:{self.port}")
         except Exception as e:
             print(f"Warning: Could not initialize display: {e}")
             print("Running in headless mode - socket server only")
@@ -1462,9 +1464,9 @@ class PumpkinFace:
     def _run_socket_server(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind(('localhost', 5000))
+        server_socket.bind((self.host, self.port))
         server_socket.listen(1)
-        print("Socket server listening on port 5000")
+        print(f"Socket server listening on {self.host}:{self.port}")
         
         try:
             while self.running:
@@ -1677,26 +1679,64 @@ class PumpkinFace:
 if __name__ == "__main__":
     monitor = 0
     fullscreen = True
+    host = 'localhost'
+    port = 5000
     
     # Parse command-line arguments
-    for arg in sys.argv[1:]:
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
         if arg == '--window':
             fullscreen = False
         elif arg == '--fullscreen':
             fullscreen = True
+        elif arg == '--host':
+            if i + 1 >= len(sys.argv):
+                print("Error: --host requires an argument")
+                sys.exit(1)
+            host = sys.argv[i + 1]
+            i += 1
+        elif arg == '--port':
+            if i + 1 >= len(sys.argv):
+                print("Error: --port requires an argument")
+                sys.exit(1)
+            try:
+                port = int(sys.argv[i + 1])
+                if port < 1 or port > 65535:
+                    print(f"Error: port must be 0-65535.")
+                    sys.exit(1)
+            except ValueError:
+                print(f"Error: Invalid port number: {sys.argv[i + 1]}")
+                sys.exit(1)
+            i += 1
+        elif arg in ['-h', '--help']:
+            print(f"Usage: python pumpkin_face.py [OPTIONS] [monitor_number]")
+            print(f"")
+            print(f"Options:")
+            print(f"  --window              Run in windowed mode (default: fullscreen)")
+            print(f"  --fullscreen          Run in fullscreen mode")
+            print(f"  --host HOST           IP address or hostname to bind to (default: localhost)")
+            print(f"  --port PORT           Port number to listen on (default: 5000)")
+            print(f"  -h, --help            Show this help message")
+            print(f"")
+            print(f"Examples:")
+            print(f"  python pumpkin_face.py                      # Fullscreen on monitor 0, localhost:5000")
+            print(f"  python pumpkin_face.py 0                    # Fullscreen on monitor 0")
+            print(f"  python pumpkin_face.py 1                    # Fullscreen on monitor 1")
+            print(f"  python pumpkin_face.py --window             # Windowed on monitor 0")
+            print(f"  python pumpkin_face.py 1 --window           # Windowed on monitor 1")
+            print(f"  python pumpkin_face.py --host 0.0.0.0       # Listen on all interfaces")
+            print(f"  python pumpkin_face.py --port 8080          # Listen on port 8080")
+            print(f"  python pumpkin_face.py --host 0.0.0.0 --port 8080  # Custom host and port")
+            sys.exit(0)
         else:
             try:
                 monitor = int(arg)
             except ValueError:
-                print(f"Usage: python pumpkin_face.py [monitor_number] [--window|--fullscreen]")
-                print(f"")
-                print(f"Examples:")
-                print(f"  python pumpkin_face.py              # Fullscreen on monitor 0 (default)")
-                print(f"  python pumpkin_face.py 0            # Fullscreen on monitor 0")
-                print(f"  python pumpkin_face.py 1            # Fullscreen on monitor 1")
-                print(f"  python pumpkin_face.py --window     # Windowed on monitor 0")
-                print(f"  python pumpkin_face.py 1 --window   # Windowed on monitor 1")
+                print(f"Error: Unknown argument: {arg}")
+                print(f"Use --help for usage information")
                 sys.exit(1)
+        i += 1
     
-    pumpkin = PumpkinFace(monitor=monitor, fullscreen=fullscreen)
+    pumpkin = PumpkinFace(monitor=monitor, fullscreen=fullscreen, host=host, port=port)
     pumpkin.run()
