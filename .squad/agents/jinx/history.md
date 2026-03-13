@@ -16,6 +16,12 @@
 
 *Patterns, conventions, and decisions discovered during work.*
 
+### GitHub Triage Follow-Through (2026-03-13)
+
+- **Issue #89** was already shipped in `v0.5.15`; it needed manual closure with a brief shipped note because the implementation was complete but the tracker was still open.
+- **PR #91** merged cleanly into `dev` after CI passed, producing merge commit `7338d0919954d80fd96e3d79a22317e93a25e9a2`.
+- **Important workflow pattern:** PR body keywords like `Closes #90` did **not** auto-close the issue when the PR merged into `dev`, so issue #90 required explicit manual closure after merge.
+
 ### Issue #77 - Model and API Key CLI Parameters (2026-03-08)
 
 Implemented CLI parameter support for model names and API keys on existing branch `squad/81-openai-provider` (included in PR #82):
