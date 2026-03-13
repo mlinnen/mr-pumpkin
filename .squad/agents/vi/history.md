@@ -20,6 +20,7 @@
 📌 Team update (2026-03-03): Issue #57 resolved: Built Jekyll 4.3 static site for GitHub Pages. Custom dark theme (orange #FF6B00 on #0d0d0d), 7 pages + blog, responsive nav, updated squad-docs.yml CI — decided by Vi
 📌 Team update (2026-03-06): Issue #66 foundations completed: Audio analyzer provider (Gemini multimodal two-pass), timeline audio_file extension, pygame playback, upload_audio server endpoint. Mylo wrote 29-test scaffold — decided by Vi, Mylo
 📌 Team update (2026-03-08): Issue #81 completed: Added OpenAI provider for audio analysis and timeline generation. OpenAIProvider (gpt-4o) and OpenAIAudioProvider (gpt-4o-audio-preview) serve as fallbacks when Gemini quota exhausted. 13 tests added — decided by Vi
+📌 Team update (2026-03-13): Issue #89 complete: Added port range validation (1-65535) in pumpkin_face.py argument parsing with immediate user-friendly error messages. Mylo verified with 15 integration tests (real server subprocess, Windows compatibility). Default: localhost:5000. Merged to decisions.md. — decided by Vi, Mylo
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
@@ -942,3 +943,62 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 - Dual-provider support enables quota exhaustion workarounds: try Gemini first, fall back to OpenAI on rate limit
 
 **PR:** #82
+
+### Command-Line Host/Port Configuration (Issue #89)
+
+**What:** Added command-line options to configure socket server binding address and port.
+
+**Key changes:**
+- Added `--host HOST` option (default: 'localhost')
+- Added `--port PORT` option (default: 5000)
+- Added `-h, --help` flag for usage information
+- Updated `PumpkinFace.__init__()` to accept `host` and `port` parameters
+- Modified `_run_socket_server()` to use configured values instead of hardcoded 'localhost:5000'
+- Updated print statements to show dynamic `host:port` instead of hardcoded "5000"
+
+**Files modified:**
+- `pumpkin_face.py`:
+  - Constructor signature: `PumpkinFace(..., host='localhost', port=5000)` (line 44)
+  - Socket binding: `server_socket.bind((self.host, self.port))` (line 1465)
+  - Argument parsing: Manual parser with `--host`, `--port`, `-h/--help` flags (lines 1677-1733)
+  - Help text: Comprehensive usage examples showing all option combinations
+- `README.md`: Updated Usage section with new CLI options and examples
+
+**Argument parsing pattern:**
+- Manual index-based parser (`i = 1; while i < len(sys.argv):`)
+- Multi-argument flags increment counter: `i += 1` after reading value
+- Error handling: Validate port as integer, check for missing arguments
+- Backward compatibility: Existing monitor number and --window/--fullscreen unchanged
+
+**Design rationale:**
+- **Preserved simplicity:** Kept manual parsing instead of argparse to match existing pattern
+- **Default behavior unchanged:** localhost:5000 remains default when options omitted
+- **Network deployment support:** `--host 0.0.0.0` enables remote access (Raspberry Pi, network clients)
+- **Port conflict resolution:** `--port` allows running multiple instances or avoiding conflicts
+
+**CLI examples:**
+- `python pumpkin_face.py` — Default: localhost:5000
+- `python pumpkin_face.py --host 0.0.0.0` — Listen on all interfaces
+- `python pumpkin_face.py --port 8080` — Custom port
+- `python pumpkin_face.py 1 --window --host 0.0.0.0 --port 7000` — All options combined
+
+**Validation:**
+- Help output displays correctly
+- Invalid port number rejected: `Error: Invalid port number: invalid`
+- Missing arguments caught: `Error: --host requires an argument`
+- Module imports successfully (no syntax errors)
+- Backward compatibility verified: existing commands work unchanged
+
+**Architectural consistency:**
+- Follows existing pattern: monitor/fullscreen options set via constructor parameters
+- Socket server configuration orthogonal to display configuration
+- Clean separation: CLI parsing in `__main__` block, server binding in `_run_socket_server()`
+
+**Future extension points:**
+- WebSocket server (port 5001) could receive similar treatment if needed
+- Environment variable fallback (e.g., `PUMPKIN_HOST`, `PUMPKIN_PORT`) could be added
+- Config file support for persistent settings across restarts
+
+**Decision documented:** See `.squad/decisions/inbox/vi-issue-89.md` for full rationale and alternatives considered.
+
+📌 Team update (2026-03-13): Issue #89 completed — CLI host/port configuration for socket server. Manual argument parser preserves existing simple pattern. Tests ready for activation (12 provisional tests marked skip, pending removal). Documentation complete. Cleanup tasks: remove test skips (Mylo), delete test_connection.py artifact (Vi) — decided by Vi, Mylo, Jinx

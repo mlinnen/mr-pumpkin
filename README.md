@@ -169,9 +169,23 @@ python pumpkin_face.py --window           # Windowed on monitor 0
 python pumpkin_face.py 1 --window         # Windowed on monitor 1
 ```
 
+**Custom host and port:**
+```bash
+python pumpkin_face.py --host 0.0.0.0     # Listen on all network interfaces
+python pumpkin_face.py --port 8080        # Listen on port 8080
+python pumpkin_face.py --host 0.0.0.0 --port 8080  # Custom host and port
+```
+
 **Usage:**
 ```
-python pumpkin_face.py [monitor_number] [--window|--fullscreen]
+python pumpkin_face.py [OPTIONS] [monitor_number]
+
+Options:
+  --window              Run in windowed mode (default: fullscreen)
+  --fullscreen          Run in fullscreen mode
+  --host HOST           IP address or hostname to bind to (default: localhost)
+  --port PORT           Port number to listen on (default: 5000)
+  -h, --help            Show this help message
 ```
 
 The program will list available monitors and run on your selected output. Press ESC to exit.
@@ -461,7 +475,12 @@ The application can run in headless mode (without a display) for automation and 
 
 ## Skill CLI Tools
 
-The `skill/` package provides two command-line tools that generate Mr. Pumpkin animation timelines and upload them to a running server. Both tools require a `GEMINI_API_KEY` environment variable (and optionally `OPENAI_API_KEY` when using the OpenAI provider).
+The `skill/` package provides three command-line tools:
+- `mr-pumpkin-record` — generate and upload a timeline from a natural-language prompt
+- `mr-pumpkin-lipsync` — generate a lip-synced timeline from an audio file
+- `mr-pumpkin-list-models` — inspect live Gemini/OpenAI model IDs available to your configured account
+
+The generation tools require a `GEMINI_API_KEY` environment variable by default (and optionally `OPENAI_API_KEY` when using the OpenAI provider). The model-listing tool requires the provider-specific API key for the provider you query.
 
 ### mr-pumpkin-record
 
@@ -559,6 +578,46 @@ python -m skill.lipsync_cli speech.wav -f story \
 # Use OpenAI for timeline generation with a specific model
 python -m skill.lipsync_cli song.mp3 -f dance \
   --provider openai --model gpt-4o
+```
+
+---
+
+### mr-pumpkin-list-models
+
+Lists the live model IDs exposed by Gemini or OpenAI so you can choose valid values for `--model` and related overrides before generating animations.
+
+```
+usage: mr-pumpkin-list-models [--provider PROVIDER] [--filter TEXT]
+                              [--all] [--api-key KEY]
+```
+
+**Arguments**
+
+| Argument | Default | Description |
+|---|---|---|
+| `--provider` / `-p` | `gemini` | Provider to query: `gemini` or `openai` |
+| `--filter` / `-f` | — | Case-insensitive substring filter applied to model IDs |
+| `--all` / `-a` | — | Query all supported providers and print grouped results |
+| `--api-key` | — | Override the provider API key instead of reading environment variables |
+
+**Environment variables**
+
+- `GEMINI_API_KEY` or `GOOGLE_API_KEY` — required for Gemini queries
+- `OPENAI_API_KEY` — required for OpenAI queries
+
+**Exit codes:** `0` success · `1` provider/API/import error · `2` argument error
+
+**Examples**
+
+```bash
+# List all Gemini models visible to the configured account
+python -m skill.list_models
+
+# Show only OpenAI models containing "gpt-4o"
+python -m skill.list_models --provider openai --filter gpt-4o
+
+# Query both providers in one pass
+python -m skill.list_models --all
 ```
 
 ---
