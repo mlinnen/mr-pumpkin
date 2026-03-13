@@ -61,7 +61,7 @@ The script will:
 - Stop process with SIGTERM (5-second timeout, then SIGKILL if needed)
 - Extract release ZIP and validate structure
 - Copy files to installation directory
-- On Raspberry Pi, install apt-managed Python packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) when possible, then use pip only for the remaining PyPI-only dependencies
+- On Raspberry Pi, keep unattended updates non-root by default: refresh only the pip-managed dependencies and leave apt-managed packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) to `install.sh` or a manual apt step
 - On other Unix-like hosts, run `pip install -r requirements.txt` to update dependencies
 - Restart with original arguments: `nohup python pumpkin_face.py [args] > /dev/null 2>&1 &`
 
@@ -181,6 +181,18 @@ INSTALL_DIR=/custom/path
 
 For Task Scheduler, set environment variable system-wide or in the script wrapper.
 
+**MR_PUMPKIN_ALLOW_PI_APT_UPDATE** - Optional Raspberry Pi override for `update.sh`:
+
+- Default: unset / `0`
+- When left at the default, `update.sh` skips apt-managed packages so cron jobs stay non-root and password-prompt free
+- Set to `1` only if you intentionally want the updater to refresh `python3-pygame`, `python3-websockets`, and `python3-mutagen` and the script will have root or passwordless sudo available
+
+Example:
+```bash
+export MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1
+./update.sh
+```
+
 ## Log File
 
 All update operations are logged to `mr-pumpkin-update.log` in the installation directory.
@@ -291,15 +303,16 @@ YYYY-MM-DD HH:MM:SS | PHASE | Message
 **Possible causes:**
 - Python not in PATH (cron job environment)
 - Missing dependencies
-- Raspberry Pi auto-update lacks non-interactive sudo access for apt-managed packages
+- Raspberry Pi is missing an apt-managed dependency that was never installed with `install.sh`
 - Port 5000/5001 already in use
 
 **Solutions:**
 1. Check log file for specific error
 2. Manually start: `python pumpkin_face.py [args]`
 3. Verify Python and pip are in system PATH
-4. On Raspberry Pi, either run the update as root/passwordless sudo or install the apt-managed Python packages manually
-5. For cron jobs, set PATH explicitly in script or crontab
+4. On Raspberry Pi, rerun `./install.sh` or manually install the apt-managed Python packages with `sudo apt-get install -y python3-pygame python3-websockets python3-mutagen`
+5. If you intentionally want `update.sh` to refresh those apt-managed packages, set `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` and ensure root/passwordless sudo is available
+6. For cron jobs, set PATH explicitly in script or crontab
 
 ### Permission Denied
 
@@ -395,6 +408,7 @@ gh auth login
 
 The update scripts run as the current user. They do NOT require root/Administrator privileges except:
 - On Linux/Raspberry Pi: Initial SDL2 installation (one-time, via install.sh)
+- On Raspberry Pi: Optional apt refresh during `update.sh` only when `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`
 
 ### Dependency Trust
 

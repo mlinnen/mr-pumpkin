@@ -12,6 +12,7 @@ INSTALL_DIR="${INSTALL_DIR:-$(pwd)}"
 LOG_FILE="$INSTALL_DIR/mr-pumpkin-update.log"
 TEMP_DIR=$(mktemp -d /tmp/mr-pumpkin-update.XXXXXX)
 DEPENDENCY_HELPER="$INSTALL_DIR/scripts/unix_dependency_plan.py"
+ALLOW_PI_APT_UPDATES="${MR_PUMPKIN_ALLOW_PI_APT_UPDATE:-0}"
 
 # Set PATH for cron job compatibility
 export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
@@ -118,22 +119,17 @@ install_python_dependencies() {
 
     eval "$("$python_cmd" "$DEPENDENCY_HELPER" --raspberry-pi --emit-shell "${plan_files[@]}")"
 
-    if [ ${#PIP_REQUIREMENTS[@]} -gt 0 ] && [ -z "$pip_cmd" ] && can_install_with_apt; then
-        APT_PACKAGES+=("python3-pip")
-    fi
-
-    local pip_fallback_requirements=()
     if [ ${#APT_PACKAGES[@]} -gt 0 ]; then
-        if install_apt_packages "${APT_PACKAGES[@]}"; then
-            log "Installed Raspberry Pi apt-managed Python packages: ${APT_PACKAGES[*]}"
+        if [ "$ALLOW_PI_APT_UPDATES" = "1" ]; then
+            if install_apt_packages "${APT_PACKAGES[@]}"; then
+                log "Installed Raspberry Pi apt-managed Python packages via opt-in update path: ${APT_PACKAGES[*]}"
+            else
+                log "WARNING: Raspberry Pi apt refresh was requested but could not run non-interactively; continuing without apt changes"
+            fi
         else
-            log "WARNING: Could not install Raspberry Pi apt-managed Python packages automatically; falling back to pip"
-            pip_fallback_requirements=("mutagen>=1.45.0" "pygame>=2.0.0,<3.0.0" "websockets>=13.0,<15.1")
+            log "INFO: Skipping Raspberry Pi apt-managed Python packages during update to keep update.sh non-root and cron-safe: ${APT_PACKAGES[*]}"
+            log "INFO: Re-run ./install.sh or sudo apt-get install -y ${APT_PACKAGES[*]} if those packages need to change"
         fi
-    fi
-
-    if [ ${#pip_fallback_requirements[@]} -gt 0 ]; then
-        PIP_REQUIREMENTS+=("${pip_fallback_requirements[@]}")
     fi
 
     pip_cmd=$(find_pip_command)

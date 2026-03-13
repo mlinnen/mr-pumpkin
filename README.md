@@ -62,7 +62,7 @@ sudo apt-get update
 sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 ```
 
-**Raspberry Pi note:** Raspberry Pi OS may reject global `pip install` calls for some system-managed packages. `install.sh` and `update.sh` now install the Raspberry Pi-packaged versions of `pygame`, `websockets`, and `mutagen` with `apt`, then use pip only for the remaining PyPI-only dependencies.
+**Raspberry Pi note:** Raspberry Pi OS may reject global `pip install` calls for some system-managed packages. `install.sh` installs the Raspberry Pi-packaged versions of `pygame`, `websockets`, and `mutagen` with `apt`, then uses pip only for the remaining PyPI-only dependencies. `update.sh` stays non-root and cron-safe by default, so on Raspberry Pi it only refreshes the pip-managed subset unless you explicitly opt into apt refresh.
 
 ### Development Setup
 
@@ -96,6 +96,8 @@ The update script will:
 3. Stop the running pumpkin_face.py process (if running)
 4. Deploy the updated files
 5. Restart pumpkin_face.py with the same arguments
+
+On Raspberry Pi, `update.sh` keeps unattended updates non-root by default: it refreshes only the pip-managed dependencies and leaves the apt-managed packages to `install.sh` or a manual `sudo apt-get install ...` step. If you explicitly want apt refresh during updates, set `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` and run with root/passwordless sudo available.
 
 ### Scheduling Automatic Updates
 
