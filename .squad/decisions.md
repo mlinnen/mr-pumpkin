@@ -4499,3 +4499,232 @@ Issue #89 is ready to ship as a focused CLI/networking change: `PumpkinFace` now
 
 I am explicitly keeping this scoped to the TCP listener and its CLI surface. The WebSocket listener remains on its existing port so we do not silently expand issue #89 into a broader network reconfiguration change without separate architecture review.
 
+
+---
+
+# Ekko — Issue #92 rescue decision
+
+- Preserve the already-approved Raspberry Pi updater contract in `update.sh`: non-root and cron-safe by default, with apt refresh only behind `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`.
+- Ship `.gitattributes` with `*.sh text eol=lf` so Bash lifecycle scripts stay LF-normalized even when edited from Windows worktrees.
+- Validate the rescue with real Bash syntax checks plus the focused updater/install contract tests before shipping PR #93.
+
+---
+
+---
+date: 2026-03-13
+owner: Jinx
+subject: Manual issue closure after dev-branch merge
+---
+
+## Context
+
+While completing issue/PR triage for #89, #90, and PR #91, PR #91 merged into `dev` with `Closes #90` in its body, but GitHub did not auto-close issue #90 after the merge.
+
+## Decision
+
+For dev-targeted PRs, the team should verify linked issue state after merge instead of assuming GitHub auto-close keywords will resolve the issue. If the issue remains open, close it explicitly with a short note referencing the merged PR or shipped version.
+
+## Why
+
+This keeps issue tracking accurate during the dev → preview → main promotion flow and avoids leaving completed work open simply because the merge landed on a non-default branch.
+
+---
+
+# Jinx Decision Inbox — Issue #90 PR
+
+- **Issue:** #90 — release package omitted `update.sh` and `update.ps1`
+- **Decision:** Treat the release ZIP as the full deployment contract for cross-platform lifecycle scripts. Both install scripts and both update scripts must be present in every generated archive.
+- **Why:** End users deploy from the release ZIP, and auto-update is part of the supported operational path documented in the README. Omitting the updater scripts creates an incomplete distribution and prevents future update workflow parity after deployment.
+- **Validation:** Added an automated packaging test that builds the ZIP and asserts `update.sh` and `update.ps1` are present under the versioned top-level release folder.
+
+---
+
+# Jinx — Issue #92 finalization
+
+## Decision
+
+Keep Raspberry Pi unattended updates non-root by default: `update.sh` must skip apt-managed dependency refresh unless `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` is explicitly set, and Unix shell scripts should stay LF-terminated in git so the updater remains valid on Raspberry Pi and other Unix hosts.
+
+## Why
+
+- `install.sh` can own the apt-managed package setup on Raspberry Pi because first-time install is already the bootstrap step that may require elevated privileges.
+- `update.sh` is part of the unattended maintenance path, so its default behavior must remain cron-safe and password-prompt free.
+- This rescue pass showed that line endings are part of the contract too: a correct updater design still fails if `update.sh` is committed with CRLF and cannot pass `bash -n`.
+
+## Evidence
+
+- `update.sh` now leaves `python3-pygame`, `python3-websockets`, and `python3-mutagen` behind an explicit opt-in path.
+- `README.md` and `docs/auto-update.md` explain the install-vs-update split and the `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` override.
+- `python -m pytest -q tests/test_pi_install_scripts.py tests/test_auto_update.py`, `bash -n install.sh`, and `bash -n update.sh` all passed.
+
+## Follow-through
+
+1. Keep future Raspberry Pi updater changes aligned with the least-privilege contract.
+2. Preserve LF endings for `.sh` files so Windows worktrees do not silently break Unix lifecycle scripts.
+
+---
+
+---
+date: 2026-03-13
+owner: Jinx
+subject: Raspberry Pi updater remains least-privilege by default
+issue: 92
+pr: 93
+---
+
+## Decision
+
+Keep the Raspberry Pi hybrid dependency split, but restore `update.sh` to a non-root, cron-safe default.
+
+## What that means
+
+1. `install.sh` continues to use `apt` for the Raspberry Pi OS-managed Python packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) and `pip` for the remaining PyPI-only dependencies.
+2. `update.sh` does not auto-run `apt-get` just because root or passwordless sudo is available.
+3. On Raspberry Pi, the default update path refreshes only the pip-managed subset and logs guidance for the apt-managed packages.
+4. APT refresh during update is allowed only behind an explicit opt-in environment variable: `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`.
+
+## Why
+
+- The updater is designed for unattended execution, especially from cron, so its safe default must not depend on privilege escalation or passwordless sudo.
+- Raspberry Pi dependency pain is real, but it belongs primarily to install-time bootstrap, not silent ongoing system package management during application updates.
+- An explicit opt-in preserves flexibility for operators who do want the updater to touch apt-managed packages, without rewriting the contract for everyone else.
+
+---
+
+### 2026-03-13: Release Promotion Pattern for v0.5.15
+**By:** Jinx  
+**Issue:** Release v0.5.15  
+**What:** For this repository, a safe release from `dev` to `preview` to `main` requires all release metadata to land on `dev` first: bump `VERSION`, add the matching `CHANGELOG.md` entry, update user-facing docs for any new CLI surface, then push `dev` before promoting downstream branches.  
+**Why:** `squad-promote.yml` reads the current `VERSION` and `squad-release.yml` validates that `CHANGELOG.md` already contains the matching section before the `preview` to `main` promotion is considered release-ready. Treating release metadata as part of the `dev` source-of-truth keeps preview validation and final main promotion deterministic.  
+**Impact:** Future release coordinators should not promote unpublished local-only `dev` commits or defer changelog/docs updates until after `preview`; the release branch chain should propagate one coherent versioned state.
+
+---
+
+# Mylo release recommendation — v0.5.15
+
+- **Date:** 2026-03-13
+- **Decision:** Do not promote `dev` to `preview` or `main` for `v0.5.15` yet.
+
+## Why
+
+- The release flow is correctly wired for `dev -> preview -> main`, with test gates on CI/preview and CHANGELOG validation before main promotion.
+- `VERSION` is `0.5.15` and `CHANGELOG.md` includes a matching `0.5.15` entry.
+- `python scripts/package_release.py` succeeds and produces the expected release ZIP.
+- However, the current release gate still fails on the full suite: `python -m pytest` fails in `tests/test_tcp_integration.py`.
+
+## Blocker detail
+
+- The failures are order-dependent and cascade after TCP integration coverage starts exercising recording/playback and nose command flows.
+- Re-running isolated failing tests can pass, but full-order execution still wedges the TCP server and causes later connect timeouts on `localhost:5000`.
+- Until that suite is green in full-order execution, promotion to `preview` or `main` would bypass the repo's intended quality bar.
+
+## Recommended next step
+
+Fix the TCP integration state-leak / server-wedge behavior first, then re-run the full pytest gate before promoting branches.
+
+---
+
+# Mylo Release Verdict — v0.5.15
+
+**Date:** 2026-03-13  
+**Requested by:** Mike Linnen  
+**Role:** Mylo (Tester)
+
+## Verdict
+
+**Reject** — do not promote `v0.5.15` on `main` yet.
+
+## Release-validation result
+
+I ran the current main release validation gate in repo terms: the workflow-equivalent `python -m pytest -q` step from `squad-release.yml` / `squad-preview.yml`.
+
+Result:
+- **682 passed**
+- **42 skipped**
+- **11 failed**
+
+Because the release workflow runs tests before packaging, the release path is currently blocked at the test step.
+
+## Precise blockers
+
+### 1) CLI startup coverage is still not stable in the full suite
+- `tests/test_cli_options.py::TestPortOption::test_port_option_does_not_bind_default_5000`
+- `tests/test_cli_options.py::TestCLIValidation::test_invalid_host_malformed`
+
+Observed failure mode: port `5000` still appears reachable during scenarios where it should not be, so the CLI host/port behavior is not release-safe under full-suite conditions.
+
+### 2) TCP/WebSocket parity is broken in integration coverage
+These tests failed during release validation:
+- `tests/test_integration_dual_protocol.py::TestIdenticalResponses::test_blink_command_both_protocols`
+- `tests/test_integration_dual_protocol.py::TestIdenticalResponses::test_expression_command_both_protocols`
+- `tests/test_integration_dual_protocol.py::TestIdenticalResponses::test_timeline_status_both_protocols`
+- `tests/test_integration_dual_protocol.py::TestIdenticalResponses::test_recording_status_both_protocols`
+- `tests/test_integration_dual_protocol.py::TestIdenticalResponses::test_list_recordings_both_protocols`
+- `tests/test_integration_dual_protocol.py::TestProtocolSwitching::test_websocket_then_tcp_sequence`
+- `tests/test_integration_dual_protocol.py::TestProtocolSwitching::test_alternating_protocols_10_commands`
+- `tests/test_integration_dual_protocol.py::TestTimelineProtocols::test_download_via_both_protocols`
+- `tests/test_integration_dual_protocol.py::TestStateSynchronization::test_change_expression_websocket_verify_tcp`
+
+Observed failure mode: WebSocket requests returned connection/close-frame errors or `None` payloads while TCP continued to respond, so dual-protocol behavior is not currently release-ready.
+
+## Additional release-state concern
+
+The worktree is also not clean: `docs/what-is-new.md` is still in an unmerged (`UU`) state locally. Even aside from the failing test gate, this is not a clean promotion state for `main`.
+
+## Required next step
+
+Re-run release validation only after:
+1. the CLI port/host failures are resolved under full-suite conditions,
+2. the dual-protocol integration failures are cleared, and
+3. the unmerged docs state is resolved.
+
+---
+
+# Vi combine dev changes
+
+- **Date:** 2026-03-13
+- **Decision:** Combine the current release-recovery follow-up work into one local `dev` commit and do not push as part of this step.
+
+## Why
+
+- The current worktree already contains one coherent set of backend, test, and squad-documentation changes tied to release recovery and CLI/socket reliability.
+- A single local commit keeps the audit trail clean while avoiding any accidental promotion beyond `dev`.
+- The request asked to combine the work on `dev`, not to publish it.
+
+---
+
+---
+date: 2026-03-13
+owner: Vi
+subject: Raspberry Pi dependency planning helper for lifecycle scripts
+issue: 92
+---
+
+## Context
+
+Issue #92 required Raspberry Pi-aware dependency installation without regressing the existing Unix release flow. The repository ships a release ZIP, so both `install.sh` and `update.sh` need the same dependency split logic and the packaged archive must include any new helper that those scripts depend on.
+
+## Decision
+
+Use a shared helper, `scripts/unix_dependency_plan.py`, to classify Raspberry Pi dependencies into:
+
+1. **apt-managed packages** currently mapped to `python3-pygame`, `python3-websockets`, and `python3-mutagen`
+2. **pip-managed packages** for everything else, preserving requirement specifiers
+
+`install.sh` applies the apt-first strategy directly on Raspberry Pi. `update.sh` uses the same plan, but only performs apt installs when root or passwordless sudo is already available; otherwise it logs a warning and falls back to pip so unattended cron-style updates do not hard-fail on privilege prompts.
+
+## Why
+
+- **Single source of truth:** The planner avoids drifting package maps between install and update paths.
+- **Pi compatibility:** Known Raspberry Pi OS packages move off the problematic pip path.
+- **Release safety:** Because `scripts/package_release.py` whitelists files, the helper must be explicitly packaged and tested.
+
+---
+
+### 2026-03-12: Harden subprocess socket tests; do not mutate released v0.5.15 main
+
+**By:** Vi
+
+**What:** For CLI/server subprocess tests, verify that the spawned process owns the listening port instead of treating any open port as readiness. Also avoid changing `main` after the existing `v0.5.15` promotion/tag when recovery work only affects test reliability.
+
+**Why:** Global port-open probes can pass against stale listeners and create order-dependent failures, especially when the server backlog is tiny and readiness checks consume the only pending connection slot. `origin/main` already points at the promoted `v0.5.15` merge/tag, so the safe recovery path is to fix validation reliability on `dev` and report that no further `main` mutation is required for this release cut.
