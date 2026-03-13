@@ -4728,3 +4728,21 @@ Use a shared helper, `scripts/unix_dependency_plan.py`, to classify Raspberry Pi
 **What:** For CLI/server subprocess tests, verify that the spawned process owns the listening port instead of treating any open port as readiness. Also avoid changing `main` after the existing `v0.5.15` promotion/tag when recovery work only affects test reliability.
 
 **Why:** Global port-open probes can pass against stale listeners and create order-dependent failures, especially when the server backlog is tiny and readiness checks consume the only pending connection slot. `origin/main` already points at the promoted `v0.5.15` merge/tag, so the safe recovery path is to fix validation reliability on `dev` and report that no further `main` mutation is required for this release cut.
+
+---
+date: 2026-03-13
+owner: Mylo
+subject: Issue #92 final reviewer gate verdict
+issue: 92
+---
+
+## Decision
+
+Approve PR #93 for issue #92.
+
+## Why
+
+- `install.sh` and `update.sh` both pass Bash syntax validation.
+- The Raspberry Pi updater contract still holds: `update.sh` is non-root and cron-safe by default, and apt refresh remains opt-in via `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`.
+- README, `docs/auto-update.md`, and the focused shell-script regression tests all describe and enforce the same behavior.
+- PR #93 is correctly based on `dev`, and the later branch commits only add `.squad/` documentation/history notes rather than changing runtime behavior.
