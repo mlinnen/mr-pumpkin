@@ -25,7 +25,6 @@ import subprocess
 import time
 import sys
 import pytest
-from pathlib import Path
 
 
 # ============================================================================
@@ -75,21 +74,119 @@ def send_tcp_command(host: str, port: int, command: str, timeout: float = 2.0) -
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.settimeout(timeout)
         client.connect((host, port))
-        client.send(command.encode('utf-8'))
-        
-        try:
-            response = client.recv(4096).decode('utf-8').strip()
-        except socket.timeout:
-            response = ""
-        
+        client.sendall(command.encode('utf-8'))
+        client.shutdown(socket.SHUT_WR)
+
+        chunks = []
+        while True:
+            try:
+                chunk = client.recv(4096)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            except socket.timeout:
+                break
+
         client.close()
-        return response
+        return b"".join(chunks).decode('utf-8').strip()
     except Exception as e:
         raise ConnectionError(f"Failed to connect to {host}:{port}: {e}")
 
 
+def get_listening_ports_for_pid(pid: int) -> set[int]:
+    """Return TCP listening ports owned by a process."""
+    if sys.platform == 'win32':
+        result = subprocess.run(
+            ['netstat', '-ano', '-p', 'tcp'],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        ports = set()
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 5 or parts[3] != 'LISTENING' or parts[4] != str(pid):
+                continue
+            try:
+                ports.add(int(parts[1].rsplit(':', 1)[1]))
+            except (IndexError, ValueError):
+                continue
+        return ports
+
+    for command in (['ss', '-ltnp'], ['lsof', '-nP', '-iTCP', '-sTCP:LISTEN']):
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+        except FileNotFoundError:
+            continue
+
+        ports = set()
+        for line in result.stdout.splitlines():
+            if command[0] == 'ss':
+                if f'pid={pid},' not in line:
+                    continue
+                parts = line.split()
+                if len(parts) < 4:
+                    continue
+                try:
+                    ports.add(int(parts[3].rsplit(':', 1)[1]))
+                except (IndexError, ValueError):
+                    continue
+            else:
+                if str(pid) not in line.split():
+                    continue
+                parts = line.split()
+                if len(parts) < 9:
+                    continue
+                try:
+                    ports.add(int(parts[8].rsplit(':', 1)[1]))
+                except (IndexError, ValueError):
+                    continue
+        return ports
+
+    return set()
+
+
+def wait_for_process_to_listen(process: subprocess.Popen, port: int,
+                               timeout: float = 5.0) -> bool:
+    """Poll until the child process owns the listening port or exits."""
+    start = time.time()
+    while time.time() - start < timeout:
+        if process.poll() is not None:
+            stdout, stderr = process.communicate(timeout=1)
+            raise RuntimeError(
+                f"Server exited before binding port {port}.\n"
+                f"stdout:\n{stdout.decode('utf-8', errors='replace')}\n"
+                f"stderr:\n{stderr.decode('utf-8', errors='replace')}"
+            )
+
+        if port in get_listening_ports_for_pid(process.pid):
+            return True
+
+        time.sleep(0.1)
+
+    return False
+
+
+def stop_server(process: subprocess.Popen | None, timeout: float = 5.0) -> None:
+    """Terminate a test server process and wait for the port to be released."""
+    if not process or process.poll() is not None:
+        return
+
+    process.terminate()
+    try:
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=2)
+
+
 def start_server_with_args(args: list, wait_host: str = 'localhost', 
-                          wait_port: int = 5000, wait_timeout: float = 10.0):
+                           wait_port: int = 5000, wait_timeout: float = 10.0):
     """Start pumpkin_face.py with given CLI arguments.
     
     Args:
@@ -120,18 +217,15 @@ def start_server_with_args(args: list, wait_host: str = 'localhost',
             stderr=subprocess.PIPE
         )
     
-    # Wait for server to be ready
-    if not wait_for_port(wait_host, wait_port, timeout=wait_timeout):
-        process.terminate()
-        try:
-            process.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            process.kill()
+    # Wait until the spawned process itself owns the target port. This avoids
+    # false positives from a stale server already listening on the same port.
+    if not wait_for_process_to_listen(process, wait_port, timeout=wait_timeout):
+        stop_server(process, timeout=2)
         raise RuntimeError(
-            f"Server did not become ready on {wait_host}:{wait_port} "
+            f"Server process {process.pid} did not bind port {wait_port} "
             f"within {wait_timeout}s"
         )
-    
+
     return process
 
 
@@ -157,12 +251,7 @@ class TestDefaultHostAndPort:
             assert response is not None, "Should receive response from default server"
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
     
     def test_default_server_accepts_neutral_command(self):
         """Default server should accept and process 'neutral' expression command."""
@@ -176,12 +265,7 @@ class TestDefaultHostAndPort:
             # Key is that no connection error occurs
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
     
     def test_default_server_not_accessible_on_other_ports(self):
         """Default server should only bind to port 5000, not 5001 or other ports."""
@@ -200,12 +284,7 @@ class TestDefaultHostAndPort:
             # The key test is that 5000 is the default TCP port
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
 
 
 # ============================================================================
@@ -229,12 +308,7 @@ class TestHostOption:
             assert response is not None, "Server should respond on 127.0.0.1:5000"
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
     
     def test_host_option_0_0_0_0(self):
         """--host 0.0.0.0 should bind to all interfaces."""
@@ -251,12 +325,7 @@ class TestHostOption:
             assert response is not None, "Server bound to 0.0.0.0 should accept local connections"
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
 
 
 # ============================================================================
@@ -280,12 +349,7 @@ class TestPortOption:
             assert response is not None, "Server should respond on localhost:6000"
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
     
     def test_port_option_does_not_bind_default_5000(self):
         """When --port 6000 used, default port 5000 should NOT be bound."""
@@ -297,17 +361,12 @@ class TestPortOption:
                 wait_port=6000
             )
             
-            # Port 5000 should NOT be accepting connections
-            port_5000_open = wait_for_port('localhost', 5000, timeout=0.5)
-            assert not port_5000_open, "Port 5000 should not be bound when --port 6000 specified"
+            assert 5000 not in get_listening_ports_for_pid(process.pid), (
+                "Process should not bind port 5000 when --port 6000 specified"
+            )
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
 
 
 # ============================================================================
@@ -331,12 +390,7 @@ class TestHostAndPortCombined:
             assert response is not None, "Server should respond on 127.0.0.1:7000"
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
     
     def test_host_and_port_argument_order_irrelevant(self):
         """--port 7001 --host 127.0.0.1 should work (order doesn't matter)."""
@@ -352,12 +406,7 @@ class TestHostAndPortCombined:
             assert response is not None, "Argument order should not matter"
             
         finally:
-            if process:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+            stop_server(process)
 
 
 # ============================================================================
@@ -387,11 +436,7 @@ class TestCLIValidation:
             
         finally:
             if process and process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+                stop_server(process, timeout=2)
     
     def test_invalid_port_out_of_range(self):
         """--port 70000 (out of valid range 1-65535) causes binding error."""
@@ -425,11 +470,7 @@ class TestCLIValidation:
             
         finally:
             if process and process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+                stop_server(process, timeout=2)
     
     def test_invalid_host_malformed(self):
         """--host invalid..host should produce a binding error or early validation error."""
@@ -456,11 +497,7 @@ class TestCLIValidation:
             
         finally:
             if process and process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+                stop_server(process, timeout=2)
 
 
 # ============================================================================
