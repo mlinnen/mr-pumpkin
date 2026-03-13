@@ -30,7 +30,9 @@ def create_release_package():
         "VERSION",
         "LICENSE",
         "install.sh",
-        "install.ps1"
+        "install.ps1",
+        "update.sh",
+        "update.ps1",
     ]
     
     # Directories to include

@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 import shutil
+import importlib.util
 
 
 # ============================================================================
@@ -423,3 +424,46 @@ class TestEdgeCases:
                 deploy_files(source_dir, dest_dir)
         finally:
             shutil.rmtree(source_dir, ignore_errors=True)
+
+
+class TestReleasePackaging:
+    """Test release package contents that support installation and updates."""
+
+    @staticmethod
+    def load_package_release_module():
+        """Load the release packaging script as a module for testing."""
+        repo_root = Path(__file__).resolve().parent.parent
+        module_path = repo_root / "scripts" / "package_release.py"
+        spec = importlib.util.spec_from_file_location("package_release", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    def test_release_package_includes_update_scripts(self, monkeypatch):
+        """Generated release ZIP contains both cross-platform update scripts."""
+        repo_root = Path(__file__).resolve().parent.parent
+        module = self.load_package_release_module()
+        version = module.read_version()
+        archive_name = f"mr-pumpkin-v{version}.zip"
+        folder_name = f"mr-pumpkin-v{version}"
+        archive_path = repo_root / archive_name
+
+        if archive_path.exists():
+            archive_path.unlink()
+
+        monkeypatch.chdir(repo_root)
+
+        try:
+            created_archive = module.create_release_package()
+            assert Path(created_archive) == Path(archive_name)
+            assert archive_path.exists()
+
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                file_names = set(zf.namelist())
+
+            assert f"{folder_name}/update.sh" in file_names
+            assert f"{folder_name}/update.ps1" in file_names
+        finally:
+            if archive_path.exists():
+                archive_path.unlink()

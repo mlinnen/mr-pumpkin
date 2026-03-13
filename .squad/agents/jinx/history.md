@@ -453,3 +453,9 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 - **Workflow precondition:** `squad-promote.yml` validates the versioned branch state, and `preview → main` is blocked unless `CHANGELOG.md` already contains the exact `## [VERSION]` heading for the release being promoted.
 - **Operational blocker pattern:** When local `dev` is ahead of `origin/dev`, release coordinators must push the finalized `dev` state first; otherwise preview/main promotion would ship an incomplete or unpublished candidate.
 - **Documentation discipline:** New user-facing CLI surface in `skill/` should be reflected in `README.md` as part of the same release cut so packaged builds, docs, and release notes describe the same toolset.
+
+### Issue #90 — Release Package Includes Update Scripts (2026-03-13)
+
+- **Release contract tightened:** The generated GitHub release ZIP must ship both install entrypoints and both update entrypoints (`install.sh`, `install.ps1`, `update.sh`, `update.ps1`) so deployment and in-place upgrades remain symmetrical across platforms.
+- **Validation pattern:** Packaging regressions are best caught by an automated test that imports `scripts/package_release.py`, builds the archive from repo root, and asserts exact archive members instead of only checking helper-level ZIP validity.
+- **Scope discipline:** This fix stayed in the packaging layer; the updater scripts themselves did not need behavioral changes, only guaranteed inclusion in the distributable artifact.
