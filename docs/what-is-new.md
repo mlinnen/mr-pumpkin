@@ -12,6 +12,18 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.15] - 2026-03-13
+
+### Added
+- **Model listing CLI** — Added `mr-pumpkin-list-models` via `python -m skill.list_models`, with Gemini/OpenAI provider support, optional substring filtering, and an `--all` mode for grouped output.
+- **Release-ready verification coverage** — Added targeted tests for the model-listing skill and the pumpkin server's `--host` / `--port` startup options.
+
+### Fixed
+- **Pumpkin server host/port startup configuration** — `pumpkin_face.py` now accepts `--host` and `--port`, validates the TCP port range before binding, and reports the actual listener address in startup output.
+- **Release ZIP completeness** — `scripts/package_release.py` now ships `command_handler.py`, ensuring packaged builds keep the full TCP/WebSocket command routing layer.
+
+---
+
 ## [0.5.14] - 2026-03-08
 
 ### Added

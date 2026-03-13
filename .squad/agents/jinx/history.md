@@ -446,3 +446,10 @@ Post follows Jekyll conventions from `docs/_posts/2026-02-19-projection-mapping.
 **Verdict:** ✅ **APPROVED** with two follow-up tasks (test activation, artifact cleanup). Core implementation is correct, complete, and production-ready.
 
 📌 Team update (2026-03-13): Issue #89 review completed — implementation and documentation approved. Tests partially approved (skip decorators now obsolete, need removal). Cleanup task identified: delete test_connection.py stray artifact. Two 30-minute follow-up tasks remain before closing issue — decided by Vi, Mylo, Jinx
+
+### v0.5.15 Release Coordination (2026-03-13)
+
+- **Release flow source of truth:** The repo-supported promotion path is `dev → preview → main`, with release metadata prepared on `dev` first (`VERSION`, `CHANGELOG.md`, and any directly related user docs) before promotion.
+- **Workflow precondition:** `squad-promote.yml` validates the versioned branch state, and `preview → main` is blocked unless `CHANGELOG.md` already contains the exact `## [VERSION]` heading for the release being promoted.
+- **Operational blocker pattern:** When local `dev` is ahead of `origin/dev`, release coordinators must push the finalized `dev` state first; otherwise preview/main promotion would ship an incomplete or unpublished candidate.
+- **Documentation discipline:** New user-facing CLI surface in `skill/` should be reflected in `README.md` as part of the same release cut so packaged builds, docs, and release notes describe the same toolset.
