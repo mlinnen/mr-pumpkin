@@ -5,6 +5,21 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.15] - 2026-03-13
+
+### Added
+- `skill/list_models.py` — new CLI and provider abstraction for listing live Gemini or OpenAI model IDs, with `--provider`, `--filter`, `--all`, and `--api-key` support.
+- Comprehensive automated coverage for provider model listing and pumpkin server host/port CLI startup behavior.
+
+### Changed
+- `README.md` now documents the release-ready skill CLI surface, including the new model-listing utility alongside the recording and lipsync tools.
+
+### Fixed
+- `pumpkin_face.py` now accepts `--host` and `--port` at startup, validates the port range before binding, and consistently reports the active TCP listener address.
+- `scripts/package_release.py` now includes `command_handler.py` in the release ZIP so packaged builds retain command routing support.
+
+---
+
 ## [0.5.13] - 2026-03-06
 
 ### Added
