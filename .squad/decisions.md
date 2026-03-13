@@ -4492,3 +4492,10 @@ This is a 33-line standalone connection testing script that duplicates functiona
 
 ✅ **APPROVED with minor follow-up work.** The core implementation is **correct, complete, and production-ready**. The only remaining tasks are test activation (remove provisional markers) and artifact cleanup (delete obsolete test script).
 
+
+## 2026-03-13 — Issue #89 finalize decision
+
+Issue #89 is ready to ship as a focused CLI/networking change: `PumpkinFace` now owns `host` and `port` as constructor state, the TCP server binds from that state, and the user-facing contract is documented in both `--help` output and README usage examples.
+
+I am explicitly keeping this scoped to the TCP listener and its CLI surface. The WebSocket listener remains on its existing port so we do not silently expand issue #89 into a broader network reconfiguration change without separate architecture review.
+
