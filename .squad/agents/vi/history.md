@@ -21,6 +21,7 @@
 📌 Team update (2026-03-06): Issue #66 foundations completed: Audio analyzer provider (Gemini multimodal two-pass), timeline audio_file extension, pygame playback, upload_audio server endpoint. Mylo wrote 29-test scaffold — decided by Vi, Mylo
 📌 Team update (2026-03-08): Issue #81 completed: Added OpenAI provider for audio analysis and timeline generation. OpenAIProvider (gpt-4o) and OpenAIAudioProvider (gpt-4o-audio-preview) serve as fallbacks when Gemini quota exhausted. 13 tests added — decided by Vi
 📌 Team update (2026-03-13): Issue #89 complete: Added port range validation (1-65535) in pumpkin_face.py argument parsing with immediate user-friendly error messages. Mylo verified with 15 integration tests (real server subprocess, Windows compatibility). Default: localhost:5000. Merged to decisions.md. — decided by Vi, Mylo
+📌 Team update (2026-03-13): Dev release-recovery follow-up combined locally: widened TCP listen backlog in pumpkin_face.py, hardened subprocess CLI/socket tests with PID-owned readiness checks and EOF-on-send behavior, and recorded reusable release-triage/socket-test skills for future validation work. — decided by Vi
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
@@ -928,6 +929,13 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 
 - OpenAI audio API uses format names ("mp3", "wav") not MIME types ("audio/mpeg", "audio/wav") — need separate _get_audio_format() vs Gemini's _get_mime_type()
 - Base64 encoding must happen in-memory — no file handle leaking to API, unlike Gemini's upload flow
+
+### Release recovery note (v0.5.15)
+
+**Date:** 2026-03-12  
+**What:** Hardened CLI subprocess socket tests after release recovery work exposed a false-readiness pattern.
+
+**Key lesson:** When a test starts `pumpkin_face.py`, "port 5000 is open" is not enough — the test must confirm the spawned PID owns the listener. Otherwise stale servers or backlog races can make readiness checks pass against the wrong process and create order-dependent failures.
 - OpenAI's audio preview model does NOT support .ogg format in base64 mode (unlike Gemini) — runtime error if attempted
 - Retry logic needed even for OpenAI — still returns markdown fences or prose despite "ONLY JSON" prompt
 - Emotion validation critical — both providers can return unexpected values, always validate against fixed set {"happy", "sad", "excited", "neutral", "solemn"}
