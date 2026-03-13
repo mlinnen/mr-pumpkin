@@ -5,6 +5,20 @@ All notable changes to Mr. Pumpkin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.17] - 2026-03-13
+
+### Added
+- `scripts/unix_dependency_plan.py` — shared Unix dependency planner that splits Raspberry Pi OS-managed Python packages from pip-managed requirements for the release lifecycle scripts.
+
+### Changed
+- `install.sh` now detects Raspberry Pi hosts and prefers `apt` for `python3-pygame`, `python3-websockets`, and `python3-mutagen`, falling back to `pip` for the remaining Python requirements when needed.
+
+### Fixed
+- `update.sh` now keeps Raspberry Pi auto-updates non-root and cron-safe by default by leaving apt-managed packages alone unless `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` is explicitly set.
+- `scripts/package_release.py` now includes `scripts/unix_dependency_plan.py` in the release ZIP so packaged installs and updates keep the Raspberry Pi dependency planning behavior.
+
+---
+
 ## [0.5.16] - 2026-03-13
 
 ### Fixed

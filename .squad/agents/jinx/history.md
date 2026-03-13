@@ -489,6 +489,12 @@ elease/* branches to target main; this PR targeted dev). Squad CI (tests) passed
 - Blocking issue: `update.sh` now attempts `apt-get` automatically whenever it detects root or passwordless sudo, which violates the prior architectural boundary that the updater remains non-root by default and only refreshes the pip-managed subset on Raspberry Pi.
 - Supporting evidence: `docs/auto-update.md` was updated to recommend running Raspberry Pi auto-update as root/passwordless sudo, confirming the implementation drifted into system-package maintenance instead of preserving the cron-friendly least-privilege updater contract.
 
+### Release v0.5.17 coordination (2026-03-13)
+
+- Release notes for branch promotion should summarize the shipped user-facing and platform-facing behavior from `dev`, not the much noisier `.squad/` coordination churn that often dominates the raw diff.
+- The release path for this repo is `dev` metadata first, then `squad-promote.yml` for `dev → preview → main`, with `squad-release.yml` on `main` owning the test/tag/package/publication phase.
+- Key release files for this flow are `VERSION`, `CHANGELOG.md`, `docs/what-is-new.md`, `.github/workflows/squad-promote.yml`, and `.github/workflows/squad-release.yml`.
+
 ## Team Sync — 2026-03-13 Completion
 
 **Issue #92 orchestration summary:**
