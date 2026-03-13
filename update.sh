@@ -37,7 +37,7 @@ trap cleanup EXIT
 log() {
     local message="$1"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "$timestamp | $message" | tee -a "$LOG_FILE"
+    echo "$timestamp | $message" | tee -a "$LOG_FILE" >&2
 }
 
 find_python_command() {
@@ -262,7 +262,7 @@ download_release() {
         cd "$TEMP_DIR"
         if gh release download "v$version" --repo "$REPO" --pattern "$zip_name" 2>/dev/null; then
             log "Downloaded via gh CLI"
-            echo "$zip_path"
+            printf '%s\n' "$zip_path"
             return 0
         fi
     fi
@@ -285,7 +285,7 @@ download_release() {
     fi
     
     log "Downloaded successfully"
-    echo "$zip_path"
+    printf '%s\n' "$zip_path"
     return 0
 }
 

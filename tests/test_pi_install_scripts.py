@@ -75,3 +75,10 @@ class TestUpdateScriptRaspberryPiBehavior:
         assert 'if [ "$OS" != "raspberry-pi" ]; then' in script
         assert '"$pip_cmd" install -r requirements.txt' in script
         assert 'log "WARNING: pip not found, skipping dependency install"' in script
+
+    def test_update_script_logs_to_stderr_so_stdout_helpers_stay_clean(self):
+        script = read_script("update.sh")
+
+        assert 'tee -a "$LOG_FILE" >&2' in script
+        assert 'local zip_path=$(download_release "$latest_version")' in script
+        assert "printf '%s\\n' \"$zip_path\"" in script

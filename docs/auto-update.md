@@ -283,6 +283,12 @@ YYYY-MM-DD HH:MM:SS | PHASE | Message
 2. Manually download and extract the release
 3. Report issue on GitHub if problem persists
 
+**Older Raspberry Pi updater symptom**: `unzip: cannot find or open ... Downloading version ...` immediately after `Extracting release...`
+
+**Cause**: Older `update.sh` builds logged progress on stdout while `download_release()` was also returning the ZIP path on stdout, so command substitution could capture the log text together with the file path.
+
+**Solution**: Update to a release that includes the stdout/stderr fix, or re-run with the patched `update.sh`.
+
 ### Process Won't Stop
 
 **Symptom**: `Force killing process...` in log
