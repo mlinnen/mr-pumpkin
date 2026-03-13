@@ -530,6 +530,25 @@ This establishes the pattern for temporary feature overrides that don't disturb 
 
 ## Learnings
 
+### Issue #92 Bash Rescue (2026-03-13)
+
+**Files shipped:**
+- update.sh
+- .gitattributes
+- README.md
+- docs/auto-update.md
+- tests/test_pi_install_scripts.py
+
+**What mattered:**
+- `update.sh` must stay checked in with Unix LF endings or real `bash -n` validation becomes unreliable on the shipped file.
+- Enforcing `*.sh text eol=lf` in `.gitattributes` is the lightweight repo-level guard that keeps the Raspberry Pi updater shippable across Windows working trees.
+- The approved Raspberry Pi updater contract is non-root by default: skip apt-managed packages during unattended updates unless `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` is explicitly set.
+
+**Focused validation used:**
+- `bash -n install.sh`
+- `bash -n update.sh`
+- `python -m pytest tests/test_pi_install_scripts.py tests/test_auto_update.py -q`
+
 ### Nav Layout Fix — Issues #61 & #62 (2026-01-01)
 
 **Files changed:**

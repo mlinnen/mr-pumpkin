@@ -44,6 +44,7 @@ A standalone Python program that renders an animated pumpkin face on fullscreen 
 The install script will:
 - Install SDL2 system dependencies (Linux/Raspberry Pi only)
 - Install Python dependencies via pip
+- On Raspberry Pi, prefer apt-managed Python packages for dependencies that ship with Raspberry Pi OS and fall back to pip only for packages not available via apt
 - Provide usage instructions
 
 ### Option 2: Install from Source
@@ -60,6 +61,8 @@ pip install -r requirements.txt
 sudo apt-get update
 sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 ```
+
+**Raspberry Pi note:** Raspberry Pi OS may reject global `pip install` calls for some system-managed packages. `install.sh` installs the Raspberry Pi-packaged versions of `pygame`, `websockets`, and `mutagen` with `apt`, then uses pip only for the remaining PyPI-only dependencies. `update.sh` stays non-root and cron-safe by default, so on Raspberry Pi it only refreshes the pip-managed subset unless you explicitly opt into apt refresh.
 
 ### Development Setup
 
@@ -93,6 +96,8 @@ The update script will:
 3. Stop the running pumpkin_face.py process (if running)
 4. Deploy the updated files
 5. Restart pumpkin_face.py with the same arguments
+
+On Raspberry Pi, `update.sh` keeps unattended updates non-root by default: it refreshes only the pip-managed dependencies and leaves the apt-managed packages to `install.sh` or a manual `sudo apt-get install ...` step. If you explicitly want apt refresh during updates, set `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` and run with root/passwordless sudo available.
 
 ### Scheduling Automatic Updates
 
