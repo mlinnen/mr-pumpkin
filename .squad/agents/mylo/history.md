@@ -26,6 +26,7 @@
 📌 Team update (2026-03-12): Issue #89 test suite created: Added tests/test_cli_options.py with 17 tests validating CLI host/port configuration. Test classes: TestDefaultHostAndPort (3 tests, all passing - baseline verification), TestHostOption (2 provisional tests), TestPortOption (2 provisional tests), TestHostAndPortCombined (2 provisional tests), TestCLIValidation (3 provisional tests), TestCLIHelpText (3 provisional tests). Confirmed current default behavior: server binds to localhost:5000. Implementation blocker: pumpkin_face.py hardcodes host/port at line 1465, needs argparse integration for --host/--port CLI options. — decided by Mylo
 📌 Team update (2026-03-13): Issue #89 complete: Vi implemented port range validation (1-65535) in pumpkin_face.py argument parsing. Mylo verified with 15 integration tests (real server subprocess, Windows compatibility, all tests passing). Default: localhost:5000. Merged to decisions.md. — decided by Vi, Mylo
 📌 Team update (2026-03-13): Release candidate v0.5.15 validation: VERSION and CHANGELOG gates are present and release packaging builds, but the full 735-test suite still fails in tests/test_tcp_integration.py. The blocker is order-dependent TCP instability: isolated CLI and TCP tests can pass, but full-order execution cascades from nose/recording playback integration timeouts and state leakage, so dev is not promotion-ready for preview/main yet. — decided by Mylo
+📌 Team update (2026-03-13): Issue #92 resolved: Fixed Raspberry Pi updater ZIP path bug (PR #93). Vi updated `update.sh` so `log()` writes to stderr and `download_release()` returns only ZIP path on stdout via `printf`. Mylo added regression test in `tests/test_pi_install_scripts.py` for clean stdout capture. Updated `docs/auto-update.md` with Raspberry Pi symptom/cause/solution note. 44 tests passing in focused suite. — decided by Vi, Mylo
 
 *Patterns, conventions, insights about testing, quality, and edge cases.*
 
@@ -1030,3 +1031,27 @@ def _make_mock_gemini_response(analysis_json, emotion):
 - Raspberry Pi update path still stays non-root and cron-safe by default, with apt refresh only behind `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`
 - README and `docs/auto-update.md` describe the same updater contract that the shell-script tests enforce
 - Post-rescue PR commits after the validated updater change only added `.squad/` coordination notes, so they do not alter the ship decision
+
+### v0.5.17 release pytest blocker triage (2026-03-13)
+
+**Observed failure:**
+- In the temporary `main` release worktree, the first real failure under the release virtualenv was `tests/test_cli_options.py::TestDefaultHostAndPort::test_server_binds_to_localhost_5000_by_default`.
+- The test failed with `RuntimeError: Server process ... did not bind port 5000 within 10.0s`.
+
+**Diagnosis:**
+- This was **environment contamination**, not a product regression and not a release-only code defect.
+- At failure time, port 5000 was already owned by stale `python pumpkin_face.py` processes, so the subprocess-socket test could not prove that the newly spawned child owned the port.
+- A clean full-suite rerun outside that contaminated state passed: `745 passed, 1 skipped`.
+
+**Testing insight:**
+- For `pumpkin_face.py` subprocess tests, a bind timeout on the first CLI host/port case should trigger an immediate port-owner inspection before assuming the app regressed.
+- The `wait_for_process_to_listen()` helper is doing the right thing: it prevents false green results from an unrelated stale listener, but it also exposes environment leaks sharply.
+
+**Release conclusion:**
+- No code change was needed in `F:\mr-pumpkin`.
+- Release publication should be unblocked by clearing stale local `pumpkin_face.py` listeners and rerunning the release validation in a clean environment.
+
+### 2026-03-13: Raspberry Pi updater ZIP path regression
+- Added `tests/test_pi_install_scripts.py::test_update_script_logs_to_stderr_so_stdout_helpers_stay_clean` to guard the updater path/log separation contract.
+- Regression coverage now asserts update.sh logs through stderr and emits the ZIP path with stdout-only `printf`, so command substitution passes a clean archive path into `unzip`.
+- Focused validation: `python -m pytest tests\\test_pi_install_scripts.py -q` (8 passed).

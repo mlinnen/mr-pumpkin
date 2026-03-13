@@ -22,6 +22,7 @@
 📌 Team update (2026-03-08): Issue #81 completed: Added OpenAI provider for audio analysis and timeline generation. OpenAIProvider (gpt-4o) and OpenAIAudioProvider (gpt-4o-audio-preview) serve as fallbacks when Gemini quota exhausted. 13 tests added — decided by Vi
 📌 Team update (2026-03-13): Issue #89 complete: Added port range validation (1-65535) in pumpkin_face.py argument parsing with immediate user-friendly error messages. Mylo verified with 15 integration tests (real server subprocess, Windows compatibility). Default: localhost:5000. Merged to decisions.md. — decided by Vi, Mylo
 📌 Team update (2026-03-13): Dev release-recovery follow-up combined locally: widened TCP listen backlog in pumpkin_face.py, hardened subprocess CLI/socket tests with PID-owned readiness checks and EOF-on-send behavior, and recorded reusable release-triage/socket-test skills for future validation work. — decided by Vi
+📌 Team update (2026-03-13): Issue #92 resolved: Fixed Raspberry Pi updater ZIP path bug (PR #93). Updated `update.sh` so `log()` writes to stderr and `download_release()` returns only ZIP path on stdout via `printf`. Added regression test in `tests/test_pi_install_scripts.py`. Updated `docs/auto-update.md` with Raspberry Pi symptom/cause/solution note. 44 tests passing. — decided by Vi, Mylo
 
 *Patterns, conventions, and insights about state machines, commands, and backend architecture.*
 
@@ -1014,3 +1015,4 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 ## Learnings
 
 - 2026-03-13: Issue #92 Raspberry Pi install/update flow now uses `scripts/unix_dependency_plan.py` to split Pi-friendly apt packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) from PyPI-only dependencies. `install.sh` prefers apt on Pi, `update.sh` attempts apt only when non-interactive privilege is available and otherwise falls back to pip with `--break-system-packages` when supported. Release packaging test now asserts the helper ships inside the ZIP, and Pi dependency planning is covered in `tests/test_auto_update.py`.
+- 2026-03-13: `update.sh` helper functions that return machine-readable values must keep stdout clean. Logging now routes through stderr so `zip_path=$(download_release ...)` captures only the archive path; otherwise Raspberry Pi updates can fail with `unzip cannot find or open ... Downloading version ...` when log lines are mixed into the command substitution.

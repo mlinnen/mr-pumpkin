@@ -3411,6 +3411,56 @@ Standard guidance says "follow these rules." But LLMs often learn from implicit 
 
 ---
 
+### 2026-03-13: Raspberry Pi updater ZIP-path capture fix
+
+**By:** Vi (Backend)  
+**Date:** 2026-03-13  
+**Issue:** #92 — Raspberry Pi updater ZIP path bug  
+**Requested by:** Mike Linnen  
+**PR:** #93
+
+**Scope:** `update.sh` command-substitution failure during Raspberry Pi auto-update
+
+**Decision:** Treat shell helper functions that return values via stdout as a strict interface boundary: operational logs must go to stderr (while still being appended to the log file) so command substitution captures only the intended value.
+
+**Why:** `update.sh` assigned `zip_path=$(download_release "$latest_version")`, but `download_release()` also called `log()`, and `log()` wrote through `tee` to stdout. That let timestamped progress lines get concatenated with the ZIP filename, which then made `unzip` look for a non-existent path containing log text.
+
+**Applied fix:**
+- Routed `log()` output to `stderr` while preserving file logging via `tee` to `2>` redirection
+- Kept `download_release()` stdout reserved for the returned ZIP path (output via `printf`)
+- Added regression test in `tests/test_pi_install_scripts.py` documenting that stdout must stay clean for helper return values
+
+**Files modified:**
+- `update.sh` — `log()` function routes to stderr; `download_release()` uses `printf` for clean stdout
+- `docs/auto-update.md` — Added Raspberry Pi symptom/cause/solution note
+- `tests/test_pi_install_scripts.py` — New regression test for stdout contract
+
+**Implication:** This convention should be reused in future shell automation: if a function is consumed with `$(...)`, never mix human-readable progress output onto stdout.
+
+**Test coverage:** 44 tests pass in focused auto-update and Pi installer suite.
+
+---
+
+### 2026-03-13: Raspberry Pi updater ZIP path regression coverage
+
+**By:** Mylo (Tester)  
+**Date:** 2026-03-13  
+**Issue:** #92 — Raspberry Pi updater ZIP path bug  
+**PR:** #93
+
+**Decision:** Treat shell helpers that return machine-readable values through command substitution as stdout-only contracts; route updater logs to stderr and guard the contract with a script regression test.
+
+**Why:** `local zip_path=$(download_release "$latest_version")` broke when log lines shared stdout with the returned archive path, causing `unzip` to receive mixed text instead of a real filename.
+
+**Test implementation:** `tests/test_pi_install_scripts.py::test_update_script_logs_to_stderr_so_stdout_helpers_stay_clean`
+- Validates that `download_release()` output contains only the ZIP filename on stdout
+- No extraneous log lines or timestamps in command substitution result
+- Focused test scope: auto-update and Pi installer suite (44 tests, all passing)
+
+**Implication:** Establishes pattern for future shell utilities: document and test stdout contracts for functions that participate in command substitution.
+
+---
+
 ## Future Refinements
 
 If the LLM produces suboptimal timelines:
