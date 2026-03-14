@@ -66,7 +66,7 @@ Type=simple
 User=pi
 WorkingDirectory=/home/pi/mr-pumpkin
 Environment="DISPLAY=:0"
-ExecStart=/usr/bin/python3 /home/pi/mr-pumpkin/pumpkin_face.py
+ExecStart=/usr/bin/python3 -u /home/pi/mr-pumpkin/pumpkin_face.py
 Restart=always
 RestartSec=10
 
