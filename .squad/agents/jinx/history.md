@@ -521,3 +521,9 @@ elease/* branches to target main; this PR targeted dev). Squad CI (tests) passed
 - Preserved the shared Raspberry Pi dependency planner and the hybrid first-install contract in `install.sh`: apt remains the right place for the Pi OS packages that were failing under pip, while pip still owns the PyPI-only remainder.
 - Reworked `update.sh` so the default Raspberry Pi path is non-root and cron-safe again: it logs and skips apt-managed packages, refreshes only the pip-managed subset, and leaves apt refresh behind an explicit `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1` opt-in.
 - Locked the contract with regression coverage in `tests/test_pi_install_scripts.py` and aligned `README.md` plus `docs/auto-update.md` so the docs now match the least-privilege updater behavior instead of normalizing root/passwordless-sudo updates.
+
+### Raspberry Pi Updater Wrap-Up (2026-03-13)
+
+- The Raspberry Pi updater fix shipped cleanly as a narrow three-file change: `update.sh`, the auto-update guide, and the focused regression test file.
+- Even when `.gitattributes` already enforces `*.sh eol=lf`, I still need to verify the actual working-tree bytes before release work; a CRLF shebang on `update.sh` is enough to break direct execution on Raspberry Pi.
+- The shell helper contract for updater scripts is now explicit and worth preserving: logs belong on stderr, machine-readable return values belong on stdout-only `printf`.

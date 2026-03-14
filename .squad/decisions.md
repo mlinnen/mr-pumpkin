@@ -4837,3 +4837,28 @@ Approve PR #93 for issue #92.
 **Outcome:** v0.5.17 successfully published; https://github.com/mlinnen/mr-pumpkin/releases/tag/v0.5.17
 
 ---
+
+### 2026-03-13: v0.5.17 Release pytest Blocker — Mylo
+
+**By:** Mylo (Tester)  
+**Date:** 2026-03-13  
+**Scope:** Diagnose failing pytest run in temporary \main\ release worktree
+
+**Decision:** Classify the observed pytest failure as an **environment-specific port-contamination issue**, not a product regression and not a release-only code defect. Do **not** make a code change for this blocker.
+
+**Evidence:**
+1. Reproduced the first real failing test in the temp release worktree's release virtualenv:
+   - \	ests/test_cli_options.py::TestDefaultHostAndPort::test_server_binds_to_localhost_5000_by_default\
+   - Failure: \RuntimeError: Server process ... did not bind port 5000 within 10.0s\
+2. The failing test uses PID ownership checks in \wait_for_process_to_listen()\, so it only passes when the spawned child really owns the port.
+3. Port inspection showed stale \python pumpkin_face.py\ listeners already occupying release test ports.
+4. A clean rerun of the full suite outside the contaminated state passed:
+   - \745 passed, 1 skipped\
+
+**Implication for release:** The release should be retried only after clearing stale local \pumpkin_face.py\ processes on ports 5000/5001 and rerunning pytest in a clean environment. The unresolved GitHub Release publication problem is therefore **not explained by a code regression found in tests**.
+
+**Recommendation:**
+- Before rerunning release validation locally, verify ports 5000 and 5001 are free.
+- If a local rerun still fails after port cleanup, capture the owning PID and subprocess stderr immediately; otherwise treat the prior failure as contaminated and non-blocking for code.
+
+---
