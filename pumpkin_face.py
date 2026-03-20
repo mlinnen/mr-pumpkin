@@ -17,6 +17,9 @@ except ImportError:
     websockets = None
 
 
+POSITION_FILE = "pumpkin_position.json"
+
+
 class Expression(Enum):
     NEUTRAL = "neutral"
     HAPPY = "happy"
@@ -90,8 +93,9 @@ class PumpkinFace:
         self.eyebrow_right_offset = 0.0  # pixels, clamped [-50, +50]
         
         # Projection offset state (for alignment/jog)
-        self.projection_offset_x = 0  # pixels, horizontal offset
-        self.projection_offset_y = 0  # pixels, vertical offset
+        saved = self._load_position()
+        self.projection_offset_x = saved[0] if saved is not None else 0  # pixels, horizontal offset
+        self.projection_offset_y = saved[1] if saved is not None else 0  # pixels, vertical offset
         self.jog_step = 5  # pixels per keypress
         
         # Head movement animation state (smooth projection offset transitions)
@@ -600,6 +604,26 @@ class PumpkinFace:
         self.mouth_viseme = None
         self.mouth_transition_progress = 1.0
 
+    def _load_position(self):
+        """Load saved projection offset from position file. Returns (x, y) tuple or None if not found."""
+        try:
+            with open(POSITION_FILE, "r") as f:
+                data = json.load(f)
+            x = int(data.get("x", 0))
+            y = int(data.get("y", 0))
+            print(f"Loaded saved position: ({x}, {y})")
+            return x, y
+        except (FileNotFoundError, KeyError, ValueError, TypeError, AttributeError, json.JSONDecodeError):
+            return None
+
+    def _save_position(self):
+        """Save current projection offset to position file."""
+        try:
+            with open(POSITION_FILE, "w") as f:
+                json.dump({"x": self.projection_offset_x, "y": self.projection_offset_y}, f)
+        except OSError as e:
+            print(f"Warning: could not save position: {e}")
+
     def jog_projection(self, dx: int, dy: int):
         """Adjust projection offset by delta pixels. Clamped to [-500, +500].
         
@@ -611,6 +635,7 @@ class PumpkinFace:
         self.projection_offset_x = clamp(self.projection_offset_x + dx)
         self.projection_offset_y = clamp(self.projection_offset_y + dy)
         print(f"Projection offset: ({self.projection_offset_x}, {self.projection_offset_y})")
+        self._save_position()
     
     def set_projection_offset(self, x: int, y: int):
         """Set absolute projection offset in pixels. Clamped to [-500, +500].
@@ -623,6 +648,7 @@ class PumpkinFace:
         self.projection_offset_x = clamp(x)
         self.projection_offset_y = clamp(y)
         print(f"Projection offset set to: ({self.projection_offset_x}, {self.projection_offset_y})")
+        self._save_position()
     
     def reset_projection_offset(self):
         """Reset projection offset to center (0, 0)."""
@@ -1151,6 +1177,7 @@ class PumpkinFace:
                 self.projection_offset_y = self.head_target_y
                 self.is_moving_head = False
                 self.head_movement_progress = 0.0
+                self._save_position()
             else:
                 # Smooth interpolation using ease-in-out cubic
                 t = self.head_movement_progress
