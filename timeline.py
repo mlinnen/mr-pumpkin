@@ -16,9 +16,11 @@ Design decisions:
 - Invalid commands during playback stop gracefully
 """
 
+import io
 import json
 import os
 import time
+import zipfile
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -800,3 +802,67 @@ class FileManager:
             raise FileExistsError(f"Recording already exists: {new_name}")
         
         old_path.rename(new_path)
+
+    def export_recordings(self) -> bytes:
+        """Export all recordings and audio files as a zip archive.
+
+        Returns:
+            Raw zip file bytes (empty zip if recordings directory does not exist)
+        """
+        audio_extensions = ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+            if self.recordings_dir.exists():
+                for filepath in self.recordings_dir.glob('*.json'):
+                    zf.write(filepath, filepath.name)
+                for ext in audio_extensions:
+                    for filepath in self.recordings_dir.glob(f'*{ext}'):
+                        zf.write(filepath, filepath.name)
+        return buf.getvalue()
+
+    def import_recordings(self, zip_bytes: bytes) -> int:
+        """Import recordings and audio files from a zip archive.
+
+        Files are extracted to the recordings directory. Existing files are
+        overwritten. Only ``.json`` and audio files are extracted; directory
+        paths within the zip are stripped to the basename.
+
+        Args:
+            zip_bytes: Raw zip file bytes
+
+        Returns:
+            Number of files imported
+
+        Raises:
+            ValueError: If the zip is invalid or contains no valid files
+        """
+        audio_extensions = ('.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac')
+        allowed_extensions = ('.json',) + audio_extensions
+
+        try:
+            buf = io.BytesIO(zip_bytes)
+            with zipfile.ZipFile(buf, 'r') as zf:
+                valid_entries = [
+                    name for name in zf.namelist()
+                    if not name.endswith('/')  # skip directory entries
+                    and any(Path(name).name.lower().endswith(ext) for ext in allowed_extensions)
+                ]
+
+                if not valid_entries:
+                    raise ValueError("Zip contains no valid recording or audio files")
+
+                self.recordings_dir.mkdir(parents=True, exist_ok=True)
+
+                count = 0
+                for name in valid_entries:
+                    basename = Path(name).name
+                    if not basename:
+                        continue
+                    dest = self.recordings_dir / basename
+                    dest.write_bytes(zf.read(name))
+                    count += 1
+
+                return count
+        except zipfile.BadZipFile:
+            raise ValueError("Invalid zip file")

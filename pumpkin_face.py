@@ -1526,8 +1526,8 @@ class PumpkinFace:
                         if not data:
                             break
                         
-                        # Route commands through CommandRouter (except upload_timeline and upload_audio)
-                        if not (data.lower().startswith("upload_timeline ") or data.lower().startswith("upload_audio ")):
+                        # Route commands through CommandRouter (except upload_timeline, upload_audio, and import_recordings)
+                        if not (data.lower().startswith("upload_timeline ") or data.lower().startswith("upload_audio ") or data.lower() == "import_recordings"):
                             response = self.command_router.execute(data)
                             if response:  # Only send response if non-empty
                                 client_socket.sendall((response + '\n').encode('utf-8'))
@@ -1652,6 +1652,48 @@ class PumpkinFace:
                                 client_socket.sendall((response + '\n').encode('utf-8'))
                             continue
                         
+                        if data.lower() == "import_recordings":
+                            try:
+                                import base64
+                                # Signal ready for base64-encoded zip data
+                                client_socket.sendall(b"READY\n")
+
+                                # Read base64 content lines until END_UPLOAD marker
+                                b64_lines = []
+                                upload_done = False
+                                upload_buf = b""
+                                while True:
+                                    chunk = client_socket.recv(4096)
+                                    if not chunk:
+                                        response = "ERROR Connection lost while reading zip data"
+                                        client_socket.sendall((response + '\n').encode('utf-8'))
+                                        break
+                                    upload_buf += chunk
+                                    while b"\n" in upload_buf:
+                                        line_bytes, upload_buf = upload_buf.split(b"\n", 1)
+                                        line = line_bytes.decode('utf-8').strip()
+                                        if line == "END_UPLOAD":
+                                            zip_bytes = base64.b64decode(''.join(b64_lines))
+                                            count = self.file_manager.import_recordings(zip_bytes)
+                                            response = f"OK Imported {count} files"
+                                            client_socket.sendall((response + '\n').encode('utf-8'))
+                                            print(response)
+                                            upload_done = True
+                                            break
+                                        if line:
+                                            b64_lines.append(line)
+                                    if upload_done:
+                                        break
+                            except ValueError as e:
+                                response = f"ERROR {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            except Exception as e:
+                                response = f"ERROR {e}"
+                                client_socket.sendall((response + '\n').encode('utf-8'))
+                                print(response)
+                            continue
+
                         # ===== END TIMELINE COMMANDS =====
                     client_socket.close()
                 except Exception as e:
@@ -1712,6 +1754,21 @@ class PumpkinFace:
                         audio_bytes = base64.b64decode(parts[2])
                         self.file_manager.upload_audio(filename, audio_bytes)
                         await websocket.send(f"OK Uploaded {filename}")
+                        continue
+                    if message.startswith("import_recordings "):
+                        import base64
+                        parts = message.split(maxsplit=1)
+                        if len(parts) < 2:
+                            await websocket.send("ERROR import_recordings requires: import_recordings <base64-zip>")
+                            continue
+                        try:
+                            zip_bytes = base64.b64decode(parts[1])
+                            count = self.file_manager.import_recordings(zip_bytes)
+                            await websocket.send(f"OK Imported {count} files")
+                        except ValueError as e:
+                            await websocket.send(f"ERROR {e}")
+                        except Exception as e:
+                            await websocket.send(f"ERROR {e}")
                         continue
                     response = self.command_router.execute(message)
                     if response:  # Only send response if non-empty

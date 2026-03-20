@@ -1,3 +1,4 @@
+import base64
 import json
 import time
 
@@ -579,6 +580,8 @@ class CommandRouter:
                 "  download_timeline <filename>       - Download timeline file as JSON content\n"
                 "  upload_timeline <filename>         - Upload a timeline file (enters upload mode)\n"
                 "  upload_audio <filename>            - Upload an audio file (enters upload mode)\n"
+                "  export_recordings                  - Export all recordings and audio files as a zip (base64)\n"
+                "  import_recordings                  - Import recordings zip (enters upload mode)\n"
                 "  neutral                            - Set expression to neutral\n"
                 "  happy                              - Set expression to happy\n"
                 "  sad                                - Set expression to sad\n"
@@ -721,14 +724,32 @@ class CommandRouter:
             # Note: upload_timeline requires socket-specific multi-step protocol
             # Return special marker to signal socket handler to enter upload mode
             return "UPLOAD_MODE"
-        
+
+        if data == "export_recordings":
+            try:
+                zip_bytes = self.pumpkin.file_manager.export_recordings()
+                zip_b64 = base64.b64encode(zip_bytes).decode('ascii')
+                response = f"RECORDINGS_ZIP:{zip_b64}"
+                print(f"Exported recordings ({len(zip_bytes)} bytes)")
+            except Exception as e:
+                response = f"ERROR {e}"
+                print(response)
+            return response
+
+        if data == "import_recordings":
+            # TCP import requires a multi-step protocol handled in pumpkin_face.py.
+            # This path is reached only for WebSocket (inline base64) — the TCP
+            # socket handler intercepts "import_recordings" before CommandRouter.
+            return "IMPORT_RECORDINGS_MODE"
+
         # ===== END TIMELINE COMMANDS =====
         
         # Check for manual override during playback
         # Timeline commands don't trigger pause, but animation/expression commands do
         is_timeline_command = data in ["record_start", "record start", "record_cancel", "record cancel", 
                                        "pause", "resume", "stop", "timeline_status", 
-                                       "recording_status", "list_recordings", "list"] or \
+                                       "recording_status", "list_recordings", "list",
+                                       "export_recordings", "import_recordings"] or \
                              data.startswith(("record_stop", "record stop", "play ", "seek ", 
                                              "delete_recording ", "rename_recording ", "upload_timeline ", "download_timeline "))
         

@@ -31,8 +31,12 @@ Usage:
       - timeline_status: Show playback state (state, filename, position, duration)
     Or file upload:
       - upload_timeline <filename> <json_file>: Upload a recording file
+    Or export/import:
+      - export_recordings <output_zip>: Export all recordings to a local zip file
+      - import_recordings <zip_file>: Import recordings from a local zip file
 """
 
+import base64
 import socket
 import json
 import os
@@ -138,6 +142,93 @@ def upload_timeline(filename: str, json_file_path: str):
     except Exception as e:
         print(f"Error uploading timeline: {e}")
 
+def export_recordings(output_zip_path: str):
+    """Export all recordings and audio files from the server as a zip.
+
+    Args:
+        output_zip_path: Local file path where the downloaded zip will be saved
+    """
+    try:
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect(('localhost', 5000))
+        client.send(b'export_recordings')
+        client.shutdown(socket.SHUT_WR)
+
+        # Response may be large — read until connection closes
+        chunks = []
+        while True:
+            chunk = client.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        client.close()
+
+        response = b''.join(chunks).decode('utf-8').strip()
+        if response.startswith("ERROR"):
+            print(f"Error: {response}")
+            return
+
+        if not response.startswith("RECORDINGS_ZIP:"):
+            print(f"Unexpected response: {response[:100]}")
+            return
+
+        zip_b64 = response[len("RECORDINGS_ZIP:"):]
+        zip_bytes = base64.b64decode(zip_b64)
+
+        with open(output_zip_path, 'wb') as f:
+            f.write(zip_bytes)
+
+        print(f"Exported recordings to: {output_zip_path} ({len(zip_bytes)} bytes)")
+    except Exception as e:
+        print(f"Error exporting recordings: {e}")
+
+def import_recordings(zip_file_path: str):
+    """Import recordings and audio files from a local zip to the server.
+
+    Existing files on the server are overwritten.
+
+    Args:
+        zip_file_path: Local path to the zip file to upload
+    """
+    if not os.path.exists(zip_file_path):
+        print(f"Error: File not found: {zip_file_path}")
+        return
+
+    try:
+        with open(zip_file_path, 'rb') as f:
+            zip_bytes = f.read()
+
+        zip_b64 = base64.b64encode(zip_bytes).decode('ascii')
+
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect(('localhost', 5000))
+
+        # Send import command
+        client.send(b'import_recordings\n')
+
+        # Wait for READY signal
+        response = client.recv(1024).decode('utf-8').strip()
+        if response != "READY":
+            print(f"Error: Server did not send READY signal. Got: {response}")
+            client.close()
+            return
+
+        # Send base64-encoded zip data
+        client.send(zip_b64.encode('ascii'))
+        client.send(b"\n")
+
+        # Send end marker
+        client.send(b"END_UPLOAD\n")
+
+        # Get response
+        response = client.recv(1024).decode('utf-8').strip()
+        client.close()
+
+        print(f"Response: {response}")
+    except Exception as e:
+        print(f"Error importing recordings: {e}")
+
+
 if __name__ == "__main__":
     print("Pumpkin Face Client")
     print("Valid expressions: neutral, happy, sad, angry, surprised, scared, sleeping")
@@ -166,6 +257,9 @@ if __name__ == "__main__":
     print("  timeline_status - Show playback state")
     print("File upload:")
     print("  upload_timeline <server_filename> <local_json_file> - Upload a recording file")
+    print("Export/import:")
+    print("  export_recordings <output_zip> - Export all recordings to a local zip file")
+    print("  import_recordings <zip_file> - Import recordings from a local zip file")
     print("Type 'quit' to exit\n")
     
     while True:
@@ -183,5 +277,19 @@ if __name__ == "__main__":
                     print("Error: upload_timeline requires two arguments: server_filename local_json_file")
                 else:
                     upload_timeline(parts[1], parts[2])
+            # Handle export_recordings <output_zip>
+            elif user_input.startswith("export_recordings "):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("Error: export_recordings requires one argument: output_zip_path")
+                else:
+                    export_recordings(parts[1])
+            # Handle import_recordings <zip_file>
+            elif user_input.startswith("import_recordings "):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("Error: import_recordings requires one argument: zip_file_path")
+                else:
+                    import_recordings(parts[1])
             else:
                 send_command(user_input)
