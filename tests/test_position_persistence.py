@@ -503,7 +503,51 @@ class TestPositionInvalidJSONFallback:
 
 
 # ---------------------------------------------------------------------------
-# 9. No Side Effects on Non-Persistence Operations
+# 9. Save on Head Movement Animation Completion
+# ---------------------------------------------------------------------------
+
+class TestPositionSaveOnHeadMovementComplete:
+    """Position is saved when a smooth head-turn animation finishes (update loop)."""
+
+    @pytest.fixture
+    def pumpkin(self):
+        pygame.init()
+        face = _make_pumpkin_no_load()
+        yield face
+        pygame.quit()
+
+    def test_head_movement_completion_calls_save_position(self, pumpkin):
+        """When head movement animation completes, _save_position() is called."""
+        # Start a head movement animation (turn_left triggers smooth movement)
+        pumpkin.turn_head_left(50)
+        assert pumpkin.is_moving_head, "turn_head_left should start head movement"
+
+        # Advance animation past completion
+        pumpkin.head_movement_progress = 0.99
+
+        with patch.object(pumpkin, "_save_position") as mock_save:
+            # Run one update tick — enough to complete the animation
+            pumpkin.update()
+            mock_save.assert_called_once(), \
+                "_save_position must be called when head movement animation completes"
+
+    def test_head_movement_saves_final_position(self, pumpkin, tmp_path):
+        """Final target offset is persisted when head movement animation completes."""
+        pos_file = tmp_path / "pumpkin_position.json"
+        with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
+            pumpkin.turn_head_left(100)
+            # Jump to completion
+            pumpkin.head_movement_progress = 0.99
+            pumpkin.update()
+
+        assert pos_file.exists(), "Position file must exist after head movement"
+        data = json.loads(pos_file.read_text())
+        assert data["x"] == pumpkin.projection_offset_x
+        assert data["y"] == pumpkin.projection_offset_y
+
+
+# ---------------------------------------------------------------------------
+# 10. No Side Effects on Non-Persistence Operations
 # ---------------------------------------------------------------------------
 
 class TestPositionNoSideEffectsOnReset:
