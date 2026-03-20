@@ -624,18 +624,21 @@ class PumpkinFace:
         except OSError as e:
             print(f"Warning: could not save position: {e}")
 
-    def jog_projection(self, dx: int, dy: int):
+    def jog_projection(self, dx: int, dy: int, save: bool = True):
         """Adjust projection offset by delta pixels. Clamped to [-500, +500].
         
         Args:
             dx: Horizontal offset change in pixels (positive = right)
             dy: Vertical offset change in pixels (positive = down)
+            save: If True (default), persist the new position to disk.
+                  If False, update in memory only without writing to disk.
         """
         def clamp(v): return max(-500, min(500, int(v)))
         self.projection_offset_x = clamp(self.projection_offset_x + dx)
         self.projection_offset_y = clamp(self.projection_offset_y + dy)
         print(f"Projection offset: ({self.projection_offset_x}, {self.projection_offset_y})")
-        self._save_position()
+        if save:
+            self._save_position()
     
     def set_projection_offset(self, x: int, y: int):
         """Set absolute projection offset in pixels. Clamped to [-500, +500].
@@ -1045,6 +1048,10 @@ class PumpkinFace:
             dx = args.get("dx", 0)
             dy = args.get("dy", 0)
             self.jog_projection(dx, dy)
+        elif command == "jog_offset_nosave":
+            dx = args.get("dx", 0)
+            dy = args.get("dy", 0)
+            self.jog_projection(dx, dy, save=False)
         elif command == "set_offset":
             x = args.get("x", 0)
             y = args.get("y", 0)
@@ -1272,6 +1279,12 @@ class PumpkinFace:
         elif cmd == "projection_reset":
             self.recording_session.record_command(cmd)
         elif cmd == "jog_offset" and len(parts) >= 3:
+            try:
+                dx, dy = int(parts[1]), int(parts[2])
+                self.recording_session.record_command(cmd, {"dx": dx, "dy": dy})
+            except ValueError:
+                pass
+        elif cmd == "jog_offset_nosave" and len(parts) >= 3:
             try:
                 dx, dy = int(parts[1]), int(parts[2])
                 self.recording_session.record_command(cmd, {"dx": dx, "dy": dy})

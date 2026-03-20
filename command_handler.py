@@ -188,6 +188,18 @@ class CommandRouter:
                 print(f"Error parsing jog_offset command: {e}")
             return ""
         
+        if data.startswith("jog_offset_nosave "):
+            if self.pumpkin.recording_session.is_recording:
+                self.pumpkin._capture_command_for_recording(data)
+            try:
+                parts = data.split()
+                dx = int(parts[1])
+                dy = int(parts[2])
+                self.pumpkin.jog_projection(dx, dy, save=False)
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing jog_offset_nosave command: {e}")
+            return ""
+        
         if data.startswith("set_offset "):
             if self.pumpkin.recording_session.is_recording:
                 self.pumpkin._capture_command_for_recording(data)
@@ -531,7 +543,8 @@ class CommandRouter:
                 "  eyebrow_left <value>               - Set left eyebrow to absolute offset value\n"
                 "  eyebrow_right <value>              - Set right eyebrow to absolute offset value\n"
                 "  projection_reset                   - Reset projection offset to default\n"
-                "  jog_offset <dx> <dy>               - Jog projection offset by dx/dy pixels\n"
+                "  jog_offset <dx> <dy>               - Jog projection offset by dx/dy pixels (saves to disk)\n"
+                "  jog_offset_nosave <dx> <dy>        - Jog projection offset by dx/dy pixels (in memory only, no save)\n"
                 "  set_offset <x> <y>                 - Set projection offset to absolute x/y pixels\n"
                 "  turn_left [amount]                 - Turn head left by amount pixels (default: 50)\n"
                 "  turn_right [amount]                - Turn head right by amount pixels (default: 50)\n"

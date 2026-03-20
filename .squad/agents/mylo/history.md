@@ -1090,3 +1090,19 @@ def _make_mock_gemini_response(analysis_json, emotion):
 
 **Branch:** squad/86-save-pumpkin-position
 
+
+### 2025 — Issue #86 save=False extension
+
+Added 5 new tests to `tests/test_position_persistence.py` under class
+`TestJogProjectionSaveFalse` covering the `save: bool = True` parameter
+Vi added to `jog_projection(dx, dy, save=True)`:
+
+1. `test_jog_no_save_does_not_write_file` — file not created when save=False
+2. `test_jog_no_save_updates_memory` — in-memory offset still moves
+3. `test_jog_save_true_still_saves` — regression guard; save=True still writes
+4. `test_jog_no_save_preserves_last_saved_position` — file unchanged after save=False jog follows a save=True jog
+5. `test_mix_save_and_no_save` — loaded position reflects only save=True calls
+
+Vi's implementation was already present on the branch. All 46 tests pass (41 pre-existing + 5 new).
+
+Pattern: use `patch("pumpkin_face.POSITION_FILE", str(tmp_path / "pumpkin_position.json"))` to isolate file assertions; use `_make_pumpkin_no_load()` helper to skip startup load.

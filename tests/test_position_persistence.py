@@ -583,3 +583,98 @@ class TestPositionNoSideEffectsOnReset:
         saved_after = json.loads(pos_file.read_text())
         assert saved_after == saved_before, \
             "Position file must not be overwritten by reset"
+
+
+# ---------------------------------------------------------------------------
+# 11. jog_projection save=False Behaviour (Issue #86 extension)
+# ---------------------------------------------------------------------------
+
+class TestJogProjectionSaveFalse:
+    """Verify that jog_projection(..., save=False) skips disk writes while
+    still updating the in-memory projection offsets.
+    """
+
+    @pytest.fixture
+    def pumpkin(self):
+        pygame.init()
+        face = _make_pumpkin_no_load()
+        yield face
+        pygame.quit()
+
+    def test_jog_no_save_does_not_write_file(self, pumpkin, tmp_path):
+        """jog_projection(dx, dy, save=False) must NOT create / update the position file."""
+        pos_file = tmp_path / "pumpkin_position.json"
+        with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
+            pumpkin.jog_projection(-10, 0, save=False)
+        assert not pos_file.exists(), \
+            "pumpkin_position.json must NOT be written when save=False"
+
+    def test_jog_no_save_updates_memory(self, pumpkin):
+        """jog_projection(dx, dy, save=False) must still update projection_offset_x/y in memory."""
+        initial_x = pumpkin.projection_offset_x
+        pumpkin.jog_projection(-10, 5, save=False)
+        assert pumpkin.projection_offset_x == initial_x - 10, \
+            f"Expected projection_offset_x={initial_x - 10}, got {pumpkin.projection_offset_x}"
+        assert pumpkin.projection_offset_y == 5, \
+            f"Expected projection_offset_y=5, got {pumpkin.projection_offset_y}"
+
+    def test_jog_save_true_still_saves(self, pumpkin, tmp_path):
+        """Regression guard: jog_projection(dx, dy, save=True) (default) writes the file."""
+        pos_file = tmp_path / "pumpkin_position.json"
+        with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
+            pumpkin.jog_projection(15, 0, save=True)
+        assert pos_file.exists(), \
+            "pumpkin_position.json must be written when save=True"
+        data = json.loads(pos_file.read_text())
+        assert data["x"] == 15, f"Expected x=15, got {data['x']}"
+
+    def test_jog_no_save_preserves_last_saved_position(self, pumpkin, tmp_path):
+        """After a save=True jog, a subsequent save=False jog must not alter the file.
+
+        Load from file should return the position from the save=True call, not the
+        in-memory position that was moved by save=False.
+        """
+        pos_file = tmp_path / "pumpkin_position.json"
+        with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
+            # First: save a real position to disk (x=20, y=0)
+            pumpkin.jog_projection(20, 0, save=True)
+            saved_after_first = json.loads(pos_file.read_text())
+
+            # Second: move in memory only — must NOT update the file
+            pumpkin.jog_projection(-5, 0, save=False)
+            saved_after_second = json.loads(pos_file.read_text())
+
+        assert saved_after_second == saved_after_first, (
+            "Position file must not be overwritten by save=False jog. "
+            f"Before: {saved_after_first}, After: {saved_after_second}"
+        )
+        # Verify memory DID move
+        assert pumpkin.projection_offset_x == 15, \
+            f"In-memory offset should be 15 (20-5), got {pumpkin.projection_offset_x}"
+
+    def test_mix_save_and_no_save(self, pumpkin, tmp_path):
+        """Mix of save=True and save=False: file reflects only the save=True calls.
+
+        Sequence:
+          1. jog(10, 0, save=True)  -> file = {x:10, y:0}
+          2. jog(-3, 0, save=False) -> memory = {x:7, y:0}, file unchanged
+          3. Load from file         -> should get x=10, not x=7
+        """
+        pos_file = tmp_path / "pumpkin_position.json"
+        with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
+            pumpkin.jog_projection(10, 0, save=True)
+            pumpkin.jog_projection(-3, 0, save=False)
+
+        # In-memory should reflect both jogs
+        assert pumpkin.projection_offset_x == 7, \
+            f"In-memory offset should be 7, got {pumpkin.projection_offset_x}"
+
+        # File should only know about the save=True jog
+        pygame.init()
+        with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
+            loaded = PumpkinFace(width=800, height=600)
+        assert loaded.projection_offset_x == 10, (
+            f"Loaded position should be 10 (from save=True jog), "
+            f"got {loaded.projection_offset_x}"
+        )
+        pygame.quit()

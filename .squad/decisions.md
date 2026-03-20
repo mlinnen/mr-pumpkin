@@ -4862,3 +4862,41 @@ Approve PR #93 for issue #92.
 - If a local rerun still fails after port cleanup, capture the owning PID and subprocess stderr immediately; otherwise treat the prior failure as contaminated and non-blocking for code.
 
 ---
+
+---
+
+### 2026-03-20: Dual Jog Commands — Save vs No-Save
+
+**By:** Vi (Backend Dev)
+
+**Branch:** squad/86-save-pumpkin-position
+
+**Issue:** #86 — Position Persistence
+
+**What:** Added save: bool = True parameter to jog_projection() method in pumpkin_face.py. New jog_offset_nosave <dx> <dy> command moves projection offset in memory only without persisting to disk. Existing jog_offset command unchanged — still saves on every move.
+
+**Decision:** Use a single method with a boolean parameter rather than creating a second method.
+
+**Rationale:**
+- One method, one clamp/move logic path — no duplication
+- The boolean default (True) preserves all existing call sites without modification
+- A second method would duplicate the clamp arithmetic and print statement
+- Command naming uses _nosave suffix convention for clarity
+
+**Alternatives Considered:**
+| Option | Rejected reason |
+|---|---|
+| Two separate methods (jog_projection + jog_projection_nosave) | Duplicates clamp logic; harder to keep in sync |
+| Separate jog_temp command (different verb) | Inconsistent with existing jog_offset vocabulary |
+| Flag on command string (jog_offset dx dy nosave) | Harder to parse; breaks current positional argument convention |
+
+**Files Changed:**
+- pumpkin_face.py — jog_projection() signature updated; both command dispatch paths modified (dict-args and string-parsing)
+- command_handler.py — new jog_offset_nosave handler and help text
+
+**Test Results:** 46 tests passing (41 existing position persistence + 5 new save=False coverage)
+
+**Outcomes:**
+- Full backwards compatibility — existing code continues unchanged
+- Implementation pattern: Single method with boolean parameter (cleaner than two methods)
+- Both command dispatch paths in pumpkin_face.py must be updated together

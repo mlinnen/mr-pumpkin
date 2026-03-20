@@ -1031,3 +1031,19 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 
 **Branch:** squad/86-save-pumpkin-position
 
+
+## Issue #86 (cont.) — Dual Jog Commands [2026-03-20T10:29:59Z]
+**Status:** ✅ Complete
+
+**What changed:**
+- jog_projection() in pumpkin_face.py now accepts save: bool = True parameter
+- When save=True (default): existing behavior — moves then persists to disk via _save_position()
+- When save=False: moves in memory only, skips _save_position()
+- New command jog_offset_nosave <dx> <dy> added to command_handler.py and both command dispatch paths in pumpkin_face.py (dict-args dispatch + string-parsing/recording path)
+- Existing jog_offset <dx> <dy> command unchanged — still saves by default
+- All 41 tests in 	ests/test_position_persistence.py pass; pre-existing failures in other test files are unrelated to this change
+
+**Learnings:**
+- One method with a save bool parameter is cleaner than two separate methods — avoids duplicating the clamp/move logic
+- Both command dispatch paths in pumpkin_face.py (the dict-args path around line 1044 and the string-parsing/recording path around line 1281) must be updated together when adding a new command
+- Pre-existing test failures in 	est_head_movement.py and others are environment-state issues (pumpkin_position.json on disk) and unrelated third-party module gaps (openai, google)
