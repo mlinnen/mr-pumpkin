@@ -1055,3 +1055,90 @@ def _make_mock_gemini_response(analysis_json, emotion):
 - Added `tests/test_pi_install_scripts.py::test_update_script_logs_to_stderr_so_stdout_helpers_stay_clean` to guard the updater path/log separation contract.
 - Regression coverage now asserts update.sh logs through stderr and emits the ZIP path with stdout-only `printf`, so command substitution passes a clean archive path into `unzip`.
 - Focused validation: `python -m pytest tests\\test_pi_install_scripts.py -q` (8 passed).
+
+### Issue #86: Position Persistence Tests (2026-03-14)
+**Context:** Vi implemented POSITION_FILE, _save_position, _load_position on branch squad/86-save-pumpkin-position. Feature was already complete when tests were written. All 41 tests passed green on first run.
+
+**Test file:** tests/test_position_persistence.py (41 tests across 10 test classes)
+
+**Patterns used:**
+- patch.object(PumpkinFace, "_load_position") helper to isolate startup from file system state
+- tmp_path pytest fixture for actual file I/O tests (clean, deterministic)
+- patch("pumpkin_face.POSITION_FILE", str(pos_file)) to redirect file writes to tmp_path
+- patch.object(pumpkin, "_save_position") to verify call counts without touching disk
+
+**Edge cases covered:**
+- 6 variants of invalid/corrupt JSON content all fall back to (0, 0) without crashing
+- reset_projection_offset() intentionally does NOT persist (preserves physical alignment across resets)
+- Head movement animation completion (update tick) also triggers _save_position
+- String-typed numeric values in JSON ("ten") caught by ValueError in Vi broad exception handler
+
+**Implementation details noted:**
+- Vi catches (FileNotFoundError, KeyError, ValueError, TypeError, AttributeError, json.JSONDecodeError) in _load_position
+- reset_projection_offset does NOT call _save_position - correct design so restart recovers calibration
+## Issue #86 — Position Persistence [2026-03-20T14:10:02Z]
+
+**Status:** ✅ Complete  
+**Test Results:** 41 tests passing, all green  
+
+**Test Coverage:**
+- 10 test classes
+- Position state management
+- Save/load round-trip verification
+- Integration with projection methods
+- Edge cases and error handling
+
+**Branch:** squad/86-save-pumpkin-position
+
+
+### 2025 — Issue #86 save=False extension
+
+Added 5 new tests to `tests/test_position_persistence.py` under class
+`TestJogProjectionSaveFalse` covering the `save: bool = True` parameter
+Vi added to `jog_projection(dx, dy, save=True)`:
+
+1. `test_jog_no_save_does_not_write_file` — file not created when save=False
+2. `test_jog_no_save_updates_memory` — in-memory offset still moves
+3. `test_jog_save_true_still_saves` — regression guard; save=True still writes
+4. `test_jog_no_save_preserves_last_saved_position` — file unchanged after save=False jog follows a save=True jog
+5. `test_mix_save_and_no_save` — loaded position reflects only save=True calls
+
+Vi's implementation was already present on the branch. All 46 tests pass (41 pre-existing + 5 new).
+
+Pattern: use `patch("pumpkin_face.POSITION_FILE", str(tmp_path / "pumpkin_position.json"))` to isolate file assertions; use `_make_pumpkin_no_load()` helper to skip startup load.
+
+## Issue #86 (cont.) — Dual Jog Commands Test Extension [2026-03-20T14:31:40Z]
+**Status:** ✅ Complete
+
+**What changed:**
+- Added 5 new tests to `TestJogProjectionSaveFalse` class in `tests/test_position_persistence.py`
+- New tests verify `save=False` behavior on jog_projection()
+
+**Test suite update:**
+1. `test_jog_no_save_does_not_write_file` — Verify no file I/O when save=False
+2. `test_jog_no_save_updates_memory` — Confirm in-memory offset changes
+3. `test_jog_save_true_still_saves` — Regression guard for save=True path
+4. `test_jog_no_save_preserves_last_saved_position` — File state unchanged
+5. `test_mix_save_and_no_save` — Verify only save=True writes reflected in load
+
+**Test results:**
+- **All 46 tests passing** (41 pre-existing + 5 new)
+- Pattern: Use `patch("pumpkin_face.POSITION_FILE", str(tmp_path / "pumpkin_position.json"))` for file isolation
+- Helper `_make_pumpkin_no_load()` skips startup load for clean state
+
+**Metadata:**
+- Orchestration log: `.squad/orchestration-log/2026-03-20T14-31-40Z-mylo.md`
+- Branch ready for merge: `squad/86-save-pumpkin-position`
+
+## Learnings - CI isolation fix for PR #96
+
+**Problem diagnosed:**
+The real root cause was NOT in test_position_persistence.py alone. PR #96 added _save_position() calls to set_projection_offset(), jog_projection(save=True), and the head-movement animation completion path. Pre-existing tests in test_head_movement.py (e.g. test_offset_rendering_performance calling set_projection_offset(200, -100)) wrote pumpkin_position.json to the CWD without patching POSITION_FILE. Subsequent tests creating fresh PumpkinFace() instances loaded those stale values.
+
+**Fix applied:**
+Added an autouse=True fixture 'isolate_position_file' to tests/conftest.py that patches pumpkin_face.POSITION_FILE to tmp_path / pumpkin_position.json for every test function. Tests that already patch POSITION_FILE themselves continue to work.
+
+**Lesson:**
+When a module gains new side-effects (file I/O), the correct isolation layer is conftest.py autouse fixture, not per-class setUp/tearDown - contamination can come from any test file.
+
+**Result:** 46 position-persistence tests pass, 44 head-movement tests pass (was 8 failing), no pumpkin_position.json left in CWD.

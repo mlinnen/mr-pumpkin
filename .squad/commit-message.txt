@@ -1,0 +1,9 @@
+feat: add jog_offset_nosave command for transient position moves
+
+Add save parameter to jog_projection() (default True). New jog_offset_nosave
+command moves projection offset in memory only without persisting to disk.
+Existing jog_offset command unchanged - still saves on every move.
+
+Tests: 46 passing (41 existing + 5 new save=False coverage)
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

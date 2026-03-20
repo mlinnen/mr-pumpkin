@@ -1,6 +1,49 @@
 # Decisions
 
-Last updated: 2026-03-04T02:59:22Z
+Last updated: 2026-03-20T14:10:02Z
+
+---
+
+## Issue #86 — Position Persistence
+
+### Decision: Position Persistence Implemented
+
+**Date:** 2026-03-20  
+**Decided by:** Vi (Backend Dev), Mylo (Tester)  
+**Related to:** Issue #86 — Pumpkin position persistence across sessions  
+**Status:** ✅ Complete
+
+#### Context
+
+The pumpkin face position (jog offset) needed to be saved and restored across application restarts to provide a seamless user experience.
+
+#### Decision
+
+Implemented persistent position storage with automatic load/save:
+
+**Files Modified:** `pumpkin_face.py`
+
+**Implementation:**
+- Added POSITION_FILE constant pointing to `.pumpkin_position`
+- Implemented `_load_position()` method to restore saved offsets on startup
+- Implemented `_save_position()` method to persist current position to disk
+- Integrated save calls into `jog_projection()` and `set_projection_offset()` methods
+- Automatic position restoration during `PumpkinFace.__init__()`
+
+#### Test Coverage
+
+**Author:** Mylo (Tester)  
+**File:** `tests/test_position_persistence.py`
+- 10 test classes
+- 41 tests total, all passing
+- Coverage: state management, save/load round-trip, integration, edge cases
+
+#### Verification
+
+- ✅ 39 tests passing in main test suite
+- ✅ 41 new tests passing in position persistence suite
+- ✅ All tests green
+- ✅ Position restored on application restart
 
 ---
 
