@@ -1129,3 +1129,16 @@ Pattern: use `patch("pumpkin_face.POSITION_FILE", str(tmp_path / "pumpkin_positi
 **Metadata:**
 - Orchestration log: `.squad/orchestration-log/2026-03-20T14-31-40Z-mylo.md`
 - Branch ready for merge: `squad/86-save-pumpkin-position`
+
+## Learnings - CI isolation fix for PR #96
+
+**Problem diagnosed:**
+The real root cause was NOT in test_position_persistence.py alone. PR #96 added _save_position() calls to set_projection_offset(), jog_projection(save=True), and the head-movement animation completion path. Pre-existing tests in test_head_movement.py (e.g. test_offset_rendering_performance calling set_projection_offset(200, -100)) wrote pumpkin_position.json to the CWD without patching POSITION_FILE. Subsequent tests creating fresh PumpkinFace() instances loaded those stale values.
+
+**Fix applied:**
+Added an autouse=True fixture 'isolate_position_file' to tests/conftest.py that patches pumpkin_face.POSITION_FILE to tmp_path / pumpkin_position.json for every test function. Tests that already patch POSITION_FILE themselves continue to work.
+
+**Lesson:**
+When a module gains new side-effects (file I/O), the correct isolation layer is conftest.py autouse fixture, not per-class setUp/tearDown - contamination can come from any test file.
+
+**Result:** 46 position-persistence tests pass, 44 head-movement tests pass (was 8 failing), no pumpkin_position.json left in CWD.
