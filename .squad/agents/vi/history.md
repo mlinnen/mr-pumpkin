@@ -1047,3 +1047,17 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 - One method with a save bool parameter is cleaner than two separate methods — avoids duplicating the clamp/move logic
 - Both command dispatch paths in pumpkin_face.py (the dict-args path around line 1044 and the string-parsing/recording path around line 1281) must be updated together when adding a new command
 - Pre-existing test failures in 	est_head_movement.py and others are environment-state issues (pumpkin_position.json on disk) and unrelated third-party module gaps (openai, google)
+
+## Issue #86 (cont.) — Change jog_projection save default to False [2026-03-20T10:44:53Z]
+**Status:** ✅ Complete
+
+**What changed:**
+- jog_projection(self, dx, dy, save: bool = True) → save: bool = False in pumpkin_face.py
+- command_handler.py jog_offset handler now explicitly passes save=True to preserve save-on-move behavior
+- jog_offset_nosave handler still passes save=False (explicit is clear)
+- 13 test call-sites in 	ests/test_position_persistence.py that expected file writes updated to pass save=True
+- All 46 tests pass
+
+## Learnings
+- When flipping a default from True→False, scan ALL callers — both production code and tests — for implicit reliance on the old default that expects the side effect (file write). Each of those sites needs save=True added.
+- Tests that mock _save_position and assert called_once() are the most fragile: they will silently pass if you forget to update a test call that no longer triggers the save.

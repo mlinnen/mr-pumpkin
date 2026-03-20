@@ -183,7 +183,7 @@ class CommandRouter:
                 parts = data.split()
                 dx = int(parts[1])
                 dy = int(parts[2])
-                self.pumpkin.jog_projection(dx, dy)
+                self.pumpkin.jog_projection(dx, dy, save=True)
             except (ValueError, IndexError) as e:
                 print(f"Error parsing jog_offset command: {e}")
             return ""

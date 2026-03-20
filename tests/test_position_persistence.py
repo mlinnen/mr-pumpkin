@@ -105,14 +105,14 @@ class TestPositionSaveOnJog:
     def test_jog_projection_calls_save_position(self, pumpkin):
         """jog_projection() must call _save_position() to persist the new offset."""
         with patch.object(pumpkin, "_save_position") as mock_save:
-            pumpkin.jog_projection(10, 5)
+            pumpkin.jog_projection(10, 5, save=True)
             mock_save.assert_called_once()
 
     def test_jog_projection_saves_correct_x(self, pumpkin, tmp_path):
         """After jog_projection(10, 0), saved file contains x=10."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(10, 0)
+            pumpkin.jog_projection(10, 0, save=True)
         assert pos_file.exists(), "Position file must be created after jog"
         data = json.loads(pos_file.read_text())
         assert data["x"] == 10, f"Expected x=10, got {data['x']}"
@@ -121,7 +121,7 @@ class TestPositionSaveOnJog:
         """After jog_projection(0, 20), saved file contains y=20."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(0, 20)
+            pumpkin.jog_projection(0, 20, save=True)
         data = json.loads(pos_file.read_text())
         assert data["y"] == 20, f"Expected y=20, got {data['y']}"
 
@@ -129,8 +129,8 @@ class TestPositionSaveOnJog:
         """Multiple jog calls accumulate; last save reflects final offset."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(10, 5)
-            pumpkin.jog_projection(-3, 15)
+            pumpkin.jog_projection(10, 5, save=True)
+            pumpkin.jog_projection(-3, 15, save=True)
         data = json.loads(pos_file.read_text())
         assert data["x"] == 7, f"Expected x=7 (10-3), got {data['x']}"
         assert data["y"] == 20, f"Expected y=20 (5+15), got {data['y']}"
@@ -139,7 +139,7 @@ class TestPositionSaveOnJog:
         """Negative projection offsets are persisted correctly."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(-50, -30)
+            pumpkin.jog_projection(-50, -30, save=True)
         data = json.loads(pos_file.read_text())
         assert data["x"] == -50
         assert data["y"] == -30
@@ -287,7 +287,7 @@ class TestPositionFileFormat:
         """_save_position() writes a file that can be parsed as JSON."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(5, 10)
+            pumpkin.jog_projection(5, 10, save=True)
         content = pos_file.read_text()
         try:
             data = json.loads(content)
@@ -298,7 +298,7 @@ class TestPositionFileFormat:
         """Saved JSON must have an 'x' key."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(5, 10)
+            pumpkin.jog_projection(5, 10, save=True)
         data = json.loads(pos_file.read_text())
         assert "x" in data, f"Position file must have 'x' key, got: {list(data.keys())}"
 
@@ -306,7 +306,7 @@ class TestPositionFileFormat:
         """Saved JSON must have a 'y' key."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(5, 10)
+            pumpkin.jog_projection(5, 10, save=True)
         data = json.loads(pos_file.read_text())
         assert "y" in data, f"Position file must have 'y' key, got: {list(data.keys())}"
 
@@ -314,7 +314,7 @@ class TestPositionFileFormat:
         """The 'x' key must hold a numeric (int or float) value."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(5, 10)
+            pumpkin.jog_projection(5, 10, save=True)
         data = json.loads(pos_file.read_text())
         assert isinstance(data["x"], (int, float)), \
             f"'x' must be numeric, got {type(data['x'])}"
@@ -323,7 +323,7 @@ class TestPositionFileFormat:
         """The 'y' key must hold a numeric (int or float) value."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(5, 10)
+            pumpkin.jog_projection(5, 10, save=True)
         data = json.loads(pos_file.read_text())
         assert isinstance(data["y"], (int, float)), \
             f"'y' must be numeric, got {type(data['y'])}"
@@ -332,7 +332,7 @@ class TestPositionFileFormat:
         """The saved 'x' value matches pumpkin.projection_offset_x after jog."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(33, 0)
+            pumpkin.jog_projection(33, 0, save=True)
         data = json.loads(pos_file.read_text())
         assert data["x"] == pumpkin.projection_offset_x
 
@@ -340,7 +340,7 @@ class TestPositionFileFormat:
         """The saved 'y' value matches pumpkin.projection_offset_y after jog."""
         pos_file = tmp_path / "pumpkin_position.json"
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):
-            pumpkin.jog_projection(0, -77)
+            pumpkin.jog_projection(0, -77, save=True)
         data = json.loads(pos_file.read_text())
         assert data["y"] == pumpkin.projection_offset_y
 
@@ -369,7 +369,7 @@ class TestPositionRoundtrip:
             with patch.object(PumpkinFace, "_load_position", return_value=None):
                 writer = PumpkinFace(width=800, height=600)
             writer.set_projection_offset(200, 150)
-            writer.jog_projection(0, 0)  # ensure last save has correct state
+            writer.jog_projection(0, 0, save=True)  # ensure last save has correct state
 
         # Load phase
         with patch("pumpkin_face.POSITION_FILE", str(pos_file)):

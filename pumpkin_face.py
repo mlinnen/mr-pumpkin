@@ -624,14 +624,14 @@ class PumpkinFace:
         except OSError as e:
             print(f"Warning: could not save position: {e}")
 
-    def jog_projection(self, dx: int, dy: int, save: bool = True):
+    def jog_projection(self, dx: int, dy: int, save: bool = False):
         """Adjust projection offset by delta pixels. Clamped to [-500, +500].
         
         Args:
             dx: Horizontal offset change in pixels (positive = right)
             dy: Vertical offset change in pixels (positive = down)
-            save: If True (default), persist the new position to disk.
-                  If False, update in memory only without writing to disk.
+            save: If True, persist the new position to disk.
+                  If False (default), update in memory only without writing to disk.
         """
         def clamp(v): return max(-500, min(500, int(v)))
         self.projection_offset_x = clamp(self.projection_offset_x + dx)
