@@ -1016,3 +1016,18 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 
 - 2026-03-13: Issue #92 Raspberry Pi install/update flow now uses `scripts/unix_dependency_plan.py` to split Pi-friendly apt packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) from PyPI-only dependencies. `install.sh` prefers apt on Pi, `update.sh` attempts apt only when non-interactive privilege is available and otherwise falls back to pip with `--break-system-packages` when supported. Release packaging test now asserts the helper ships inside the ZIP, and Pi dependency planning is covered in `tests/test_auto_update.py`.
 - 2026-03-13: `update.sh` helper functions that return machine-readable values must keep stdout clean. Logging now routes through stderr so `zip_path=$(download_release ...)` captures only the archive path; otherwise Raspberry Pi updates can fail with `unzip cannot find or open ... Downloading version ...` when log lines are mixed into the command substitution.
+
+- 2026-03-20: Issue #86 position persistence implemented. Files changed: \pumpkin_face.py\ (added \POSITION_FILE\ module constant, \_load_position()\, \_save_position()\ methods; hooked save into \jog_projection()\ and \set_projection_offset()\; load called in \__init__\; head movement animation saves on completion). \pumpkin_position.json\ stored in working directory (project root). \eset_projection_offset()\ intentionally does NOT save — preserves last alignment across in-session resets. All 39 tests in \	ests/test_position_persistence.py\ pass.
+## Issue #86 — Position Persistence [2026-03-20T14:10:02Z]
+
+**Status:** ✅ Complete  
+**Test Results:** 39 tests passing  
+
+**Implementation Summary:**
+- Added position persistence layer to PumpkinFace
+- Position saved on projection changes (jog_projection, set_projection_offset)
+- Position loaded automatically on startup
+- Full test coverage by Mylo: 41 tests, all green
+
+**Branch:** squad/86-save-pumpkin-position
+

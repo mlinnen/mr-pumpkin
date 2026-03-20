@@ -1055,3 +1055,38 @@ def _make_mock_gemini_response(analysis_json, emotion):
 - Added `tests/test_pi_install_scripts.py::test_update_script_logs_to_stderr_so_stdout_helpers_stay_clean` to guard the updater path/log separation contract.
 - Regression coverage now asserts update.sh logs through stderr and emits the ZIP path with stdout-only `printf`, so command substitution passes a clean archive path into `unzip`.
 - Focused validation: `python -m pytest tests\\test_pi_install_scripts.py -q` (8 passed).
+
+### Issue #86: Position Persistence Tests (2026-03-14)
+**Context:** Vi implemented POSITION_FILE, _save_position, _load_position on branch squad/86-save-pumpkin-position. Feature was already complete when tests were written. All 41 tests passed green on first run.
+
+**Test file:** tests/test_position_persistence.py (41 tests across 10 test classes)
+
+**Patterns used:**
+- patch.object(PumpkinFace, "_load_position") helper to isolate startup from file system state
+- tmp_path pytest fixture for actual file I/O tests (clean, deterministic)
+- patch("pumpkin_face.POSITION_FILE", str(pos_file)) to redirect file writes to tmp_path
+- patch.object(pumpkin, "_save_position") to verify call counts without touching disk
+
+**Edge cases covered:**
+- 6 variants of invalid/corrupt JSON content all fall back to (0, 0) without crashing
+- reset_projection_offset() intentionally does NOT persist (preserves physical alignment across resets)
+- Head movement animation completion (update tick) also triggers _save_position
+- String-typed numeric values in JSON ("ten") caught by ValueError in Vi broad exception handler
+
+**Implementation details noted:**
+- Vi catches (FileNotFoundError, KeyError, ValueError, TypeError, AttributeError, json.JSONDecodeError) in _load_position
+- reset_projection_offset does NOT call _save_position - correct design so restart recovers calibration
+## Issue #86 — Position Persistence [2026-03-20T14:10:02Z]
+
+**Status:** ✅ Complete  
+**Test Results:** 41 tests passing, all green  
+
+**Test Coverage:**
+- 10 test classes
+- Position state management
+- Save/load round-trip verification
+- Integration with projection methods
+- Edge cases and error handling
+
+**Branch:** squad/86-save-pumpkin-position
+
