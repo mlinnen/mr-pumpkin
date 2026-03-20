@@ -1106,3 +1106,26 @@ Vi added to `jog_projection(dx, dy, save=True)`:
 Vi's implementation was already present on the branch. All 46 tests pass (41 pre-existing + 5 new).
 
 Pattern: use `patch("pumpkin_face.POSITION_FILE", str(tmp_path / "pumpkin_position.json"))` to isolate file assertions; use `_make_pumpkin_no_load()` helper to skip startup load.
+
+## Issue #86 (cont.) — Dual Jog Commands Test Extension [2026-03-20T14:31:40Z]
+**Status:** ✅ Complete
+
+**What changed:**
+- Added 5 new tests to `TestJogProjectionSaveFalse` class in `tests/test_position_persistence.py`
+- New tests verify `save=False` behavior on jog_projection()
+
+**Test suite update:**
+1. `test_jog_no_save_does_not_write_file` — Verify no file I/O when save=False
+2. `test_jog_no_save_updates_memory` — Confirm in-memory offset changes
+3. `test_jog_save_true_still_saves` — Regression guard for save=True path
+4. `test_jog_no_save_preserves_last_saved_position` — File state unchanged
+5. `test_mix_save_and_no_save` — Verify only save=True writes reflected in load
+
+**Test results:**
+- **All 46 tests passing** (41 pre-existing + 5 new)
+- Pattern: Use `patch("pumpkin_face.POSITION_FILE", str(tmp_path / "pumpkin_position.json"))` for file isolation
+- Helper `_make_pumpkin_no_load()` skips startup load for clean state
+
+**Metadata:**
+- Orchestration log: `.squad/orchestration-log/2026-03-20T14-31-40Z-mylo.md`
+- Branch ready for merge: `squad/86-save-pumpkin-position`
