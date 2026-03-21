@@ -1,0 +1,98 @@
+@inject PumpkinWebSocketService PumpkinService
+@implements IDisposable
+
+@if (recordings.Count > 0)
+{
+    <div class="card">
+        <h2>Recordings (@recordings.Count)</h2>
+        <div class="recording-list">
+            @foreach (var rec in recordings)
+            {
+                <div class="recording-item @(selectedRecordings.Contains(rec.Filename) ? "selected" : "")">
+                    <input type="checkbox" 
+                           checked="@selectedRecordings.Contains(rec.Filename)" 
+                           @onchange="@((e) => ToggleSelection(rec.Filename))" />
+                    <div class="recording-info" @onclick="@(() => ToggleSelection(rec.Filename))">
+                        <div class="recording-name">@rec.Filename</div>
+                        <div class="recording-meta">@rec.CommandCount cmds · @rec.DurationMs ms</div>
+                    </div>
+                    <div class="recording-actions">
+                        <button class="btn btn-sm btn-play" @onclick="@(() => Play(rec.Filename))">▶️</button>
+                        <button class="btn btn-sm btn-edit" @onclick="@(() => Rename(rec.Filename))">✏️</button>
+                        <button class="btn btn-sm btn-danger" @onclick="@(() => Delete(rec.Filename))">🗑️</button>
+                    </div>
+                </div>
+            }
+        </div>
+        
+        @if (selectedRecordings.Count > 1)
+        {
+            <button class="btn btn-primary" @onclick="CreateFromSelection">➕ Create from Selected</button>
+        }
+    </div>
+}
+else
+{
+    <div class="card">
+        <p class="empty-state">No recordings available</p>
+    </div>
+}
+
+@code {
+    private List<RecordingInfo> recordings = new();
+    private HashSet<string> selectedRecordings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        PumpkinService.RecordingsChanged += OnRecordingsChanged;
+        await RefreshRecordings();
+    }
+
+    private void OnRecordingsChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(RefreshRecordings);
+    }
+
+    private async Task RefreshRecordings()
+    {
+        if (!PumpkinService.IsConnected) return;
+        recordings = await PumpkinService.ListRecordingsAsync();
+        StateHasChanged();
+    }
+
+    private void ToggleSelection(string filename)
+    {
+        if (selectedRecordings.Contains(filename))
+            selectedRecordings.Remove(filename);
+        else
+            selectedRecordings.Add(filename);
+    }
+
+    private async Task Play(string filename)
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.PlayAsync(filename);
+    }
+
+    private async Task Delete(string filename)
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.DeleteRecordingAsync(filename);
+        await RefreshRecordings();
+    }
+
+    private async Task Rename(string filename)
+    {
+        // TODO: Implement rename dialog
+    }
+
+    private async Task CreateFromSelection()
+    {
+        // TODO: Implement create from selection
+    }
+
+    public void Dispose()
+    {
+        PumpkinService.RecordingsChanged -= OnRecordingsChanged;
+    }
+}

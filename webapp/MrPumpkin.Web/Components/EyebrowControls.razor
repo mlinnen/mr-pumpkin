@@ -1,0 +1,58 @@
+@inject PumpkinWebSocketService PumpkinService
+
+<div class="card">
+    <h2>Eyebrows</h2>
+    <div class="control-grid">
+        <button class="btn btn-control" @onclick="RaiseBoth">⬆️ Raise Both</button>
+        <button class="btn btn-control" @onclick="LowerBoth">⬇️ Lower Both</button>
+        <button class="btn btn-control" @onclick="RaiseLeft">⬆️ Raise Left</button>
+        <button class="btn btn-control" @onclick="LowerLeft">⬇️ Lower Left</button>
+        <button class="btn btn-control" @onclick="RaiseRight">⬆️ Raise Right</button>
+        <button class="btn btn-control" @onclick="LowerRight">⬇️ Lower Right</button>
+        <button class="btn btn-control btn-secondary" @onclick="Reset">🔄 Reset</button>
+    </div>
+</div>
+
+@code {
+    private async Task RaiseBoth()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RaiseEyebrowsAsync();
+    }
+
+    private async Task LowerBoth()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.LowerEyebrowsAsync();
+    }
+
+    private async Task RaiseLeft()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RaiseEyebrowLeftAsync();
+    }
+
+    private async Task LowerLeft()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.LowerEyebrowLeftAsync();
+    }
+
+    private async Task RaiseRight()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RaiseEyebrowRightAsync();
+    }
+
+    private async Task LowerRight()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.LowerEyebrowRightAsync();
+    }
+
+    private async Task Reset()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.ResetEyebrowsAsync();
+    }
+}

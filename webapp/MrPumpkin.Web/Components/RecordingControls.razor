@@ -1,0 +1,76 @@
+@inject PumpkinWebSocketService PumpkinService
+@implements IDisposable
+
+<div class="card">
+    <h2>Recording</h2>
+    
+    @if (isRecording)
+    {
+        <div class="recording-status recording-active">
+            <span class="recording-dot"></span>
+            <span>Recording...</span>
+        </div>
+        <div class="recording-actions">
+            <input type="text" @bind="recordingName" placeholder="Recording name" class="form-control" />
+            <button class="btn btn-danger" @onclick="StopRecording">⏹️ Stop & Save</button>
+            <button class="btn btn-secondary" @onclick="CancelRecording">❌ Cancel</button>
+        </div>
+    }
+    else
+    {
+        <button class="btn btn-primary" @onclick="StartRecording">⏺️ Start Recording</button>
+    }
+</div>
+
+@code {
+    private bool isRecording = false;
+    private string recordingName = "";
+
+    protected override void OnInitialized()
+    {
+        PumpkinService.RecordingStatusChanged += OnRecordingStatusChanged;
+    }
+
+    private void OnRecordingStatusChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(async () =>
+        {
+            var status = await PumpkinService.GetRecordingStatusAsync();
+            isRecording = status.IsRecording;
+            StateHasChanged();
+        });
+    }
+
+    private async Task StartRecording()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RecordStartAsync();
+        isRecording = true;
+        recordingName = $"recording-{DateTime.Now:yyyyMMdd-HHmmss}";
+    }
+
+    private async Task StopRecording()
+    {
+        if (!PumpkinService.IsConnected) return;
+        if (string.IsNullOrWhiteSpace(recordingName))
+        {
+            recordingName = $"recording-{DateTime.Now:yyyyMMdd-HHmmss}";
+        }
+        await PumpkinService.RecordStopAsync(recordingName);
+        isRecording = false;
+        recordingName = "";
+    }
+
+    private async Task CancelRecording()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RecordCancelAsync();
+        isRecording = false;
+        recordingName = "";
+    }
+
+    public void Dispose()
+    {
+        PumpkinService.RecordingStatusChanged -= OnRecordingStatusChanged;
+    }
+}

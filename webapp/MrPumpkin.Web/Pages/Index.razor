@@ -1,0 +1,100 @@
+@page "/"
+@inject PumpkinWebSocketService PumpkinService
+
+<PageTitle>Mr. Pumpkin - Dashboard</PageTitle>
+
+<div class="dashboard">
+    <h1>Mr. Pumpkin Control</h1>
+
+    @if (!PumpkinService.IsConnected)
+    {
+        <div class="warning-card">
+            <p>⚠️ Not connected to pumpkin server</p>
+            <p>Make sure the Python server is running on ws://localhost:5001</p>
+        </div>
+    }
+
+    <div class="card">
+        <h2>Quick Expressions</h2>
+        <div class="expression-grid">
+            <button class="btn btn-expression" @onclick="@(() => SendExpression("neutral"))">😐 Neutral</button>
+            <button class="btn btn-expression" @onclick="@(() => SendExpression("happy"))">😊 Happy</button>
+            <button class="btn btn-expression" @onclick="@(() => SendExpression("sad"))">😢 Sad</button>
+            <button class="btn btn-expression" @onclick="@(() => SendExpression("angry"))">😠 Angry</button>
+            <button class="btn btn-expression" @onclick="@(() => SendExpression("surprised"))">😲 Surprised</button>
+            <button class="btn btn-expression" @onclick="@(() => SendExpression("scared"))">😨 Scared</button>
+            <button class="btn btn-expression" @onclick="@(() => SendExpression("sleeping"))">😴 Sleeping</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Quick Actions</h2>
+        <div class="action-grid">
+            <button class="btn btn-action" @onclick="Blink">👁️ Blink</button>
+            <button class="btn btn-action" @onclick="WinkLeft">😉 Wink Left</button>
+            <button class="btn btn-action" @onclick="WinkRight">😉 Wink Right</button>
+            <button class="btn btn-action" @onclick="RollClockwise">🔄 Roll ↻</button>
+        </div>
+    </div>
+
+    <NowPlaying />
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        PumpkinService.ConnectionStatusChanged += OnConnectionChanged;
+        
+        if (!PumpkinService.IsConnected)
+        {
+            try
+            {
+                await PumpkinService.ConnectAsync();
+            }
+            catch
+            {
+                // Connection failed - user can retry from ConnectionBar
+            }
+        }
+    }
+
+    private void OnConnectionChanged(object? sender, bool connected)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SendExpression(string expression)
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.SendExpressionAsync(expression);
+    }
+
+    private async Task Blink()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.BlinkAsync();
+    }
+
+    private async Task WinkLeft()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.WinkLeftAsync();
+    }
+
+    private async Task WinkRight()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.WinkRightAsync();
+    }
+
+    private async Task RollClockwise()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RollClockwiseAsync();
+    }
+
+    public void Dispose()
+    {
+        PumpkinService.ConnectionStatusChanged -= OnConnectionChanged;
+    }
+}

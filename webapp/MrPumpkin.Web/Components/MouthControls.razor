@@ -1,0 +1,44 @@
+@inject PumpkinWebSocketService PumpkinService
+
+<div class="card">
+    <h2>Mouth Visemes</h2>
+    <div class="control-grid">
+        <button class="btn btn-control" @onclick="SetClosed">😶 Closed (M,B,P)</button>
+        <button class="btn btn-control" @onclick="SetOpen">😮 Open (AH,AA)</button>
+        <button class="btn btn-control" @onclick="SetWide">😁 Wide (EE,IH)</button>
+        <button class="btn btn-control" @onclick="SetRounded">😯 Rounded (OO,OH)</button>
+        <button class="btn btn-control btn-secondary" @onclick="SetNeutral">🔄 Neutral</button>
+    </div>
+</div>
+
+@code {
+    private async Task SetClosed()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.SetMouthClosedAsync();
+    }
+
+    private async Task SetOpen()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.SetMouthOpenAsync();
+    }
+
+    private async Task SetWide()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.SetMouthWideAsync();
+    }
+
+    private async Task SetRounded()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.SetMouthRoundedAsync();
+    }
+
+    private async Task SetNeutral()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.SetMouthNeutralAsync();
+    }
+}

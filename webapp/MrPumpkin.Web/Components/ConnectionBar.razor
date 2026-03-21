@@ -1,0 +1,51 @@
+@inject PumpkinWebSocketService PumpkinService
+
+<div class="connection-bar @(PumpkinService.IsConnected ? "connected" : "disconnected")">
+    <div class="status-indicator">
+        <span class="dot"></span>
+        <span class="status-text">@(PumpkinService.IsConnected ? "Connected" : "Disconnected")</span>
+    </div>
+    
+    @if (!PumpkinService.IsConnected)
+    {
+        <div class="server-input">
+            <input type="text" @bind="serverUri" placeholder="ws://localhost:5001" />
+            <button class="btn btn-sm" @onclick="Connect">Connect</button>
+        </div>
+    }
+    else
+    {
+        <button class="btn btn-sm btn-danger" @onclick="Disconnect">Disconnect</button>
+    }
+</div>
+
+@code {
+    private string serverUri = "ws://localhost:5001";
+
+    protected override void OnInitialized()
+    {
+        PumpkinService.ConnectionStatusChanged += OnConnectionChanged;
+        serverUri = PumpkinService.ServerUri;
+    }
+
+    private void OnConnectionChanged(object? sender, bool connected)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task Connect()
+    {
+        PumpkinService.ServerUri = serverUri;
+        await PumpkinService.ConnectAsync();
+    }
+
+    private async Task Disconnect()
+    {
+        await PumpkinService.DisconnectAsync();
+    }
+
+    public void Dispose()
+    {
+        PumpkinService.ConnectionStatusChanged -= OnConnectionChanged;
+    }
+}
