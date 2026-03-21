@@ -1,0 +1,42 @@
+@page "/recordings"
+@inject PumpkinWebSocketService PumpkinService
+
+<PageTitle>Recordings - Mr. Pumpkin</PageTitle>
+
+<div class="recordings-page">
+    <h1>Recordings</h1>
+
+    <div class="card">
+        <div class="toolbar">
+            <button class="btn btn-primary" @onclick="UploadRecording">📤 Upload</button>
+            <button class="btn btn-primary" @onclick="DownloadSelected">📥 Download</button>
+            <button class="btn btn-primary" @onclick="ExportAll">📦 Export All</button>
+            <button class="btn btn-primary" @onclick="ImportAll">📂 Import All</button>
+        </div>
+    </div>
+
+    <RecordingList />
+</div>
+
+@code {
+    private async Task UploadRecording()
+    {
+        // TODO: Implement file upload
+    }
+
+    private async Task DownloadSelected()
+    {
+        // TODO: Implement download
+    }
+
+    private async Task ExportAll()
+    {
+        if (!PumpkinService.IsConnected) return;
+        // TODO: Implement export
+    }
+
+    private async Task ImportAll()
+    {
+        // TODO: Implement import
+    }
+}

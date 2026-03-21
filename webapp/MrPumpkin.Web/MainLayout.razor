@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="main">
+        <ConnectionBar />
+        <div class="content">
+            @Body
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <NavLink href="" Match="NavLinkMatch.All" class="nav-item">
+            <span class="icon">🎃</span>
+            <span class="label">Dashboard</span>
+        </NavLink>
+        <NavLink href="recordings" class="nav-item">
+            <span class="icon">🎬</span>
+            <span class="label">Recordings</span>
+        </NavLink>
+        <NavLink href="controls" class="nav-item">
+            <span class="icon">🎮</span>
+            <span class="label">Controls</span>
+        </NavLink>
+    </nav>
+</div>

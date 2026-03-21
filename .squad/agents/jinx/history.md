@@ -527,3 +527,38 @@ elease/* branches to target main; this PR targeted dev). Squad CI (tests) passed
 - The Raspberry Pi updater fix shipped cleanly as a narrow three-file change: `update.sh`, the auto-update guide, and the focused regression test file.
 - Even when `.gitattributes` already enforces `*.sh eol=lf`, I still need to verify the actual working-tree bytes before release work; a CRLF shebang on `update.sh` is enough to break direct execution on Raspberry Pi.
 - The shell helper contract for updater scripts is now explicit and worth preserving: logs belong on stderr, machine-readable return values belong on stdout-only `printf`.
+
+## Learnings
+
+### Issue #76 — PWA Architecture & Scaffolding (2026-03-13)
+
+**WebSocket Protocol:**
+- Port: 5001 (WebSocket), 5000 (legacy TCP)
+- Message format: Plain text commands (e.g., "happy", "blink", "gaze 45 30")
+- Response format: Text ("OK ...", "ERROR ...") or JSON for status queries
+- Special upload commands use inline format: `upload_timeline <filename> <json>`, `upload_audio <filename> <base64>`
+- Export returns base64-encoded zip: `RECORDINGS_ZIP:<base64>`
+
+**Available Commands (50+):**
+- Expressions: neutral, happy, sad, angry, surprised, scared, sleeping
+- Animations: blink, wink_left, wink_right, roll_clockwise, roll_counterclockwise
+- Gaze: gaze <x> <y> [<x2> <y2>] (±90° range)
+- Eyebrows: eyebrow_raise/lower[_left/_right], eyebrow_reset, eyebrow[_left/_right] <value>
+- Mouth: mouth_closed/open/wide/rounded/neutral, mouth <viseme>
+- Nose: wiggle_nose/twitch_nose/scrunch_nose [magnitude], reset_nose
+- Head: turn_left/right/up/down [amount], center_head
+- Projection: jog_offset <dx> <dy>, set_offset <x> <y>, projection_reset
+- Recording: record_start, record_stop [filename], record_cancel, recording_status
+- Playback: play <filename>, pause, resume, stop, seek <ms>, timeline_status
+- File management: list_recordings, delete_recording, rename_recording, download_timeline, upload_timeline, upload_audio, export_recordings, import_recordings
+
+**Blazor PWA Structure:**
+- Project: .NET 9 Blazor WebAssembly with PWA template
+- Architecture: 3-page app (Dashboard, Recordings, Controls) with bottom navigation
+- State management: Singleton `PumpkinWebSocketService` with event-driven updates
+- Mobile-first: Bottom nav bar, large touch targets (min 48x48dp), dark theme, PWA manifest
+- Service layer: 50+ async methods mapping 1:1 to server commands
+- Components: 9 reusable components (ConnectionBar, ExpressionControls, AnimationControls, etc.)
+- Hosting: Static file hosting (separate from Python server) — Blazor WASM served by IIS/nginx/GitHub Pages
+
+**Decision:** Blazor WASM over Blazor Server because the Python server is the backend; PWA is pure client-side with WebSocket connection to existing server.
