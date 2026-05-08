@@ -459,7 +459,8 @@ Nose animations use the same deterministic frame-based pattern as head movement 
 **Design Insight:** The pumpkin lobe shape is most convincingly achieved with three overlapping ellipses (not a single distorted circle). The jagged mouth requires careful vertex ordering: trace the top jaw teeth, then close via the bottom jaw baseline. This produces a clean filled polygon with no stray strokes needed.
 
 📌 Team update (2026-03-03): SVG logo created for GitHub Pages header (Issue #57)
-
+
+
 📌 Team update (2026-03-03): Jekyll GitHub Pages site built by Vi for Issue #57; PR #58 open — Ekko contributed SVG logo (docs/assets/img/logo.svg)
 
 ### Viseme Mouth Rendering (Issue #59)
@@ -530,6 +531,12 @@ This establishes the pattern for temporary feature overrides that don't disturb 
 
 ## Learnings
 
+### PR ekko/audit-dt-animation (2026-05-08)
+
+- Stabilized animations by propagating delta-time (dt) to animation updates; added explicit PUPIL_COLOR constant.
+- Validation: compiled (python -m py_compile) and AST parse smoke check (no display).
+- Follow-ups: convert speed constants to durations; consider easing curves.
+
 ### Issue #92 Bash Rescue (2026-03-13)
 
 **Files shipped:**
@@ -576,3 +583,4 @@ The CSS also defines .header-top and .header-bottom classes that are **not used*
 - All desktop nav is handled without @media — mobile overrides live in @media (max-width: 768px)
 - The .site-nav.open class is toggled by inline JS in default.html
 - Search input has explicit widths: 160px desktop, 120px mobile
+
