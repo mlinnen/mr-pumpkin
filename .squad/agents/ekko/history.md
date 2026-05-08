@@ -584,3 +584,4 @@ The CSS also defines .header-top and .header-bottom classes that are **not used*
 - The .site-nav.open class is toggled by inline JS in default.html
 - Search input has explicit widths: 160px desktop, 120px mobile
 
+2026-05-08: Cleaned .squad metadata edits from PR #102; moved metadata to Scribe.
