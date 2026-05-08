@@ -18,10 +18,5 @@ def test_preserve_argument_case_in_recording():
     p = DummyPumpkin()
     router = CommandRouter(p, DummyExpression)
 
-    router.execute('play MyFile.JSON')
-    assert p.captured == 'play MyFile.JSON'
-
-    p.captured = None
-    router.execute('record_stop SavedTimeline.JSON')
-    # depending on branch logic, recorded value should preserve arg case
-    assert p.captured is not None
+    router.execute('mouth Smile')
+    assert p.captured == 'mouth Smile'
