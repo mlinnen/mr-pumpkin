@@ -913,7 +913,13 @@ class PumpkinFace:
         Returns:
             Tuple of (left_x, left_y, right_x, right_y)
         """
-        return (self.left_gaze_x, self.left_gaze_y, self.right_gaze_x, self.right_gaze_y)
+        # Return the underlying pupil angle tuples (left_x, left_y, right_x, right_y)
+        return (
+            self.pupil_angle_left[0],
+            self.pupil_angle_left[1],
+            self.pupil_angle_right[0],
+            self.pupil_angle_right[1],
+        )
     
     def _animate_nose_twitch(self):
         """Update twitching animation progress (±8px horizontal oscillation, 5 cycles)."""

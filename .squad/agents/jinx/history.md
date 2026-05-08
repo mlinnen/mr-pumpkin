@@ -12,6 +12,46 @@
 
 ## Learnings
 
+- 2026-05-08: Repository analysis — PumpkinFace contains a clear expression state machine and orthogonal animation subsystems (blink, wink, nose, mouth visemes). Timeline supports nested playback with audio-sync; CommandRouter maps many text commands directly to PumpkinFace methods which is convenient but risks duplicated validation and scattered error handling. Immediate blockers: no CI, unknown test stability, and nested playback edge-cases; see .squad/decisions/inbox/jinx-plan.md for owners and plan.  — Jinx
+
+## Issue #99 — Python to .NET Migration Triage (2026-05-07)
+
+### 1. Recommendation
+**Do not proceed** (for now): The migration cost and risk outweigh the benefits unless there is a compelling .NET-specific requirement.
+
+### 2. Migration Plan (if pursued)
+- **Steps:**
+  1. Inventory all Python modules, dependencies, and features (graphics, command routing, timeline, audio, AI integration).
+  2. Prototype core rendering (expressions, transitions) in .NET (likely C# with SDL2 or SkiaSharp).
+  3. Port command/state engine (Vi), then graphics/animation (Ekko), then test harness (Mylo).
+  4. Rebuild network protocol (TCP/WebSocket), timeline playback, and AI integration (Gemini/OpenAI).
+  5. Validate feature parity and rendering fidelity.
+- **MVP Scope:**
+  - One expression, basic transitions, TCP command, minimal timeline playback.
+- **Effort:** High (80–120h+)
+- **Skills:** C#/.NET graphics, async networking, state machines, test design, AI API integration.
+- **Blockers:**
+  - SDL2/pygame feature parity in .NET
+  - Timeline/animation engine port
+  - AI provider SDKs for .NET
+  - Cross-platform graphics (Windows, Linux, Pi)
+
+### 3. Agent Tasking
+- **Ekko:** Prototype .NET graphics/animation pipeline (SkiaSharp/SDL2)
+- **Vi:** Port state/command engine to C#
+- **Mylo:** Design .NET test harness, parity tests
+
+### 4. Risks & Mitigations
+- **Platform support:** .NET on Pi is less mature; test early on target hardware
+- **Dependency gaps:** Some Python libs (e.g., Gemini, mutagen) lack .NET equivalents; may require custom wrappers
+- **Rendering fidelity:** Subtle differences in graphics APIs; require visual regression tests
+- **CI/CD:** Rebuild workflows for .NET; validate on all platforms
+
+---
+
+Plain summary: After triage, I recommend not migrating to .NET at this time due to high risk, cost, and limited benefit. If a .NET port is ever required, start with a minimal prototype and validate graphics, state, and AI integration early. Task Ekko, Vi, and Mylo for scoped prototypes and parity tests. Risks include platform support, dependency gaps, and rendering fidelity.
+
+
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen
 
 *Patterns, conventions, and decisions discovered during work.*

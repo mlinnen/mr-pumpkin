@@ -16,6 +16,43 @@
 📌 Team update (2026-02-25): Feature branch workflow standard and repository cleanliness directive — decided by Mike Linnen
 📌 Team update (2026-02-27): Issue triage Round 1: #20 (lip-sync P2, Vi+Ekko) assigned for architectural design — decided by Jinx
 
+---
+
+### .NET Graphics/Animation Library Research (2026-05-07)
+
+**SkiaSharp**
+- Cross-platform (Windows/Linux/macOS), high-performance 2D vector graphics.
+- Low-level API, excellent fidelity, manual animation/timing logic required.
+- Porting effort moderate; Python drawing patterns map well to SkiaSharp’s canvas model.
+
+**MonoGame**
+- Game-focused, cross-platform, hardware-accelerated, real-time animation.
+- Overkill for simple UIs; event loop and sprite batching differ from Python.
+- Porting effort higher, but strong for complex, interactive animation.
+
+**Avalonia**
+- Modern, cross-platform UI framework, supports vector graphics and animation.
+- XAML-based, easier for UI-centric apps, but less control than SkiaSharp.
+- Animation fidelity good, but not as granular as SkiaSharp.
+
+**WPF**
+- Windows-only, mature, rich animation and vector support.
+- Not cross-platform; best for Windows desktop apps only.
+
+**Win2D**
+- Windows-only, high-performance, but limited to UWP/WinAppSDK.
+- Not suitable for cross-platform needs.
+
+**Recommendation:**
+SkiaSharp is the best fit for a cross-platform, high-fidelity, animated 2D face. It offers direct drawing APIs similar to Python’s, with strong performance and flexibility.
+
+**Sample Migration Notes:**
+- Python’s canvas-based drawing (e.g., `draw.ellipse`, `draw.arc`) maps to SkiaSharp’s `SKCanvas.DrawEllipse`, `SKCanvas.DrawArc`.
+- Animation timing (frame updates, transitions) must be managed manually, similar to a game loop or timer.
+- For UI integration, SkiaSharp can be embedded in Avalonia or WinForms/WPF as a custom control.
+
+---
+
 ### Pupil Rotation Implementation (Rolling Eyes Bug Fix)
 
 **Issue:** Rolling eyes feature had working state machine but pupils didn't move visually when C and X keys were pressed.
