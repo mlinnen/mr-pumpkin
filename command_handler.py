@@ -1,5 +1,6 @@
 import json
 import time
+import re
 
 class CommandRouter:
     """
@@ -22,7 +23,15 @@ class CommandRouter:
         Returns:
             Response string: "OK ...", "ERROR ...", or JSON data
         """
-        data = command_str.strip().lower()
+        cmd = command_str.strip()
+        # Lowercase only the verb; preserve argument case and whitespace
+        m = re.match(r'^(\S+)(.*)$', cmd)
+        if m:
+            verb = m.group(1).lower()
+            rest = m.group(2)  # includes the separator/whitespace before args
+            data = verb + rest
+        else:
+            data = cmd.lower()
         
         # Handle blink command
         if data == "blink":

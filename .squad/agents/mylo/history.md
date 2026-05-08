@@ -1030,3 +1030,4 @@ def _make_mock_gemini_response(analysis_json, emotion):
 - Raspberry Pi update path still stays non-root and cron-safe by default, with apt refresh only behind `MR_PUMPKIN_ALLOW_PI_APT_UPDATE=1`
 - README and `docs/auto-update.md` describe the same updater contract that the shell-script tests enforce
 - Post-rescue PR commits after the validated updater change only added `.squad/` coordination notes, so they do not alter the ship decision
+\n### 2026-05-08: Headless CI fixtures added\n- Added tests/conftest.py fixtures to set SDL_VIDEODRIVER=dummy and provide MockSurface.\n- Ran pytest: many unit tests passed; rolling_eyes timing and tcp integration tests failed and need follow-up.\n

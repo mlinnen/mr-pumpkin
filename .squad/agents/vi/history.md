@@ -1014,3 +1014,7 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 ## Learnings
 
 - 2026-03-13: Issue #92 Raspberry Pi install/update flow now uses `scripts/unix_dependency_plan.py` to split Pi-friendly apt packages (`python3-pygame`, `python3-websockets`, `python3-mutagen`) from PyPI-only dependencies. `install.sh` prefers apt on Pi, `update.sh` attempts apt only when non-interactive privilege is available and otherwise falls back to pip with `--break-system-packages` when supported. Release packaging test now asserts the helper ships inside the ZIP, and Pi dependency planning is covered in `tests/test_auto_update.py`.
+
+- Committed branch vi/fix-get-gaze-and-suggestions. Ran python -m py_compile pumpkin_face.py (OK). Minimal import smoke test failed due to missing pygame in this environment; CI should validate runtime. PR created: https://github.com/mlinnen/mr-pumpkin/pull/101
+
+2026-05-08: Removed .squad metadata cleanup for PR #101 (branch: mylo/ci-headless-tests)
