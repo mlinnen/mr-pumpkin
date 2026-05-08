@@ -1,0 +1,51 @@
+@inject PumpkinWebSocketService PumpkinService
+
+<div class="card">
+    <h2>Animations</h2>
+    <div class="control-grid">
+        <button class="btn btn-control" @onclick="Blink">👁️ Blink</button>
+        <button class="btn btn-control" @onclick="WinkLeft">😉 Wink Left</button>
+        <button class="btn btn-control" @onclick="WinkRight">😉 Wink Right</button>
+        <button class="btn btn-control" @onclick="RollClockwise">🔄 Roll ↻</button>
+        <button class="btn btn-control" @onclick="RollCounterclockwise">🔄 Roll ↺</button>
+        <button class="btn btn-control" @onclick="TwitchNose">👃 Twitch Nose</button>
+    </div>
+</div>
+
+@code {
+    private async Task Blink()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.BlinkAsync();
+    }
+
+    private async Task WinkLeft()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.WinkLeftAsync();
+    }
+
+    private async Task WinkRight()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.WinkRightAsync();
+    }
+
+    private async Task RollClockwise()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RollClockwiseAsync();
+    }
+
+    private async Task RollCounterclockwise()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.RollCounterclockwiseAsync();
+    }
+
+    private async Task TwitchNose()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.TwitchNoseAsync();
+    }
+}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Mr. Pumpkin Control</title>
+    <base href="/" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="MrPumpkin.Web.styles.css" rel="stylesheet" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+    <meta name="theme-color" content="#FF6B35" />
+</head>
+<body>
+    <div id="app">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading Mr. Pumpkin...</p>
+        </div>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script>navigator.serviceWorker.register('service-worker.js');</script>
+</body>
+</html>
