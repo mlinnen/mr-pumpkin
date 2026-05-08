@@ -4955,3 +4955,127 @@ This redirects all reads and writes of `POSITION_FILE` to a per-test temp direct
 - `tests/test_head_movement.py`: 44/44 pass (was 8 failing)
 - No `pumpkin_position.json` created in CWD after any test run
 
+---
+
+## 2026-05-08: Python to .NET Migration Triage (Issue #99)
+
+**By:** Jinx (Lead)  
+**Date:** 2026-05-07
+
+**Decision:** Do not proceed with a .NET migration at this time.
+
+**Rationale:** The migration effort and risk are high, with no compelling .NET-specific requirement. Python is mature, cross-platform, and well-tested for this domain. Only revisit if strategic needs change or Python becomes non-viable.
+
+**Summary of analysis:**
+- Estimated effort: High (80–120h+)
+- Major blockers: Graphics/animation parity, AI SDKs, platform support (esp. Pi)
+- MVP: One expression, basic transitions, TCP command, minimal timeline
+- Agent tasking: Ekko (graphics prototype), Vi (state engine port), Mylo (test harness)
+- Risks: Platform support, dependency gaps, rendering fidelity, CI/CD
+
+---
+
+## 2026-05-08: Focused 3-Step Plan for Shipping
+
+**By:** Jinx (Lead)  
+**Date:** 2026-05-08
+
+**Decision:** Adopted a focused 3-step plan to reach a shippable Mr. Pumpkin.
+
+**Owners:**
+- Vi: timeline, recording, playback error handling, and unit tests
+- Ekko: rendering, expression transitions, viseme integration, projection persistence
+- Mylo: test suite stabilization, CI integration, and integration tests
+
+**Prioritized plan:**
+1. **Stabilize Timeline/Playback (Vi)**
+   - Fix nested playback edge-cases, ensure Timeline.load/save robust to invalid JSON, improve error messages, add unit tests for Playback and Timeline.
+
+2. **Harden Command Router & Expression transitions (Ekko)**
+   - Centralize command parsing/validation, decouple side-effecting calls from parsing, ensure mouth viseme axis remains orthogonal to expressions, add visual smoke tests.
+
+3. **Repair test suite and add CI (Mylo)**
+   - Run full pytest, triage failing tests, add GitHub Actions to run tests on push/PR, ensure reproducible environment via requirements-dev.txt.
+
+**Rationale:** Clear separation of concerns enables parallel work, faster verification, and safer releases.
+
+---
+
+## 2026-05-08: Delta-Time-First Animation Convention
+
+**By:** Ekko (Graphics Dev)  
+**Date:** 2026-05-08
+
+**Decision:** Adopt delta-time-first animation convention across the project.
+
+**Rationale:**
+- Animations in pumpkin_face.py used fixed frame assumptions (1/60) and per-frame speed increments which caused timing variability across machines and when frame-rate drops.
+- Using dt_seconds propagated from the main update loop ensures consistent timing independent of render rate.
+
+**Recommended action items:**
+1. Accept the Ekko PR that converts animation progress to dt_seconds (this PR).
+2. Begin a follow-up PR to convert speed constants to explicit duration semantics (e.g., blink_duration = 0.2s) so designers can set timings in seconds rather than per-frame multipliers.
+3. Add a short developer note to the README documenting the animation timing convention and how to tune animation parameters for projection mapping.
+
+**Requested reviewers:** Ekko (author), Jinx (lead), Vi (backend), Mylo (QA)
+
+**Status:** Proposed
+
+---
+
+## 2026-05-08: Testing Strategy for pumpkin_face
+
+**By:** Mylo (QA Lead)  
+**Date:** 2026-05-08
+
+**Decision:** Use mocking for unit tests; reserve headless SDL_VIDEODRIVER=dummy or xvfb-enabled CI jobs for integration tests that require actual rendering.
+
+**Rationale:**
+- Mocking reduces flakiness and speeds up CI.
+- Headless rendering is used only for full-stack integration validation.
+
+**Actions:**
+- Implement mocks for pygame in unit tests.
+- Add CI job to run integration tests with SDL_VIDEODRIVER=dummy if needed.
+
+---
+
+## 2026-05-08: VI Bug Fixes and PR Planning
+
+**By:** Vi (Backend Dev)  
+**Date:** 2026-05-08
+
+**Scope:** Three bugs identified and targeted for fixes:
+
+### 1. get_gaze AttributeError
+- **File:** pumpkin_face.py
+- **Location:** def get_gaze(self)
+- **Symptom:** Returns undefined attributes (left_gaze_x, etc) causing AttributeError when called.
+- **Fix:** Return values from self.pupil_angle_left and self.pupil_angle_right instead.
+
+### 2. Lowercasing of commands
+- **File:** command_handler.py
+- **Symptom:** command_str is lowercased which may mutate filenames and case-sensitive data (upload/play/download). This can surprise users.
+- **Recommendation:** Only lowercase the command verb (first token) for parsing; preserve the remainder for args/filenames.
+
+### 3. Nose animation timing uses fixed 1/60s step
+- **File:** pumpkin_face.py (nose animation update)
+- **Symptom:** Uses hardcoded 60 FPS delta; leads to inconsistent animation if loop runs at different frame rates.
+- **Recommendation:** Use real dt (time between frames) from update() rather than fixed fraction.
+
+**Suggested PR:**
+- Create a branch i/fix-get-gaze-and-suggestions with the following changes:
+  1. Fix get_gaze as implemented (safe, unit-change isolated). Add unit test if available.
+  2. Add a ticket/issue to address command_handler lowercasing and nose dt usage (separate PRs).
+  3. Run existing tests (if any) and validate manual smoke tests: start pumpkin_face in headless mode and exercise get_gaze call path.
+
+**Commit message example:**
+``
+Fix get_gaze AttributeError; return pupil_angle tuples instead of non-existent attributes
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+``
+
+**Files to change in follow-up PRs:**
+- command_handler.py: change lowercasing behavior when parsing filenames and args
+- pumpkin_face.py: use dt_seconds in nose animation updates

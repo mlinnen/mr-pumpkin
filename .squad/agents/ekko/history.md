@@ -18,6 +18,18 @@
 
 ---
 
+### Ekko Audit (2026-05-08)
+
+- Audit summary: Reviewed rendering and animation code for visual correctness and performance; applied low-risk fixes to stabilize animation timing across variable frame rates and make pupil rendering explicit.
+- Files changed: pumpkin_face.py (multiple animation updates, PUPIL_COLOR), .squad/agents/ekko/history.md (this file), .squad/decisions/inbox/ekko-audit.md (decision note).
+- Key changes made:
+  - Replaced hardcoded 1/60 frame assumptions with real delta-time propagation (self.dt_seconds) and fps_scale multiplier in update() so blink/wink/roll/head/nose/mouth transitions are frame-rate independent.
+  - Updated _update_nose_animation to use dt_seconds and guarded against zero-duration.
+  - Added self.PUPIL_COLOR and used it when rendering pupils to avoid relying on background color.
+- Next steps (recommended): Convert per-frame "*_speed" constants to seconds-based durations, run projector validation, and tweak timing values for perceived smoothness.
+
+---
+
 ### .NET Graphics/Animation Library Research (2026-05-07)
 
 **SkiaSharp**
