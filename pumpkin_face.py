@@ -126,6 +126,7 @@ class PumpkinFace:
         # Colors - optimized for projection mapping
         self.BACKGROUND_COLOR = (0, 0, 0)  # Black background for projection
         self.FEATURE_COLOR = (255, 255, 255)  # White features (eyes, nose, mouth)
+        self.PUPIL_COLOR = (0, 0, 0)  # Explicit pupil color (don't rely on background color)
         
         # Timeline playback and recording state
         self.timeline_playback = Playback()
@@ -339,8 +340,8 @@ class PumpkinFace:
                 left_pupil_x, left_pupil_y = self._angle_to_pixel(left_pos, self.pupil_angle_left, pupil_orbit_radius)
                 right_pupil_x, right_pupil_y = self._angle_to_pixel(right_pos, self.pupil_angle_right, pupil_orbit_radius)
             
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (left_pupil_x, left_pupil_y), pupil_radius)
-            pygame.draw.circle(surface, self.BACKGROUND_COLOR, (right_pupil_x, right_pupil_y), pupil_radius)
+            pygame.draw.circle(surface, self.PUPIL_COLOR, (left_pupil_x, left_pupil_y), pupil_radius)
+            pygame.draw.circle(surface, self.PUPIL_COLOR, (right_pupil_x, right_pupil_y), pupil_radius)
     
     def _angle_to_pixel(self, eye_center: Tuple[int, int], angles: Tuple[float, float], orbit_radius: int) -> Tuple[int, int]:
         """Convert gaze X/Y angles to pupil pixel position.
@@ -948,20 +949,27 @@ class PumpkinFace:
     
     def _update_nose_animation(self):
         """Update nose animation state each frame (called from update() loop)."""
+        # Use actual frame delta if available, otherwise fall back to 1/60
+        delta_time = getattr(self, 'dt_seconds', 1.0 / 60.0)
+
         if self.is_twitching:
-            delta_time = 1.0 / 60.0  # Assume 60 FPS
-            self.nose_animation_progress += delta_time / self.nose_animation_duration
-            
+            if self.nose_animation_duration > 0:
+                self.nose_animation_progress += delta_time / self.nose_animation_duration
+            else:
+                self.nose_animation_progress = 1.0
+
             if self.nose_animation_progress >= 1.0:
                 # Animation complete: auto-return to neutral
                 self._reset_nose()
             else:
                 self._animate_nose_twitch()
-        
+
         elif self.is_scrunching:
-            delta_time = 1.0 / 60.0  # Assume 60 FPS
-            self.nose_animation_progress += delta_time / self.nose_animation_duration
-            
+            if self.nose_animation_duration > 0:
+                self.nose_animation_progress += delta_time / self.nose_animation_duration
+            else:
+                self.nose_animation_progress = 1.0
+
             if self.nose_animation_progress >= 1.0:
                 # Animation complete: auto-return to neutral
                 self._reset_nose()
@@ -1111,19 +1119,24 @@ class PumpkinFace:
         # Calculate delta time for timeline playback
         current_time = time.time()
         dt_seconds = current_time - self.last_update_time
+        if dt_seconds <= 0.0:
+            dt_seconds = 1.0 / 60.0
         self.last_update_time = current_time
+        # Expose dt to other animation helpers
+        self.dt_seconds = dt_seconds
+        fps_scale = dt_seconds * 60.0
         dt_ms = dt_seconds * 1000  # Convert to milliseconds
         
-        # Update timeline playback
+        # Update timeline playback (timeline expects milliseconds)
         if self.timeline_playback.state.value == "playing":
             errors = self.timeline_playback.update(dt_ms)
             if errors:
                 for error in errors:
                     print(f"Timeline error: {error}")
         
-        # Handle blink animation
+        # Handle blink animation (scale speed by actual frame delta)
         if self.is_blinking:
-            self.blink_progress += self.blink_speed
+            self.blink_progress += self.blink_speed * fps_scale
             if self.blink_progress >= 1.0:
                 self.is_blinking = False
                 self.blink_progress = 0.0
@@ -1132,7 +1145,7 @@ class PumpkinFace:
         
         # Handle wink animation
         if self.is_winking:
-            self.wink_progress += self.wink_speed
+            self.wink_progress += self.wink_speed * fps_scale
             
             # Closing phase (0.0 to 0.5)
             # Hold closed (0.5 to 0.55)
@@ -1160,8 +1173,8 @@ class PumpkinFace:
         
         # Handle rolling eyes animation (pauses during blink or wink)
         if self.is_rolling and not (self.is_blinking or self.is_winking):
-            delta_time = 1.0 / 60.0  # Assume 60 FPS
-            self.rolling_progress += delta_time / self.rolling_duration
+            # Use real delta to advance rolling progress so animation timing is stable
+            self.rolling_progress += dt_seconds / self.rolling_duration
             if self.rolling_progress >= 1.0:
                 # Complete: return to exact starting angle
                 self.pupil_angle = self.rolling_start_angle
@@ -1181,8 +1194,8 @@ class PumpkinFace:
         
         # Handle head movement animation
         if self.is_moving_head:
-            delta_time = 1.0 / 60.0  # Assume 60 FPS
-            self.head_movement_progress += delta_time / self.head_movement_duration
+            # Use real delta so head movement duration is consistent across machines
+            self.head_movement_progress += dt_seconds / self.head_movement_duration
             
             if self.head_movement_progress >= 1.0:
                 # Complete: set to exact target position
@@ -1204,13 +1217,13 @@ class PumpkinFace:
         # Handle nose animations
         self._update_nose_animation()
         
-        # Update mouth viseme transition
+        # Update mouth viseme transition (frame-rate independent)
         if self.mouth_transition_progress < 1.0:
-            self.mouth_transition_progress = min(1.0, self.mouth_transition_progress + self.mouth_transition_speed)
+            self.mouth_transition_progress = min(1.0, self.mouth_transition_progress + self.mouth_transition_speed * fps_scale)
         
-        # Handle expression transitions
+        # Handle expression transitions (frame-rate independent)
         if self.transition_progress < 1.0:
-            self.transition_progress += self.transition_speed
+            self.transition_progress += self.transition_speed * fps_scale
             if self.transition_progress >= 1.0:
                 self.current_expression = self.target_expression
                 self.transition_progress = 1.0
