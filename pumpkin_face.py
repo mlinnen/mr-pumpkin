@@ -136,6 +136,9 @@ class PumpkinFace:
         
         # Initialize command router
         self.command_router = CommandRouter(self, Expression)
+        # Expression listeners for external renderers (e.g., Silk.NET)
+        # Listeners receive events as: (event_type: str, payload: dict)
+        self._expression_listeners = []
         self.last_update_time = time.time()  # For delta time calculation
     
     @property
@@ -768,7 +771,32 @@ class PumpkinFace:
         if expression != self.current_expression:
             self.target_expression = expression
             self.transition_progress = 0.0
+            # Notify external listeners of target change
+            try:
+                self._emit_expression_event("target_changed", {"target": expression.value})
+            except Exception:
+                pass
     
+    def add_expression_listener(self, listener):
+        """Register a callable to receive expression events: (event_type:str, payload:dict)."""
+        if callable(listener):
+            self._expression_listeners.append(listener)
+
+    def remove_expression_listener(self, listener):
+        """Unregister a previously registered listener."""
+        try:
+            self._expression_listeners.remove(listener)
+        except ValueError:
+            pass
+
+    def _emit_expression_event(self, event_type: str, payload: dict):
+        """Emit expression events to registered listeners. Swallows listener exceptions."""
+        for l in list(self._expression_listeners):
+            try:
+                l(event_type, payload)
+            except Exception as e:
+                print(f"Expression listener error: {e}")
+
     def blink(self):
         if not self.is_blinking:  # Don't interrupt an ongoing blink
             self.is_blinking = True
@@ -1142,6 +1170,10 @@ class PumpkinFace:
                 self.blink_progress = 0.0
                 # Restore original expression after blink
                 self.current_expression = self.pre_blink_expression
+                try:
+                    self._emit_expression_event("current_changed", {"current": self.current_expression.value})
+                except Exception:
+                    pass
         
         # Handle wink animation
         if self.is_winking:
@@ -1226,6 +1258,10 @@ class PumpkinFace:
             self.transition_progress += self.transition_speed * fps_scale
             if self.transition_progress >= 1.0:
                 self.current_expression = self.target_expression
+                try:
+                    self._emit_expression_event("current_changed", {"current": self.current_expression.value})
+                except Exception:
+                    pass
                 self.transition_progress = 1.0
     
     def _capture_command_for_recording(self, data: str):

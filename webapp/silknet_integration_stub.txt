@@ -1,0 +1,6 @@
+Silk.NET integration notes (stub)
+
+- This project will expose expression events from Python host to external renderers.
+- Suggested approach: Python emits JSON over WebSocket to which .NET app subscribes.
+- Schema: { "type": "current_changed", "payload": { "current": "happy" }, "version": "1" }
+- webapp may use the same WebSocket to visualize state in browser for debugging.

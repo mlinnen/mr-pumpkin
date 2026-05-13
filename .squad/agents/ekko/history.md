@@ -398,6 +398,21 @@ Fixed pixel coordinate sampling in head movement tests. Eyes render at `center_y
   - Base left: `(nose_x - width/2, nose_y)`
   - Base right: `(nose_x + width/2, nose_y)`
 
+---
+
+### Silk.NET / Expression Adapter Scaffolding (2026-05-13)
+
+- Created feature branch: `squad/99-ekko-graphics` (scaffolded locally)
+- Added silknet_adapter/ with initial C# stubs: SilkNetRenderer.cs, ExpressionAdapter.cs, README.md
+- Added a minimal event contract on Python side: `target_changed` and `current_changed` events; PumpkinFace now exposes listener registration and emits those events on target change and when transitions commit or blink restores.
+- Added decision note `.squad/decisions/inbox/ekko-issue99.md` requesting IPC selection (WebSocket vs gRPC) and rendering library choice (Silk.NET vs SkiaSharp).
+
+Next steps:
+- Confirm IPC choice (prefer WebSocket) and schema versioning
+- Implement a thin WebSocket server/client on the Python side to broadcast events, or embed a small JSON-over-TCP emitter
+- Implement Silk.NET render loop and safely dispatch events onto the render thread
+
+
 **Animation State Variables:**
 - `nose_offset_x`, `nose_offset_y`: Current position offsets (twitch affects X)
 - `nose_scale`: Vertical scale factor (scrunch affects this)
