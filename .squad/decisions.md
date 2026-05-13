@@ -5266,6 +5266,7 @@ webapp/MrPumpkin.Web/
    - Preference: WebSocket for cross-process + webapp friendliness. Confirm?
    - **[APPROVED by Jinx — WebSocket is correct choice, aligns with Vi's concurrent dual-protocol work and projection-first architecture. Enables browser-based remote animation and dev tooling.]**
 2. **Event Schema Versioning:** Add ersion field to events to support future evolution? (Recommended)
+   - **[APPROVED by Jinx — version field in event schema is mandatory. Prevents silent incompatibilities as event design evolves.]**
 3. **Rendering Library Choice:** Silk.NET is acceptable for low-level GL access; SkiaSharp may be faster to implement for 2D vector rendering and maps well to current pygame code. Which do we prefer long-term?
    - **[FLAGGED by Jinx for revision — Recommend SkiaSharp over Silk.NET for 2D vector rendering. Silk.NET adds GL complexity when current pygame model uses simple 2D vectors (circles, lines, rectangles). SkiaSharp maps directly to pygame rendering code, enabling faster prototype → production port. Reserve Silk.NET for future 3D/shader needs.]**
 
