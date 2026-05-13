@@ -1,0 +1,82 @@
+@inject PumpkinWebSocketService PumpkinService
+
+<div class="card">
+    <h2>Gaze & Projection</h2>
+    
+    <div class="gaze-container">
+        <div class="gaze-pad" @onmousedown="OnGazeStart" @onmousemove="OnGazeMove" @onmouseup="OnGazeEnd" 
+             @ontouchstart="OnGazeStart" @ontouchmove="OnGazeMove" @ontouchend="OnGazeEnd">
+            <div class="crosshair"></div>
+            <div class="gaze-dot" style="left: @gazeXPercent%; top: @gazeYPercent%;"></div>
+        </div>
+        <p class="gaze-info">Drag to set gaze direction</p>
+    </div>
+
+    <div class="jog-controls">
+        <h3>Jog Display</h3>
+        <div class="jog-grid">
+            <div></div>
+            <button class="btn btn-jog" @onclick="@(() => Jog(0, -5))">⬆️</button>
+            <div></div>
+            <button class="btn btn-jog" @onclick="@(() => Jog(-5, 0))">⬅️</button>
+            <button class="btn btn-jog" @onclick="Center">⏺️</button>
+            <button class="btn btn-jog" @onclick="@(() => Jog(5, 0))">➡️</button>
+            <div></div>
+            <button class="btn btn-jog" @onclick="@(() => Jog(0, 5))">⬇️</button>
+            <div></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isDragging = false;
+    private double gazeXPercent = 50;
+    private double gazeYPercent = 50;
+
+    private void OnGazeStart(MouseEventArgs e)
+    {
+        isDragging = true;
+        UpdateGazePosition(e.OffsetX, e.OffsetY, e.CurrentTarget);
+    }
+
+    private void OnGazeMove(MouseEventArgs e)
+    {
+        if (isDragging)
+        {
+            UpdateGazePosition(e.OffsetX, e.OffsetY, e.CurrentTarget);
+        }
+    }
+
+    private void OnGazeEnd(MouseEventArgs e)
+    {
+        isDragging = false;
+    }
+
+    private void UpdateGazePosition(double x, double y, object? target)
+    {
+        // Convert to percentage (0-100)
+        gazeXPercent = Math.Clamp(x / 200.0 * 100, 0, 100);
+        gazeYPercent = Math.Clamp(y / 200.0 * 100, 0, 100);
+
+        // Convert to degrees (-90 to +90)
+        float gazeX = (float)((gazeXPercent - 50) * 1.8);
+        float gazeY = (float)((50 - gazeYPercent) * 1.8);
+
+        if (PumpkinService.IsConnected)
+        {
+            _ = PumpkinService.SetGazeAsync(gazeX, gazeY);
+        }
+    }
+
+    private async Task Jog(int dx, int dy)
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.JogOffsetAsync(dx, dy);
+    }
+
+    private async Task Center()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.CenterHeadAsync();
+    }
+}

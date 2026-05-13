@@ -1,0 +1,110 @@
+@inject PumpkinWebSocketService PumpkinService
+@implements IDisposable
+
+@if (status != null && status.State != "stopped")
+{
+    <div class="card now-playing">
+        <h2>Now Playing</h2>
+        <div class="playback-info">
+            <div class="filename">🎬 @status.Filename</div>
+            <div class="playback-state">@status.State</div>
+        </div>
+        
+        <div class="seek-bar">
+            <input type="range" 
+                   min="0" 
+                   max="@status.DurationMs" 
+                   value="@status.PositionMs" 
+                   @oninput="OnSeek" />
+            <div class="time-display">
+                <span>@FormatTime(status.PositionMs)</span>
+                <span>@FormatTime(status.DurationMs)</span>
+            </div>
+        </div>
+        
+        <div class="playback-controls">
+            @if (status.State == "playing")
+            {
+                <button class="btn btn-control" @onclick="Pause">⏸️ Pause</button>
+            }
+            else if (status.State == "paused")
+            {
+                <button class="btn btn-control" @onclick="Resume">▶️ Resume</button>
+            }
+            <button class="btn btn-control btn-danger" @onclick="Stop">⏹️ Stop</button>
+        </div>
+    </div>
+}
+
+@code {
+    private TimelineStatus? status;
+    private System.Threading.Timer? updateTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PumpkinService.PlaybackStatusChanged += OnPlaybackStatusChanged;
+        await RefreshStatus();
+        
+        // Poll status every 100ms during playback
+        updateTimer = new System.Threading.Timer(async _ =>
+        {
+            if (status?.State == "playing")
+            {
+                await InvokeAsync(async () =>
+                {
+                    await RefreshStatus();
+                    StateHasChanged();
+                });
+            }
+        }, null, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100));
+    }
+
+    private void OnPlaybackStatusChanged(object? sender, TimelineStatus newStatus)
+    {
+        status = newStatus;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshStatus()
+    {
+        if (!PumpkinService.IsConnected) return;
+        status = await PumpkinService.GetTimelineStatusAsync();
+    }
+
+    private async Task OnSeek(ChangeEventArgs e)
+    {
+        if (!PumpkinService.IsConnected || e.Value == null) return;
+        int positionMs = int.Parse(e.Value.ToString()!);
+        await PumpkinService.SeekAsync(positionMs);
+    }
+
+    private async Task Pause()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.PauseAsync();
+    }
+
+    private async Task Resume()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.ResumeAsync();
+    }
+
+    private async Task Stop()
+    {
+        if (!PumpkinService.IsConnected) return;
+        await PumpkinService.StopAsync();
+    }
+
+    private string FormatTime(int ms)
+    {
+        var ts = TimeSpan.FromMilliseconds(ms);
+        return $"{ts.Minutes:D2}:{ts.Seconds:D2}.{ts.Milliseconds / 10:D2}";
+    }
+
+    public void Dispose()
+    {
+        PumpkinService.PlaybackStatusChanged -= OnPlaybackStatusChanged;
+        updateTimer?.Dispose();
+    }
+}
