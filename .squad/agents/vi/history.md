@@ -1065,3 +1065,9 @@ Two-pass pipeline that translates audio files into synchronized Mr. Pumpkin anim
 ## Learnings
 - When flipping a default from True→False, scan ALL callers — both production code and tests — for implicit reliance on the old default that expects the side effect (file write). Each of those sites needs save=True added.
 - Tests that mock _save_position and assert called_once() are the most fragile: they will silently pass if you forget to update a test call that no longer triggers the save.
+
+## 2026-05-13 — Begin Issue #107/#108 work (squad/99-vi-engine)
+
+- Created branch: squad/99-vi-engine and added initial engine stubs (command_router, websocket_adapter, timeline_adapter).
+- Drafted implementation checklist and decision drop at .squad/decisions/inbox/vi-issue99.md.
+
