@@ -5243,3 +5243,105 @@ webapp/MrPumpkin.Web/
 - [ ] Add haptic feedback (vibration) on button press
 - [ ] Consider audio playback in PWA (sync with pumpkin animation)
 
+
+---
+
+## 2026-05-13: Issue #99 Sprint — Backend Renderer & Test Infra
+
+**Date:** 2026-05-13  
+**Authors:** Ekko (Graphics), Vi (Backend), Mylo (Tester)  
+**Issue(s):** #99, #105–#112  
+**Status:** Scaffolding & decisions phase
+
+### EKKO — Issue 99 (Scaffold Silk.NET renderer + expression adapter)
+
+**What:** Scaffolded Silk.NET C# renderer adapter; updated pumpkin_face.py to emit expression change events.
+
+**Expression Event Schema:**
+- 	arget_changed: { "target": "happy" } — when target expression is set
+- current_changed: { "current": "happy" } — when current expression completes transition
+
+**Architectural Questions for Jinx:**
+1. **IPC Mechanism:** Recommend WebSocket (binary-safe, integrates with webapp) or TCP/Unix socket for simplicity. gRPC offers typed contracts but adds dependency complexity.
+   - Preference: WebSocket for cross-process + webapp friendliness. Confirm?
+2. **Event Schema Versioning:** Add ersion field to events to support future evolution? (Recommended)
+3. **Rendering Library Choice:** Silk.NET is acceptable for low-level GL access; SkiaSharp may be faster to implement for 2D vector rendering and maps well to current pygame code. Which do we prefer long-term?
+
+**Deliverables:**
+- .squad/decisions/inbox/ekko-issue99.md → merged into decisions
+- Appended to .squad/agents/ekko/history.md
+
+---
+
+### VI — Issue 99 (WebSocket & Timeline API choices)
+
+**Date:** 2026-05-13  
+**Author:** Vi (Backend)
+
+**Decisions Approved:**
+
+1. **Transport:** Dual-protocol approach. Continue TCP (port 5000) and add WebSocket (port 5001) to enable browser clients. WebSocket uses the websockets asyncio library when available; startup should degrade gracefully if unavailable.
+
+2. **Message schema (WebSocket):** JSON object with shape:
+   ```json
+   {
+     "command": "<command_name>",
+     "args": { /* optional dict of arguments */ },
+     "meta": { /* optional: client_id, correlation_id */ }
+   }
+   ```
+   Text/TCP transport remains backwards-compatible (single-line text commands). CommandRouter.execute must accept both string and parsed dict inputs and preserve semantics.
+
+3. **upload_timeline:** 
+   - For TCP, preserve READY/END_UPLOAD handshake
+   - For WebSocket, use single-message inline JSON: {"command":"upload_timeline", "args": {"filename":"x.json","content":<object|string>} }
+
+4. **Timeline serialization parity:** Keep existing Timeline JSON schema (version 1.0) with fields: version, duration_ms, commands[] where each entry has time_ms, command, args.
+
+5. **Error/Response formats:**
+   - For WebSocket, use JSON responses: {"status":"ok"/"error","message":"..."}
+   - For TCP, retain text OK/ERROR lines for backward compatibility
+
+**Deliverables:**
+- ngine/command_router.py — created
+- ngine/websocket_adapter.py — created
+- ngine/timeline_adapter.py — created
+- .squad/agents/vi/checklist_issue99.md — implementation tracking
+- .squad/decisions/inbox/vi-issue99.md → merged into decisions
+- Appended to .squad/agents/vi/history.md
+- GitHub issue #112 opened (Jinx review of WS API decision)
+- Branch: squad/99-vi-engine
+
+---
+
+### MYLO — Issue 99 (Test Suite Migration)
+
+**Date:** 2026-05-13  
+**Author:** Mylo (Tester)
+
+**Summary:** Created initial test scaffolding for state transitions, command handling, and recording/playback. Added a CI workflow to run pytest in a headless environment.
+
+**Blockers / Requested Infrastructure Changes (for Jinx):**
+- CI must set SDL_VIDEODRIVER=dummy (already set in the workflow), and runner may need SDL libs if pygame is installed.
+- Recommend mocking or removing pygame usage from unit tests; if pygame is required in CI, install dependencies (e.g., libasound2, libsdl2-dev) or use xvfb.
+- Consider adding a lightweight pygame dev dependency pinned to a known-working version for CI.
+- Provide a test-run user or runner with display/headless support if we need integration tests that exercise rendering.
+
+**Deliverables:**
+- 	ests/ scaffolding created
+- .github/workflows/ci-tests.yml — added
+- Branch: squad/99-mylo-tests
+- .squad/decisions/inbox/mylo-issue99.md → merged into decisions
+- Appended to .squad/agents/mylo/history.md
+
+**Next Steps:**
+- Implement the skipped tests to exercise the real PumpkinFace API
+- Add pygame mocks and/or fixtures to emulate timing and events
+- Iterate on CI matrix to add Windows/macOS runners if platform-specific behavior is required
+
+---
+
+### Summary of GitHub Issues Created
+
+**Decomposition issues (Issues #105–#111):** Scoped subtasks from Issue #99  
+**Issue #112:** Opened by Vi for Jinx review of WebSocket API decision
