@@ -5264,8 +5264,10 @@ webapp/MrPumpkin.Web/
 **Architectural Questions for Jinx:**
 1. **IPC Mechanism:** Recommend WebSocket (binary-safe, integrates with webapp) or TCP/Unix socket for simplicity. gRPC offers typed contracts but adds dependency complexity.
    - Preference: WebSocket for cross-process + webapp friendliness. Confirm?
+   - **[APPROVED by Jinx — WebSocket is correct choice, aligns with Vi's concurrent dual-protocol work and projection-first architecture. Enables browser-based remote animation and dev tooling.]**
 2. **Event Schema Versioning:** Add ersion field to events to support future evolution? (Recommended)
 3. **Rendering Library Choice:** Silk.NET is acceptable for low-level GL access; SkiaSharp may be faster to implement for 2D vector rendering and maps well to current pygame code. Which do we prefer long-term?
+   - **[FLAGGED by Jinx for revision — Recommend SkiaSharp over Silk.NET for 2D vector rendering. Silk.NET adds GL complexity when current pygame model uses simple 2D vectors (circles, lines, rectangles). SkiaSharp maps directly to pygame rendering code, enabling faster prototype → production port. Reserve Silk.NET for future 3D/shader needs.]**
 
 **Deliverables:**
 - .squad/decisions/inbox/ekko-issue99.md → merged into decisions
@@ -5281,8 +5283,10 @@ webapp/MrPumpkin.Web/
 **Decisions Approved:**
 
 1. **Transport:** Dual-protocol approach. Continue TCP (port 5000) and add WebSocket (port 5001) to enable browser clients. WebSocket uses the websockets asyncio library when available; startup should degrade gracefully if unavailable.
+   - **[APPROVED by Jinx — Dual-protocol maintains backward compatibility while enabling webapp clients. Graceful degradation is critical for platform independence.]**
 
 2. **Message schema (WebSocket):** JSON object with shape:
+   - **[APPROVED by Jinx — Well-designed, flexible contract with optional metadata. Supports future correlation/tracing without breaking existing clients.]**
    ```json
    {
      "command": "<command_name>",
@@ -5296,7 +5300,8 @@ webapp/MrPumpkin.Web/
    - For TCP, preserve READY/END_UPLOAD handshake
    - For WebSocket, use single-message inline JSON: {"command":"upload_timeline", "args": {"filename":"x.json","content":<object|string>} }
 
-4. **Timeline serialization parity:** Keep existing Timeline JSON schema (version 1.0) with fields: version, duration_ms, commands[] where each entry has time_ms, command, args.
+4. **Timeline serialization parity:** Keep existing Timeline JSON schema
+   - **[APPROVED by Jinx — Maintains compatibility; preserves recording playback across protocol changes. Version field enables future evolution.]** (version 1.0) with fields: version, duration_ms, commands[] where each entry has time_ms, command, args.
 
 5. **Error/Response formats:**
    - For WebSocket, use JSON responses: {"status":"ok"/"error","message":"..."}
@@ -5320,8 +5325,11 @@ webapp/MrPumpkin.Web/
 **Author:** Mylo (Tester)
 
 **Summary:** Created initial test scaffolding for state transitions, command handling, and recording/playback. Added a CI workflow to run pytest in a headless environment.
+**Decision Approval:**
+- **[APPROVED by Jinx — Headless testing with SDL_VIDEODRIVER=dummy and unit test mocking reduces flakiness. Approach aligns with CI best practices for Python projects. Supports parallel development across team without rendering dependencies.]**
 
 **Blockers / Requested Infrastructure Changes (for Jinx):**
+- **[FLAGGED for action — Blocker: CI requires SDL libs (libasound2, libsdl2-dev). Action: Add pygame=4.0.0+ pinned to requirements-dev.txt. Alternative: Use xvfb for integration tests. Runner may need SDL setup in GHA workflow. Mylo to provide detailed environment spec.]**
 - CI must set SDL_VIDEODRIVER=dummy (already set in the workflow), and runner may need SDL libs if pygame is installed.
 - Recommend mocking or removing pygame usage from unit tests; if pygame is required in CI, install dependencies (e.g., libasound2, libsdl2-dev) or use xvfb.
 - Consider adding a lightweight pygame dev dependency pinned to a known-working version for CI.
