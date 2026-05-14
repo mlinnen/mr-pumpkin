@@ -1,4 +1,4 @@
-# Python
+# Python (legacy — being transitioned to dotnet)
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,28 +9,57 @@ dist/
 build/
 .eggs/
 
-# Virtual environments
+# Python Virtual environments
 venv/
 .venv/
 env/
 .env/
 
-# Pytest
+# Python Tests
 .pytest_cache/
 .cache/
 
-# IDE
+# .NET / C# (new migration target)
+bin/
+obj/
+.vs/
+.user
+.suo
+.sln.docstates
+*.ncrunchproject
+*.ncrunchsolution
+packages/
+.nuget/
+*.DotSettings.user
+launchSettings.json
+appsettings.Development.json
+
+# .NET Build outputs
+*.dll
+*.exe
+*.pdb
+release/
+publish/
+
+# IDE (shared across Python & .NET)
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-
-# Squad: ignore generated logs
+# Squad: ignore generated logs and transient state
 #.squad/orchestration-log/
 #.squad/log/
 .squad/decisions/inbox/
 .squad/sessions/
 .squad-workstream
+
+# Local environment files (both Python & .NET)
+.env.local
+*.local
+config.local.json
